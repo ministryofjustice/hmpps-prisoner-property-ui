@@ -5,10 +5,10 @@ generic-service:
   replicaCount: 2
 
   ingress:
-    host: prisoner-property-ui-dev.hmpps.service.justice.gov.uk
+    host: prisoner-property-dev.hmpps.service.justice.gov.uk
 
   env:
-    INGRESS_URL: "https://prisoner-property-ui-dev.hmpps.service.justice.gov.uk"
+    INGRESS_URL: "https://prisoner-property-dev.hmpps.service.justice.gov.uk"
     HMPPS_AUTH_URL: "https://sign-in-dev.hmpps.service.justice.gov.uk/auth"
     TOKEN_VERIFICATION_API_URL: "https://token-verification-api-dev.prison.service.justice.gov.uk"
     PRISONER_PROPERTY_API_URL: 'https://prisoner-property-api-dev.hmpps.service.justice.gov.uk'
