@@ -3,7 +3,8 @@
 [![Ministry of Justice Repository Compliance Badge](https://github-community.service.justice.gov.uk/repository-standards/api/hmpps-prisoner-property-ui/badge?style=flat)](https://github-community.service.justice.gov.uk/repository-standards/hmpps-prisoner-property-ui)
 [![Docker Repository on ghcr](https://img.shields.io/badge/ghcr.io-repository-2496ED.svg?logo=docker)](https://ghcr.io/ministryofjustice/hmpps-prisoner-property-ui)
 
-Template github repo used for new Typescript based projects.
+Frontend UI for the prisoner property service — find, view and maintain prisoner property records.
+Backed by [hmpps-prisoner-property-api](https://github.com/ministryofjustice/hmpps-prisoner-property-api).
 
 # Instructions
 
