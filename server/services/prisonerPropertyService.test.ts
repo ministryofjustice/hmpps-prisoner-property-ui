@@ -24,4 +24,15 @@ describe('PrisonerPropertyService', () => {
     expect(prisonerPropertyApiClient.getPropertyForPrisoner).toHaveBeenCalledWith('A1234BC', 'AUSER_GEN')
     expect(result).toEqual(containers)
   })
+
+  it('should call getPrisonProperty on the api client and return its result', async () => {
+    const pageResult = { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 } as never
+    prisonerPropertyApiClient.getPrisonProperty.mockResolvedValue(pageResult)
+
+    const query = { page: 0, size: 20 }
+    const result = await prisonerPropertyService.getPrisonProperty('MDI', query, 'AUSER_GEN')
+
+    expect(prisonerPropertyApiClient.getPrisonProperty).toHaveBeenCalledWith('MDI', query, 'AUSER_GEN')
+    expect(result).toEqual(pageResult)
+  })
 })

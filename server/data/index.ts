@@ -4,6 +4,7 @@ import config from '../config'
 import HmppsAuditClient from './hmppsAuditClient'
 import logger from '../../logger'
 import PrisonerPropertyApiClient from './prisonerPropertyApiClient'
+import ManageUsersApiClient from './manageUsersApiClient'
 import applicationInfoSupplier from '../applicationInfo'
 
 const applicationInfo = applicationInfoSupplier()
@@ -19,10 +20,11 @@ export const dataAccess = () => {
     applicationInfo,
     hmppsAuthClient,
     prisonerPropertyApiClient: new PrisonerPropertyApiClient(hmppsAuthClient),
+    manageUsersApiClient: new ManageUsersApiClient(hmppsAuthClient),
     hmppsAuditClient: new HmppsAuditClient(config.sqs.audit),
   }
 }
 
 export type DataAccess = ReturnType<typeof dataAccess>
 
-export { AuthenticationClient, HmppsAuditClient, PrisonerPropertyApiClient }
+export { AuthenticationClient, HmppsAuditClient, PrisonerPropertyApiClient, ManageUsersApiClient }

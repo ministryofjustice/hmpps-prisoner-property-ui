@@ -2,7 +2,12 @@ import { RestClient, asSystem } from '@ministryofjustice/hmpps-rest-client'
 import type { AuthenticationClient } from '@ministryofjustice/hmpps-auth-clients'
 import config from '../config'
 import logger from '../../logger'
-import type { PrisonerPropertyContainer } from './prisonerPropertyApiTypes'
+import type {
+  PrisonerPropertyContainer,
+  PrisonerPropertyGroup,
+  PrisonPropertyListQuery,
+  RestPage,
+} from './prisonerPropertyApiTypes'
 
 export default class PrisonerPropertyApiClient extends RestClient {
   constructor(authenticationClient: AuthenticationClient) {
@@ -19,6 +24,23 @@ export default class PrisonerPropertyApiClient extends RestClient {
   getPropertyForPrisoner(prisonerNumber: string, username: string): Promise<PrisonerPropertyContainer[]> {
     return this.get<PrisonerPropertyContainer[]>(
       { path: `/property-containers/prisoner/${prisonerNumber}` },
+      asSystem(username),
+    )
+  }
+
+  /**
+   * Get the establishment-wide property list for a prison, paged and grouped by prisoner.
+   *
+   * Called with a system token tied to the signed-in user (`asSystem(username)`). Filters are
+   * exact-match on the API side; undefined query values are dropped by superagent.
+   */
+  getPrisonProperty(
+    prisonId: string,
+    query: PrisonPropertyListQuery,
+    username: string,
+  ): Promise<RestPage<PrisonerPropertyGroup>> {
+    return this.get<RestPage<PrisonerPropertyGroup>>(
+      { path: `/property-containers/prison/${prisonId}`, query: { ...query } },
       asSystem(username),
     )
   }

@@ -3,11 +3,12 @@ import prisonerPropertyApi from '../mockApis/prisonerPropertyApi'
 import hmppsAuth from '../mockApis/hmppsAuth'
 import tokenVerification from '../mockApis/tokenVerification'
 import frontendComponents from '../mockApis/frontendComponents'
+import manageUsersApi from '../mockApis/manageUsersApi'
 
 import { resetStubs } from '../testUtils'
 
 // NB: add new mock apis here:
-const mockApis = [hmppsAuth, tokenVerification, prisonerPropertyApi, frontendComponents]
+const mockApis = [hmppsAuth, tokenVerification, prisonerPropertyApi, frontendComponents, manageUsersApi]
 
 test.describe('Health', () => {
   test.afterEach(async () => {

@@ -1,0 +1,101 @@
+{% extends "../partials/layout.njk" %}
+
+{% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/select/macro.njk" import govukSelect %}
+{% from "govuk/components/checkboxes/macro.njk" import govukCheckboxes %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+{% from "moj/components/pagination/macro.njk" import mojPagination %}
+
+{% set pageTitle = applicationName + " - Property" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block content %}
+  <h1 class="govuk-heading-xl">
+    Prisoner property{% if establishmentName %} <span class="govuk-!-font-weight-regular">— {{ establishmentName }}</span>{% endif %}
+  </h1>
+
+  <form method="get" action="/" novalidate data-qa="property-search">
+    {{ govukInput({
+      label: { text: "Search by prison number or seal number" },
+      id: "q",
+      name: "q",
+      value: search,
+      classes: "govuk-input--width-20"
+    }) }}
+
+    <details class="govuk-details" data-qa="filters">
+      <summary class="govuk-details__summary">
+        <span class="govuk-details__summary-text">Filters</span>
+      </summary>
+      <div class="govuk-details__text">
+        {{ govukSelect({
+          id: "containerType",
+          name: "containerType",
+          label: { text: "Property type" },
+          items: containerTypeItems
+        }) }}
+
+        {{ govukCheckboxes({
+          idPrefix: "status",
+          name: "status",
+          classes: "govuk-checkboxes--small",
+          fieldset: { legend: { text: "Status" } },
+          items: statusItems
+        }) }}
+
+        {{ govukInput({
+          label: { text: "Storage location" },
+          hint: { text: "Location code, or 'Branston' for offsite storage" },
+          id: "storageLocation",
+          name: "storageLocation",
+          value: storageLocation,
+          classes: "govuk-input--width-20"
+        }) }}
+      </div>
+    </details>
+
+    {{ govukButton({ text: "Search" }) }}
+    <a class="govuk-link govuk-!-margin-left-2" href="/">Clear search</a>
+  </form>
+
+  {% if groups.length == 0 %}
+    <p class="govuk-body" data-qa="no-results">No property containers found.</p>
+  {% else %}
+    {% for group in groups %}
+      <h2 class="govuk-heading-m govuk-!-margin-top-6" data-qa="prisoner-heading">
+        {{ group.prisonerName or "Unknown" }}
+        <span class="govuk-!-font-weight-regular">({{ group.prisonerNumber }})</span>
+      </h2>
+      <p class="govuk-body-s govuk-!-margin-bottom-2">
+        Current establishment: {{ group.prisonerCurrentPrisonName or "Not known" }}
+      </p>
+
+      {% set rows = [] %}
+      {% for container in group.containers %}
+        {% set statusData = container.currentStatus | statusTag %}
+        {% set rows = (rows.push([
+          { text: container.currentSealNumber or "-" },
+          { text: container.containerType | containerTypeLabel },
+          { text: container | containerLocation },
+          { text: container.createDateTime | formatDate },
+          { html: govukTag({ text: statusData.text, classes: statusData.classes }) }
+        ]), rows) %}
+      {% endfor %}
+
+      {{ govukTable({
+        head: [
+          { text: "Seal number" },
+          { text: "Property type" },
+          { text: "Storage location" },
+          { text: "Added" },
+          { text: "Status" }
+        ],
+        rows: rows
+      }) }}
+    {% endfor %}
+
+    {{ mojPagination(pagination) }}
+  {% endif %}
+{% endblock %}

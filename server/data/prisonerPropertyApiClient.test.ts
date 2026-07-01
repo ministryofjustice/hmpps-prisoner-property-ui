@@ -2,7 +2,7 @@ import nock from 'nock'
 import type { AuthenticationClient } from '@ministryofjustice/hmpps-auth-clients'
 import PrisonerPropertyApiClient from './prisonerPropertyApiClient'
 import config from '../config'
-import type { PrisonerPropertyContainer } from './prisonerPropertyApiTypes'
+import type { PrisonerPropertyContainer, PrisonerPropertyGroup } from './prisonerPropertyApiTypes'
 
 describe('PrisonerPropertyApiClient', () => {
   let prisonerPropertyApiClient: PrisonerPropertyApiClient
@@ -33,6 +33,27 @@ describe('PrisonerPropertyApiClient', () => {
       const response = await prisonerPropertyApiClient.getPropertyForPrisoner('A1234BC', 'AUSER_GEN')
 
       expect(response).toEqual(containers as PrisonerPropertyContainer[])
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+  })
+
+  describe('getPrisonProperty', () => {
+    it('should GET the prison property page with filters/paging as query params using a system token', async () => {
+      const pageBody = { content: [] as PrisonerPropertyGroup[], totalElements: 0, totalPages: 0, number: 0, size: 20 }
+
+      nock(config.apis.prisonerPropertyApi.url)
+        .get('/property-containers/prison/MDI')
+        .query({ prisonerNumber: 'A1234BC', containerType: 'STANDARD', status: 'STORED', page: '0', size: '20' })
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, pageBody)
+
+      const response = await prisonerPropertyApiClient.getPrisonProperty(
+        'MDI',
+        { prisonerNumber: 'A1234BC', containerType: 'STANDARD', status: ['STORED'], page: 0, size: 20 },
+        'AUSER_GEN',
+      )
+
+      expect(response).toEqual(pageBody)
       expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
     })
   })
