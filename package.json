@@ -1,7 +1,7 @@
 {
   "name": "hmpps-prisoner-property-ui",
   "version": "0.0.1",
-  "description": "HMPPS Prisoner Property Ui",
+  "description": "Frontend UI for the prisoner property service",
   "repository": "git@github.com:ministryofjustice/hmpps-prisoner-property-ui.git",
   "license": "MIT",
   "scripts": {

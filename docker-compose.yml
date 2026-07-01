@@ -40,15 +40,16 @@ services:
     healthcheck:
       test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/3000"]
     environment:
-      - PRODUCT_ID=UNASSIGNED
+      - PRODUCT_ID=DPS136
       - REDIS_ENABLED=false
       - REDIS_HOST=localhost
       - HMPPS_AUTH_EXTERNAL_URL=http://localhost:9090/auth
       - HMPPS_AUTH_URL=http://hmpps-auth:8080/auth
+      - PRISONER_PROPERTY_API_URL=http://hmpps-template-kotlin:8080
       # These will need to match new creds in the seed auth service auth
-      - AUTH_CODE_CLIENT_ID=hmpps-typescript-template
+      - AUTH_CODE_CLIENT_ID=hmpps-prisoner-property
       - AUTH_CODE_CLIENT_SECRET=clientsecret
-      - CLIENT_CREDS_CLIENT_ID=hmpps-typescript-template-system
+      - CLIENT_CREDS_CLIENT_ID=hmpps-prisoner-property-system
       - CLIENT_CREDS_CLIENT_SECRET=clientsecret
       - SESSION_SECRET=somesecretvalue
       - TOKEN_VERIFICATION_API_URL=http://hmpps-auth:8080/auth
