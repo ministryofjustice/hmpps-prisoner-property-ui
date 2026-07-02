@@ -2,6 +2,8 @@ import { Page } from '@playwright/test'
 import tokenVerification from './mockApis/tokenVerification'
 import hmppsAuth, { type UserToken } from './mockApis/hmppsAuth'
 import frontendComponents from './mockApis/frontendComponents'
+import manageUsersApi from './mockApis/manageUsersApi'
+import prisonerPropertyApi from './mockApis/prisonerPropertyApi'
 import { resetStubs } from './mockApis/wiremock'
 
 export { resetStubs }
@@ -27,6 +29,10 @@ export const login = async (
     tokenVerification.stubVerifyToken(active),
     // The DPS shared header/footer are fetched on every authenticated page
     frontendComponents.stubComponents(),
+    // The landing page ('/') is the establishment property list, so give it a working caseload +
+    // an empty property page by default. Specs can re-stub for specific data before navigating.
+    manageUsersApi.stubGetMyCaseloads(),
+    prisonerPropertyApi.stubGetPrisonProperty(),
   ])
   return attemptHmppsAuthLogin(page)
 }

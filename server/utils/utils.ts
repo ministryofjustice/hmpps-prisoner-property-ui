@@ -14,6 +14,13 @@ const properCaseName = (name: string): string => (isBlank(name) ? '' : name.spli
 export const convertToTitleCase = (sentence?: string | null): string =>
   isBlank(sentence) ? '' : sentence!.split(' ').map(properCaseName).join(' ')
 
+export const formatDate = (value?: string | null): string => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 export const initialiseName = (fullName?: string | null): string | null => {
   // this check is for the authError page
   if (!fullName) return null

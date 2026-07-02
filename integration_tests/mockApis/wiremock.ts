@@ -7,6 +7,7 @@ const url = 'http://localhost:9091/__admin'
  * https://wiremock.org/docs/standalone/admin-api-reference/#tag/Stub-Mappings/operation/createNewStubMapping
  */
 interface Mapping {
+  priority?: number
   request?: {
     method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
     queryParameters?: Record<string, { equalTo: string } | { matches: string }>
