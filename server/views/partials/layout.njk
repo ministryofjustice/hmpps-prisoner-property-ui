@@ -2,17 +2,33 @@
 
 {% block head %}
   <link href="{{ '/assets/css/index.css' | assetMap }}" rel="stylesheet"/>
+  {% for css in feComponents.cssIncludes %}
+    <link href="{{ css }}" nonce="{{ cspNonce }}" rel="stylesheet"/>
+  {% endfor %}
 {% endblock %}
 
 {% block pageTitle %}{{pageTitle | default(applicationName)}}{% endblock %}
 
 {% block header %}
-  {% include "./header.njk" %}
+  {% if feComponents %}
+    {{ feComponents.header | safe }}
+  {% else %}
+    {% include "./header.njk" %}
+  {% endif %}
+{% endblock %}
+
+{% block footer %}
+  {% if feComponents %}
+    {{ feComponents.footer | safe }}
+  {% endif %}
 {% endblock %}
 
 {% block bodyStart %}
 {% endblock %}
 
 {% block bodyEnd %}
+  {% for js in feComponents.jsIncludes %}
+    <script src="{{ js }}" nonce="{{ cspNonce }}"></script>
+  {% endfor %}
   <script type="module" src="{{ '/assets/js/index.js' | assetMap }}"></script>
 {% endblock %}

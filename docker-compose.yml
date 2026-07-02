@@ -1,30 +1,170 @@
 services:
 
+  prisoner-property-db:
+    image: postgres:18
+    networks:
+      - hmpps
+    container_name: prisoner-property-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=prisoner-property
+      - POSTGRES_USER=prisoner-property
+      - POSTGRES_DB=prisoner-property
+
+  auth-db:
+    image: postgres:18
+    container_name: auth-db
+    restart: always
+    networks:
+      - hmpps
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_PASSWORD=admin_password
+      - POSTGRES_USER=admin
+      - POSTGRES_DB=auth-db
+
+  manage-users-db:
+    image: postgres:18
+    container_name: manage-users-db
+    restart: always
+    networks:
+      - hmpps
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_PASSWORD=admin_password
+      - POSTGRES_USER=admin
+      - POSTGRES_DB=manage-users-db
+
   hmpps-auth:
     image: ghcr.io/ministryofjustice/hmpps-auth:latest
     networks:
       - hmpps
     container_name: hmpps-auth
+    depends_on:
+      - auth-db
     ports:
       - "9090:8080"
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/auth/health" ]
     environment:
-      - SPRING_PROFILES_ACTIVE=dev
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=dev,local-postgres,manage-users-api,nomis
+      - DELIUS_ENDPOINT_URL=http://wiremock:8080/delius
+      - MANAGE_USERS_API_ENDPOINT_URL=http://hmpps-manage-users-api:8080
+      - NOMIS_ENDPOINT_URL=http://nomis-user-roles-api:8080
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://auth-db:5432/auth-db
+      - HOSTNAME=hmpps-auth
       - APPLICATION_AUTHENTICATION_UI_ALLOWLIST=0.0.0.0/0
 
-  hmpps-template-kotlin:
-    image: ghcr.io/ministryofjustice/hmpps-template-kotlin:latest
+  nomis-user-roles-api:
+    image: ghcr.io/ministryofjustice/nomis-user-roles-api:latest
+    container_name: nomis-user-roles-api
     networks:
       - hmpps
-    container_name: hmpps-template-kotlin
     ports:
-      - "8080:8080"
+      - "8081:8080"
     healthcheck:
-      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ping" ]
     environment:
-      - HMPPS_AUTH_URL=http://hmpps-auth:8080/auth
-      - EXAMPLE_API_URL=http://localhost:8080
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=dev
+      - API_BASE_URL_OAUTH=http://hmpps-auth:8080/auth
+
+  manage-users-api:
+    image: ghcr.io/ministryofjustice/hmpps-manage-users-api:latest
+    container_name: manage-users-api
+    networks:
+      - hmpps
+    depends_on:
+      - hmpps-auth
+      - hmpps-external-users-api
+      - nomis-user-roles-api
+      - manage-users-db
+    ports:
+      - "8082:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ping" ]
+    environment:
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=dev,local-docker
+      - HMPPS_AUTH_ENDPOINT_URL=http://hmpps-auth:8080/auth
+      - HMPPS_AUTH_EXTERNAL_ENDPOINT_URL=http://localhost:8080/auth
+      - NOMIS_ENDPOINT_URL=http://nomis-user-roles-api:8080
+      - AUTHORIZATION_SERVER_TOKEN_ENDPOINT_URL=http://hmpps-auth:8080/auth/oauth/token
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://manage-users-db:5432/manage-users-db
+      - HMPPS_SQS_LOCALSTACK_URL=http://localstack:4566
+
+  hmpps-external-users-api:
+    image: ghcr.io/ministryofjustice/hmpps-external-users-api:latest
+    container_name: hmpps-external-users-api
+    networks:
+      - hmpps
+    depends_on:
+      - hmpps-auth
+    ports:
+      - "8088:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ping" ]
+    environment:
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=dev,local-postgres
+      - API_BASE_URL_OAUTH=http://hmpps-auth:8080/auth
+      - SPRING_R2DBC_URL=r2dbc:postgresql://auth-db:5432/auth-db?sslmode=prefer
+      - SPRING_FLYWAY_URL=jdbc:postgresql://auth-db:5432/auth-db?sslmode=prefer
+      - HMPPS_SQS_LOCALSTACK_URL=http://localstack:4566
+
+  prisoner-property-api:
+    image: ghcr.io/ministryofjustice/hmpps-prisoner-property-api:latest
+    container_name: prisoner-property-api
+    depends_on:
+      - hmpps-auth
+      - prisoner-property-db
+      - localstack
+    networks:
+      - hmpps
+    ports:
+      - "8090:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ping" ]
+    environment:
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=dev
+      - API_BASE_URL_OAUTH=http://hmpps-auth:8080/auth
+      - API_BASE_URL_PRISONER_SEARCH=http://prisoner-search:8080
+      - API_BASE_URL_PRISON_REGISTER=http://prison-register:8080
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://prisoner-property-db:5432/prisoner-property?sslmode=prefer
+      - HMPPS_SQS_LOCALSTACK_URL=http://localstack:4566
+      - PRISONER_PROPERTY_API_CLIENT_ID=hmpps-prisoner-property-api
+      - PRISONER_PROPERTY_API_CLIENT_SECRET=clientsecret
+
+  localstack:
+    image: localstack/localstack:community-archive
+    networks:
+      - hmpps
+    container_name: localstack
+    ports:
+      - "4566:4566"
+      - "8999:8080"
+    environment:
+      - DEBUG=${DEBUG- }
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "${TMPDIR:-/tmp/localstack}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  redis:
+    image: 'redis:8.8'
+    networks:
+      - hmpps
+    container_name: redis
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    ports:
+      - '6379:6379'
 
   app:
     build:
@@ -33,8 +173,13 @@ services:
         BUILD_NUMBER: "1.0.0"
         GIT_REF: "a1b2c3"
         GIT_BRANCH: main
-    networks:
-      - hmpps
+    network_mode: "host"
+    depends_on:
+      - manage-users-api
+      - hmpps-auth
+      - prisoner-property-api
+    profiles:
+      - include-frontend
     ports:
       - "3000:3000"
     healthcheck:
@@ -45,8 +190,10 @@ services:
       - REDIS_HOST=localhost
       - HMPPS_AUTH_EXTERNAL_URL=http://localhost:9090/auth
       - HMPPS_AUTH_URL=http://hmpps-auth:8080/auth
-      - PRISONER_PROPERTY_API_URL=http://hmpps-template-kotlin:8080
-      # These will need to match new creds in the seed auth service auth
+      - PRISONER_PROPERTY_API_URL=http://localhost:8080
+      - MANAGE_USERS_API_URL=http://localhost:8082
+      - COMPONENT_API_URL=https://frontend-components-dev.hmpps.service.justice.gov.uk
+      - DPS_URL=https://dps-dev.prison.service.justice.gov.uk
       - AUTH_CODE_CLIENT_ID=hmpps-prisoner-property
       - AUTH_CODE_CLIENT_SECRET=clientsecret
       - CLIENT_CREDS_CLIENT_ID=hmpps-prisoner-property-system
