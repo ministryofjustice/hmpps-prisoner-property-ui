@@ -1,6 +1,10 @@
 import type { SuperAgentRequest } from 'superagent'
 import { stubFor, stubPing } from './wiremock'
-import type { PrisonerPropertyContainer, PrisonerPropertyGroup } from '../../server/data/prisonerPropertyApiTypes'
+import type {
+  PrisonerPropertyContainer,
+  PrisonerPropertyGroup,
+  PropertyEvent,
+} from '../../server/data/prisonerPropertyApiTypes'
 
 export default {
   stubPing: (httpStatus = 200): SuperAgentRequest => stubPing('/prisoner-property-api', httpStatus),
@@ -49,6 +53,23 @@ export default {
           first: true,
           last: true,
         },
+      },
+    }),
+
+  stubGetContainerEvents: (
+    { id = 'c1', events = [] as PropertyEvent[], priority = undefined as number | undefined } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'GET',
+        urlPath: `/prisoner-property-api/property-containers/${id}/events`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: events,
       },
     }),
 }

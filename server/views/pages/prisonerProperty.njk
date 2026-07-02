@@ -40,7 +40,8 @@
           { text: heldAt },
           { text: container | containerLocation },
           { text: container.createDateTime | formatDate },
-          { html: govukTag({ text: statusData.text, classes: statusData.classes }) }
+          { html: govukTag({ text: statusData.text, classes: statusData.classes }) },
+          { html: '<a class="govuk-link" href="/prisoner/' + prisonerNumber + '/container/' + container.id + '">View history</a>' }
         ]), activeRows) %}
       {% endfor %}
 
@@ -52,7 +53,8 @@
           { text: "Held at" },
           { text: "Storage location" },
           { text: "Added" },
-          { text: "Status" }
+          { text: "Status" },
+          { text: "History" }
         ],
         rows: activeRows
       }) }}
@@ -66,7 +68,8 @@
           { text: container.currentSealNumber or "-" },
           { text: container.containerType | containerTypeLabel },
           { text: container.removalOutcome | removalOutcomeLabel },
-          { text: container.removalDate | formatDate }
+          { text: container.removalDate | formatDate },
+          { html: '<a class="govuk-link" href="/prisoner/' + prisonerNumber + '/container/' + container.id + '">View history</a>' }
         ]), pastRows) %}
       {% endfor %}
 
@@ -76,7 +79,8 @@
           { text: "Seal number" },
           { text: "Property type" },
           { text: "Outcome" },
-          { text: "Removed on" }
+          { text: "Removed on" },
+          { text: "History" }
         ],
         rows: pastRows
       }) }}

@@ -4,6 +4,7 @@ export enum Page {
   HOME_PAGE = 'HOME_PAGE',
   PROPERTY_LIST = 'PROPERTY_LIST',
   PRISONER_PROPERTY = 'PRISONER_PROPERTY',
+  CONTAINER_HISTORY = 'CONTAINER_HISTORY',
 }
 
 export interface PageViewEventDetails {

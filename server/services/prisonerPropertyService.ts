@@ -3,6 +3,7 @@ import type {
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PrisonPropertyListQuery,
+  PropertyEvent,
   RestPage,
 } from '../data/prisonerPropertyApiTypes'
 
@@ -11,6 +12,10 @@ export default class PrisonerPropertyService {
 
   getPropertyForPrisoner(prisonerNumber: string, username: string): Promise<PrisonerPropertyContainer[]> {
     return this.prisonerPropertyApiClient.getPropertyForPrisoner(prisonerNumber, username)
+  }
+
+  getContainerEvents(id: string, username: string): Promise<PropertyEvent[]> {
+    return this.prisonerPropertyApiClient.getContainerEvents(id, username)
   }
 
   getPrisonProperty(

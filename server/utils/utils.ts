@@ -21,6 +21,19 @@ export const formatDate = (value?: string | null): string => {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+export const formatDateTime = (value?: string | null): string => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export const initialiseName = (fullName?: string | null): string | null => {
   // this check is for the authError page
   if (!fullName) return null

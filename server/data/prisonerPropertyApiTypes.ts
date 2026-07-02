@@ -41,6 +41,36 @@ export interface PrisonerPropertyGroup {
   containers: PrisonerPropertyContainer[]
 }
 
+export type PropertyEventType =
+  | 'CREATED_SEALED'
+  | 'SEAL_CHANGED'
+  | 'CONTAINER_TYPE_CHANGE'
+  | 'MOVED'
+  | 'PRISONER_RECEIVED'
+  | 'TRANSFERRED'
+  | 'RETURNED'
+  | 'DISPOSAL_REQUIRED'
+  | 'DISPOSED'
+  | 'COMBINED'
+
+// A single event in a container's history (GET /property-containers/{id}/events), newest first.
+// See PropertyEventDto in the API for the source of truth. Each event carries only the fields
+// relevant to it; the rest are null.
+export interface PropertyEvent {
+  id: string
+  eventType: PropertyEventType
+  eventDateTime: string
+  eventUserId: string
+  sealNumber: string | null
+  fromInternalLocationId: string | null
+  toInternalLocationId: string | null
+  toStorageLocationType: StorageLocationType | null
+  fromPrisonId: string | null
+  toPrisonId: string | null
+  eventDate: string | null
+  relatedContainerId: string | null
+}
+
 // Filters + paging for the establishment-wide list (GET /property-containers/prison/{prisonId}).
 // All filters are exact-match on the API side; omit a field to leave it unfiltered.
 export interface PrisonPropertyListQuery {
