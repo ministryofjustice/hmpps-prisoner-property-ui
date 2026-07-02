@@ -95,7 +95,7 @@ export default {
     audit: auditConfig(),
   },
   serviceUrls: {
-    digitalPrison: get('DPS_URL', 'https://digital-dev.prison.service.justice.gov.uk', requiredInProduction),
+    digitalPrison: get('DPS_URL', 'https://dps-dev.prison.service.justice.gov.uk', requiredInProduction),
   },
   ingressUrl: get('INGRESS_URL', 'http://localhost:3000', requiredInProduction),
   environmentName: get('ENVIRONMENT_NAME', ''),
