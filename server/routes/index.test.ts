@@ -5,7 +5,7 @@ import AuditService, { Page } from '../services/auditService'
 import HmppsAuditClient from '../data/hmppsAuditClient'
 import PrisonerPropertyService from '../services/prisonerPropertyService'
 import UserService from '../services/userService'
-import type { PrisonerPropertyGroup, RestPage } from '../data/prisonerPropertyApiTypes'
+import type { PrisonerPropertyContainer, PrisonerPropertyGroup, RestPage } from '../data/prisonerPropertyApiTypes'
 
 jest.mock('../services/auditService')
 jest.mock('../services/prisonerPropertyService')
@@ -142,6 +142,114 @@ describe('GET /', () => {
         expect(res.text).toContain('You do not have an active caseload')
         expect(prisonerPropertyService.getPrisonProperty).not.toHaveBeenCalled()
         expect(auditService.logPageView).not.toHaveBeenCalled()
+      })
+  })
+})
+
+const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPropertyContainer => ({
+  id: 'c1',
+  prisonerNumber: 'A1234BC',
+  prisonerName: 'John Smith',
+  prisonId: 'MDI',
+  prisonName: 'Moorland (HMP & YOI)',
+  inPrisonersCurrentPrison: true,
+  containerType: 'STANDARD',
+  currentSealNumber: 'SN0001',
+  currentStatus: 'STORED',
+  currentLocation: null,
+  currentLocationType: 'INTERNAL',
+  locationDescription: 'Reception A1',
+  proposedDisposalDate: null,
+  removalOutcome: null,
+  removalDate: null,
+  createDateTime: '2026-06-01T10:00:00',
+  createdByUserId: 'AUSER',
+  archived: false,
+  ...overrides,
+})
+
+const withActiveCaseload = () =>
+  userService.getActiveCaseload.mockResolvedValue({
+    activeCaseloadId: 'MDI',
+    activeCaseloadName: 'Moorland (HMP & YOI)',
+    caseloadIds: ['MDI'],
+  })
+
+describe('GET /prisoner/:prisonerNumber', () => {
+  it('renders current and past property for the prisoner and audits the view', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'c1', currentSealNumber: 'SN0001', currentStatus: 'STORED' }),
+      container({
+        id: 'c2',
+        currentSealNumber: 'SN0002',
+        containerType: 'VALUABLES',
+        currentStatus: 'RETURNED',
+        removalOutcome: 'RETURNED',
+        removalDate: '2026-06-20',
+        inPrisonersCurrentPrison: false,
+        prisonName: 'Leeds (HMP)',
+      }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect('Content-Type', /html/)
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('John Smith')
+        expect(res.text).toContain('A1234BC')
+        expect(res.text).toContain('Current property')
+        expect(res.text).toContain('SN0001')
+        expect(res.text).toContain('Reception A1')
+        expect(res.text).toContain('Past property')
+        expect(res.text).toContain('SN0002')
+        expect(res.text).toContain('Returned')
+        expect(prisonerPropertyService.getPropertyForPrisoner).toHaveBeenCalledWith('A1234BC', user.username)
+        expect(auditService.logPageView).toHaveBeenCalledWith(
+          Page.PRISONER_PROPERTY,
+          expect.objectContaining({ who: user.username, subjectId: 'A1234BC', subjectType: 'PRISONER_NUMBER' }),
+        )
+      })
+  })
+
+  it('shows an empty state when the prisoner has no property', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([])
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('No property found for this person')
+      })
+  })
+
+  it('shows the no-caseload page and does not call the property API when there is no active caseload', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: null,
+      activeCaseloadName: null,
+      caseloadIds: [],
+    })
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('You do not have an active caseload')
+        expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
+        expect(auditService.logPageView).not.toHaveBeenCalled()
+      })
+  })
+
+  it('returns 404 for an invalid prisoner number', async () => {
+    withActiveCaseload()
+
+    return request(app)
+      .get('/prisoner/not-a-number')
+      .expect(404)
+      .expect(() => {
+        expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
       })
   })
 })
