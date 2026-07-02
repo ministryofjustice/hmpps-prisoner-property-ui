@@ -1,11 +1,12 @@
 import type { Express } from 'express'
 import request from 'supertest'
-import { appWithAllRoutes, user } from './testutils/appSetup'
+import { appWithAllRoutes, flashProvider, user } from './testutils/appSetup'
 import AuditService, { Page } from '../services/auditService'
 import HmppsAuditClient from '../data/hmppsAuditClient'
 import PrisonerPropertyService from '../services/prisonerPropertyService'
 import UserService from '../services/userService'
 import type {
+  BoxLocation,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PropertyEvent,
@@ -39,6 +40,8 @@ beforeEach(() => {
     userSupplier: () => user,
   })
   auditService.logPageView.mockResolvedValue(undefined)
+  // connect-flash always returns an array; the test harness mocks req.flash, so default it to empty.
+  flashProvider.mockReturnValue([])
 })
 
 afterEach(() => {
@@ -340,6 +343,207 @@ describe('GET /prisoner/:prisonerNumber/container/:id', () => {
       .expect(404)
       .expect(() => {
         expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
+      })
+  })
+})
+
+const box = (overrides: Partial<BoxLocation>): BoxLocation => ({
+  id: 'box1',
+  prisonId: 'MDI',
+  code: 'PROP1',
+  localName: 'Reception Store',
+  pathHierarchy: 'RECP-PROP1',
+  name: 'Reception Store',
+  containerCount: 0,
+  ...overrides,
+})
+
+const boxPage = (locations: BoxLocation[]): RestPage<BoxLocation> => ({
+  content: locations,
+  totalElements: locations.length,
+  totalPages: locations.length === 0 ? 0 : 1,
+  number: 0,
+  size: 20,
+  numberOfElements: locations.length,
+  first: true,
+  last: true,
+})
+
+const manageUser = { ...user, userRoles: ['PRISONERPROP__MANAGE'] }
+const manageApp = () =>
+  appWithAllRoutes({
+    services: { auditService, prisonerPropertyService, userService },
+    userSupplier: () => manageUser,
+  })
+
+describe('Add container journey - access control', () => {
+  it('renders the Add property button on the person view for a user with the manage role', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Add property')
+        expect(res.text).toContain('/prisoner/A1234BC/add-container')
+      })
+  })
+
+  it('hides the Add property button from a user without the manage role', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).not.toContain('/prisoner/A1234BC/add-container')
+      })
+  })
+
+  it('forbids the journey for a user without the manage role', async () => {
+    withActiveCaseload()
+
+    return request(app)
+      .get('/prisoner/A1234BC/add-container/details')
+      .expect(403)
+      .expect(() => {
+        expect(userService.getActiveCaseload).not.toHaveBeenCalled()
+      })
+  })
+})
+
+describe('Add container journey - steps', () => {
+  it('renders the details form', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC/add-container/details')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Add a property container')
+        expect(res.text).toContain('John Smith')
+        expect(res.text).toContain('current seal number')
+      })
+  })
+
+  it('re-renders the details form with an error when the seal number is missing', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    return request(manageApp())
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({ containerType: 'STANDARD' })
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+        expect(res.text).toContain('Enter the property container')
+      })
+  })
+
+  it('walks details -> location -> check -> confirm and creates the container', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
+    prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
+    prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'newC' }))
+
+    const agent = request.agent(manageApp())
+
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({ sealNumber: 'SN9', containerType: 'VALUABLES' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/add-container/location')
+
+    await agent
+      .get('/prisoner/A1234BC/add-container/location')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Select a storage location for container SN9')
+        expect(res.text).toContain('Reception Store')
+      })
+
+    await agent
+      .post('/prisoner/A1234BC/add-container/location')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/add-container/check')
+
+    await agent
+      .get('/prisoner/A1234BC/add-container/check')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Check your answers')
+        expect(res.text).toContain('SN9')
+        expect(res.text).toContain('Reception Store')
+        expect(res.text).toContain('Valuables')
+      })
+
+    await agent
+      .post('/prisoner/A1234BC/add-container/confirm')
+      .type('form')
+      .send({})
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC')
+
+    expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prisonerNumber: 'A1234BC',
+        prisonId: 'MDI',
+        containerType: 'VALUABLES',
+        sealNumber: 'SN9',
+        internalLocationId: 'box1',
+      }),
+      user.username,
+    )
+    expect(flashProvider).toHaveBeenCalledWith('success', 'Property container added')
+    expect(auditService.logPageView).toHaveBeenCalledWith(
+      Page.ADD_PROPERTY_CONTAINER,
+      expect.objectContaining({ subjectId: 'A1234BC', details: { containerId: 'newC' } }),
+    )
+  })
+
+  it('redirects back to details with an error when the seal number is already in use (409)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({})]))
+    prisonerPropertyService.createContainer.mockRejectedValue({ responseStatus: 409 })
+
+    const agent = request.agent(manageApp())
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({ sealNumber: 'SN9', containerType: 'STANDARD' })
+    await agent
+      .post('/prisoner/A1234BC/add-container/location')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+
+    await agent
+      .post('/prisoner/A1234BC/add-container/confirm')
+      .type('form')
+      .send({})
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/add-container/details')
+
+    expect(flashProvider).toHaveBeenCalledWith('error', expect.stringContaining('seal number'))
+  })
+
+  it('shows the success banner on the person view from a flash message', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    flashProvider.mockReturnValueOnce(['Property container added'])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Property container added')
       })
   })
 })

@@ -12,6 +12,10 @@ export default class PrisonerPropertyPage extends AbstractPage {
 
   readonly noResults: Locator
 
+  readonly addProperty: Locator
+
+  readonly successBanner: Locator
+
   private constructor(page: Page) {
     super(page)
     this.name = page.getByTestId('prisoner-name')
@@ -19,6 +23,8 @@ export default class PrisonerPropertyPage extends AbstractPage {
     this.activeProperty = page.getByTestId('active-property')
     this.pastProperty = page.getByTestId('past-property')
     this.noResults = page.getByTestId('no-results')
+    this.addProperty = page.getByTestId('add-property')
+    this.successBanner = page.getByTestId('success-banner')
   }
 
   static async verifyOnPage(page: Page): Promise<PrisonerPropertyPage> {

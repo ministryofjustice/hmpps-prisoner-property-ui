@@ -1,0 +1,71 @@
+{% extends "../../partials/layout.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "moj/components/pagination/macro.njk" import mojPagination %}
+
+{% set pageTitle = applicationName + " - Select a storage location" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back", href: backUrl }) }}
+{% endblock %}
+
+{% block content %}
+  {% if errorBanner %}
+    {{ govukNotificationBanner({ titleText: "There is a problem", text: errorBanner, attributes: { "data-qa": "error-banner" } }) }}
+  {% endif %}
+
+  <h1 class="govuk-heading-xl" data-qa="location-heading">Select a storage location for container {{ sealNumber }}</h1>
+
+  <form method="get" novalidate data-qa="location-search" class="govuk-!-margin-bottom-6">
+    <div class="govuk-form-group govuk-!-margin-bottom-2">
+      {{ govukInput({
+        label: { text: "Search for an available storage location", classes: "govuk-label--s" },
+        hint: { text: "Enter a location name or code. Use * and ? as wildcards." },
+        id: "query",
+        name: "query",
+        value: query,
+        classes: "govuk-input--width-20"
+      }) }}
+    </div>
+    {{ govukButton({ text: "Search", classes: "govuk-!-margin-bottom-0" }) }}
+    <a class="govuk-link govuk-!-margin-left-2" href="?" data-qa="clear-search">Clear search</a>
+  </form>
+
+  {% if locations.length == 0 %}
+    <p class="govuk-body" data-qa="no-locations">No available storage locations found.</p>
+  {% else %}
+    <table class="govuk-table" data-qa="locations">
+      <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+          <th scope="col" class="govuk-table__header">Available storage location</th>
+          <th scope="col" class="govuk-table__header">Containers held</th>
+          <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody class="govuk-table__body">
+        {% for location in locations %}
+          <tr class="govuk-table__row">
+            <td class="govuk-table__cell">{{ location.name }}</td>
+            <td class="govuk-table__cell">{{ location.containerCount }}</td>
+            <td class="govuk-table__cell govuk-!-text-align-right">
+              <form method="post">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                <input type="hidden" name="internalLocationId" value="{{ location.id }}">
+                <input type="hidden" name="locationName" value="{{ location.name }}">
+                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">
+                  Select location<span class="govuk-visually-hidden"> {{ location.name }}</span>
+                </button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {{ mojPagination(pagination) }}
+  {% endif %}
+{% endblock %}
