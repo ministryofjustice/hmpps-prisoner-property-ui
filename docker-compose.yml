@@ -46,6 +46,8 @@ services:
       - HMPPS_AUTH_EXTERNAL_URL=http://localhost:9090/auth
       - HMPPS_AUTH_URL=http://hmpps-auth:8080/auth
       - PRISONER_PROPERTY_API_URL=http://hmpps-template-kotlin:8080
+      - COMPONENT_API_URL=https://frontend-components-dev.hmpps.service.justice.gov.uk
+      - DPS_URL=https://digital-dev.prison.service.justice.gov.uk
       # These will need to match new creds in the seed auth service auth
       - AUTH_CODE_CLIENT_ID=hmpps-prisoner-property
       - AUTH_CODE_CLIENT_SECRET=clientsecret

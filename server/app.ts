@@ -2,7 +2,10 @@ import express from 'express'
 
 import createError from 'http-errors'
 
+import { getFrontendComponents } from '@ministryofjustice/hmpps-connect-dps-components'
 import nunjucksSetup from './utils/nunjucksSetup'
+import logger from '../logger'
+import config from './config'
 import errorHandler from './errorHandler'
 import authorisationMiddleware from './middleware/authorisationMiddleware'
 
@@ -35,6 +38,19 @@ export default function createApp(services: Services): express.Application {
   app.use(authorisationMiddleware())
   app.use(setUpCsrf())
   app.use(setUpCurrentUser())
+
+  app.use(
+    getFrontendComponents({
+      logger,
+      componentApiConfig: config.apis.componentApi,
+      dpsUrl: config.serviceUrls.digitalPrison,
+      requestOptions: {
+        includeSharedData: false,
+        environmentName: config.environmentName,
+        authUrl: config.apis.hmppsAuth.externalUrl,
+      },
+    }),
+  )
 
   app.use(routes(services))
 

@@ -23,12 +23,13 @@ test.describe('SignIn', () => {
     await expect(page.getByRole('heading')).toHaveText('Sign in')
   })
 
-  test('User name visible in header', async ({ page }) => {
+  test('DPS shared header and footer are rendered', async ({ page }) => {
     await login(page, { name: 'A TestUser' })
 
-    const homePage = await HomePage.verifyOnPage(page)
+    await HomePage.verifyOnPage(page)
 
-    await expect(homePage.usersName).toHaveText('A. Testuser')
+    await expect(page.getByTestId('common-header')).toBeVisible()
+    await expect(page.getByTestId('common-footer')).toBeVisible()
   })
 
   test('Phase banner visible in header', async ({ page }) => {
@@ -72,7 +73,7 @@ test.describe('SignIn', () => {
 
     await login(page, { name: 'Some OtherTestUser', active: true })
 
-    const homePage = await HomePage.verifyOnPage(page)
-    await expect(homePage.usersName).toHaveText('S. Othertestuser')
+    await HomePage.verifyOnPage(page)
+    await expect(page.getByTestId('common-header')).toBeVisible()
   })
 })
