@@ -3,9 +3,10 @@ import path from 'path'
 import nunjucks from 'nunjucks'
 import express from 'express'
 import fs from 'fs'
-import { initialiseName, formatDate } from './utils'
+import { initialiseName, formatDate, formatDateTime } from './utils'
 import { statusTag, containerTypeLabel, containerLocation } from './propertyList'
 import { removalOutcomeLabel } from './personProperty'
+import { eventTypeLabel, eventDescription } from './containerHistory'
 import config from '../config'
 import logger from '../../logger'
 
@@ -44,8 +45,11 @@ export default function nunjucksSetup(app: express.Express): void {
   njkEnv.addFilter('initialiseName', initialiseName)
   njkEnv.addFilter('assetMap', (url: string) => assetManifest[url] || url)
   njkEnv.addFilter('formatDate', formatDate)
+  njkEnv.addFilter('formatDateTime', formatDateTime)
   njkEnv.addFilter('statusTag', statusTag)
   njkEnv.addFilter('containerTypeLabel', containerTypeLabel)
   njkEnv.addFilter('containerLocation', containerLocation)
   njkEnv.addFilter('removalOutcomeLabel', removalOutcomeLabel)
+  njkEnv.addFilter('eventTypeLabel', eventTypeLabel)
+  njkEnv.addFilter('eventDescription', eventDescription)
 }

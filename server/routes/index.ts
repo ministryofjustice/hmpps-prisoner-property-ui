@@ -113,5 +113,45 @@ export default function routes({ auditService, prisonerPropertyService, userServ
     })
   })
 
+  router.get('/prisoner/:prisonerNumber/container/:id', async (req, res, next) => {
+    const { token, username } = res.locals.user
+    const { prisonerNumber, id } = req.params
+
+    const { activeCaseloadId } = await userService.getActiveCaseload(token)
+    if (!activeCaseloadId) {
+      return res.render('pages/noCaseload')
+    }
+
+    if (!isPrisonerNumber(prisonerNumber)) {
+      return next(createError(404, 'Prisoner not found'))
+    }
+
+    // Resolve the container from the prisoner's own property so the URL is coherent (the container
+    // belongs to this prisoner) and we have its details for the page heading. 404 otherwise.
+    const containers = await prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username)
+    const container = containers.find(c => c.id === id)
+    if (!container) {
+      return next(createError(404, 'Property container not found'))
+    }
+
+    const events = await prisonerPropertyService.getContainerEvents(id, username)
+
+    await auditService.logPageView(Page.CONTAINER_HISTORY, {
+      who: username,
+      subjectId: prisonerNumber,
+      subjectType: 'PRISONER_NUMBER',
+      correlationId: req.id,
+      details: { containerId: id },
+    })
+
+    return res.render('pages/containerHistory', {
+      prisonerNumber,
+      prisonerName: container.prisonerName,
+      container,
+      events,
+      backUrl: `/prisoner/${prisonerNumber}`,
+    })
+  })
+
   return router
 }

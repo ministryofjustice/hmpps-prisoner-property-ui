@@ -5,7 +5,12 @@ import AuditService, { Page } from '../services/auditService'
 import HmppsAuditClient from '../data/hmppsAuditClient'
 import PrisonerPropertyService from '../services/prisonerPropertyService'
 import UserService from '../services/userService'
-import type { PrisonerPropertyContainer, PrisonerPropertyGroup, RestPage } from '../data/prisonerPropertyApiTypes'
+import type {
+  PrisonerPropertyContainer,
+  PrisonerPropertyGroup,
+  PropertyEvent,
+  RestPage,
+} from '../data/prisonerPropertyApiTypes'
 
 jest.mock('../services/auditService')
 jest.mock('../services/prisonerPropertyService')
@@ -247,6 +252,91 @@ describe('GET /prisoner/:prisonerNumber', () => {
 
     return request(app)
       .get('/prisoner/not-a-number')
+      .expect(404)
+      .expect(() => {
+        expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
+      })
+  })
+})
+
+const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
+  id: 'e1',
+  eventType: 'CREATED_SEALED',
+  eventDateTime: '2026-06-01T10:00:00',
+  eventUserId: 'AUSER',
+  sealNumber: null,
+  fromInternalLocationId: null,
+  toInternalLocationId: null,
+  toStorageLocationType: null,
+  fromPrisonId: null,
+  toPrisonId: null,
+  eventDate: null,
+  relatedContainerId: null,
+  ...overrides,
+})
+
+describe('GET /prisoner/:prisonerNumber/container/:id', () => {
+  it("renders the container's history timeline and audits the view", async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'c1', currentSealNumber: 'SN0001' }),
+    ])
+    prisonerPropertyService.getContainerEvents.mockResolvedValue([
+      event({ id: 'e2', eventType: 'MOVED', toStorageLocationType: 'BRANSTON' }),
+      event({ id: 'e1', eventType: 'CREATED_SEALED', sealNumber: 'SN0001' }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC/container/c1')
+      .expect('Content-Type', /html/)
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Property container history')
+        expect(res.text).toContain('SN0001')
+        expect(res.text).toContain('Created and sealed')
+        expect(res.text).toContain('Moved to Branston (offsite)')
+        expect(prisonerPropertyService.getContainerEvents).toHaveBeenCalledWith('c1', user.username)
+        expect(auditService.logPageView).toHaveBeenCalledWith(
+          Page.CONTAINER_HISTORY,
+          expect.objectContaining({ who: user.username, subjectId: 'A1234BC', details: { containerId: 'c1' } }),
+        )
+      })
+  })
+
+  it('returns 404 when the container is not one of the prisoners and does not fetch events', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ id: 'c1' })])
+
+    return request(app)
+      .get('/prisoner/A1234BC/container/does-not-exist')
+      .expect(404)
+      .expect(() => {
+        expect(prisonerPropertyService.getContainerEvents).not.toHaveBeenCalled()
+      })
+  })
+
+  it('shows the no-caseload page and does not call the property API when there is no active caseload', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: null,
+      activeCaseloadName: null,
+      caseloadIds: [],
+    })
+
+    return request(app)
+      .get('/prisoner/A1234BC/container/c1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('You do not have an active caseload')
+        expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
+        expect(prisonerPropertyService.getContainerEvents).not.toHaveBeenCalled()
+      })
+  })
+
+  it('returns 404 for an invalid prisoner number', async () => {
+    withActiveCaseload()
+
+    return request(app)
+      .get('/prisoner/not-a-number/container/c1')
       .expect(404)
       .expect(() => {
         expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()

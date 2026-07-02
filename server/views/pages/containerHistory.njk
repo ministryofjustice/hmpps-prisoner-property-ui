@@ -1,0 +1,42 @@
+{% extends "../partials/layout.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+
+{% set pageTitle = applicationName + " - Container history" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back to " + (prisonerName or prisonerNumber) + "'s property", href: backUrl }) }}
+{% endblock %}
+
+{% block content %}
+  <h1 class="govuk-heading-xl govuk-!-margin-bottom-2" data-qa="container-history-heading">
+    Property container history
+  </h1>
+  <p class="govuk-body" data-qa="container-summary">
+    {{ container.containerType | containerTypeLabel }} container
+    {% if container.currentSealNumber %}(seal {{ container.currentSealNumber }}){% endif %}
+    for {{ prisonerName or "Unknown" }} ({{ prisonerNumber }})
+  </p>
+
+  {% if events.length == 0 %}
+    <p class="govuk-body" data-qa="no-events">No history is available for this container.</p>
+  {% else %}
+    <div class="moj-timeline" data-qa="container-timeline">
+      {% for event in events %}
+        <div class="moj-timeline__item">
+          <div class="moj-timeline__header">
+            <h2 class="moj-timeline__title">{{ event.eventType | eventTypeLabel }}</h2>
+            <p class="moj-timeline__byline">by {{ event.eventUserId }}</p>
+          </div>
+          <p class="moj-timeline__date">
+            <time datetime="{{ event.eventDateTime }}">{{ event.eventDateTime | formatDateTime }}</time>
+          </p>
+          <div class="moj-timeline__description">
+            <p class="govuk-body">{{ event | eventDescription }}</p>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

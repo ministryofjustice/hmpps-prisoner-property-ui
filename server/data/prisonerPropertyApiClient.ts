@@ -6,6 +6,7 @@ import type {
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PrisonPropertyListQuery,
+  PropertyEvent,
   RestPage,
 } from './prisonerPropertyApiTypes'
 
@@ -26,6 +27,16 @@ export default class PrisonerPropertyApiClient extends RestClient {
       { path: `/property-containers/prisoner/${prisonerNumber}` },
       asSystem(username),
     )
+  }
+
+  /**
+   * Get a container's event history (newest first).
+   *
+   * Called with a system token tied to the signed-in user (`asSystem(username)`). The system client
+   * must hold the ROLE_PRISONER_PROPERTY__RO role.
+   */
+  getContainerEvents(id: string, username: string): Promise<PropertyEvent[]> {
+    return this.get<PropertyEvent[]>({ path: `/property-containers/${id}/events` }, asSystem(username))
   }
 
   /**
