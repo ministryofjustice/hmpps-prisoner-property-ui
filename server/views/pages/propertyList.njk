@@ -65,8 +65,10 @@
   {% else %}
     {% for group in groups %}
       <h2 class="govuk-heading-m govuk-!-margin-top-6" data-qa="prisoner-heading">
-        {{ group.prisonerName or "Unknown" }}
-        <span class="govuk-!-font-weight-regular">({{ group.prisonerNumber }})</span>
+        <a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}">
+          {{ group.prisonerName or "Unknown" }}
+          <span class="govuk-!-font-weight-regular">({{ group.prisonerNumber }})</span>
+        </a>
       </h2>
       <p class="govuk-body-s govuk-!-margin-bottom-2">
         Current establishment: {{ group.prisonerCurrentPrisonName or "Not known" }}

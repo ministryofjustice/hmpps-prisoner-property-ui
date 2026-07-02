@@ -29,6 +29,8 @@ const CONTAINER_TYPE_LABELS: Record<ContainerType, string> = {
 export const ALL_STATUSES = Object.keys(STATUS_TAGS) as ContainerStatus[]
 export const ALL_CONTAINER_TYPES = Object.keys(CONTAINER_TYPE_LABELS) as ContainerType[]
 
+export const isPrisonerNumber = (value: string): boolean => PRISON_NUMBER_PATTERN.test(value)
+
 export const statusTag = (status: ContainerStatus): { text: string; classes: string } =>
   STATUS_TAGS[status] ?? { text: status, classes: 'govuk-tag--grey' }
 

@@ -1,0 +1,85 @@
+{% extends "../partials/layout.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+
+{% set pageTitle = applicationName + " - Person property" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back to property list", href: backUrl }) }}
+{% endblock %}
+
+{% block content %}
+  <h1 class="govuk-heading-xl govuk-!-margin-bottom-2" data-qa="prisoner-name">
+    {{ prisonerName or "Unknown" }}
+    <span class="govuk-!-font-weight-regular">({{ prisonerNumber }})</span>
+  </h1>
+  <p class="govuk-body" data-qa="current-establishment">
+    Current establishment: {{ currentPrisonName or "Not known" }}
+  </p>
+
+  {% if active.length == 0 and past.length == 0 %}
+    <p class="govuk-body" data-qa="no-results">No property found for this person.</p>
+  {% else %}
+    <h2 class="govuk-heading-l govuk-!-margin-top-6">Current property</h2>
+    {% if active.length == 0 %}
+      <p class="govuk-body" data-qa="no-active-property">No property is currently being held for this person.</p>
+    {% else %}
+      {% set activeRows = [] %}
+      {% for container in active %}
+        {% set statusData = container.currentStatus | statusTag %}
+        {% set heldAt = container.prisonName or "-" %}
+        {% if not container.inPrisonersCurrentPrison and container.prisonName %}
+          {% set heldAt = container.prisonName + " (elsewhere)" %}
+        {% endif %}
+        {% set activeRows = (activeRows.push([
+          { text: container.currentSealNumber or "-" },
+          { text: container.containerType | containerTypeLabel },
+          { text: heldAt },
+          { text: container | containerLocation },
+          { text: container.createDateTime | formatDate },
+          { html: govukTag({ text: statusData.text, classes: statusData.classes }) }
+        ]), activeRows) %}
+      {% endfor %}
+
+      {{ govukTable({
+        attributes: { "data-qa": "active-property" },
+        head: [
+          { text: "Seal number" },
+          { text: "Property type" },
+          { text: "Held at" },
+          { text: "Storage location" },
+          { text: "Added" },
+          { text: "Status" }
+        ],
+        rows: activeRows
+      }) }}
+    {% endif %}
+
+    {% if past.length %}
+      <h2 class="govuk-heading-l govuk-!-margin-top-6">Past property</h2>
+      {% set pastRows = [] %}
+      {% for container in past %}
+        {% set pastRows = (pastRows.push([
+          { text: container.currentSealNumber or "-" },
+          { text: container.containerType | containerTypeLabel },
+          { text: container.removalOutcome | removalOutcomeLabel },
+          { text: container.removalDate | formatDate }
+        ]), pastRows) %}
+      {% endfor %}
+
+      {{ govukTable({
+        attributes: { "data-qa": "past-property" },
+        head: [
+          { text: "Seal number" },
+          { text: "Property type" },
+          { text: "Outcome" },
+          { text: "Removed on" }
+        ],
+        rows: pastRows
+      }) }}
+    {% endif %}
+  {% endif %}
+{% endblock %}

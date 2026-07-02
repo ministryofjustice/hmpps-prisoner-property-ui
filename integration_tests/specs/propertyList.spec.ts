@@ -49,6 +49,10 @@ test.describe('Establishment property list', () => {
     await expect(listPage.heading).toContainText('Moorland (HMP & YOI)')
     await expect(listPage.prisonerHeadings).toContainText('John Smith')
     await expect(listPage.prisonerHeadings).toContainText('A1234BC')
+    await expect(listPage.prisonerHeadings.getByRole('link', { name: /John Smith/ })).toHaveAttribute(
+      'href',
+      '/prisoner/A1234BC',
+    )
     await expect(page.getByRole('cell', { name: 'SN8842K1' })).toBeVisible()
     await expect(page.getByRole('cell', { name: 'Valuables' })).toBeVisible()
     await expect(page.getByRole('cell', { name: 'Branston (offsite)' })).toBeVisible()

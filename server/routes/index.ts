@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import createError from 'http-errors'
 
 import type { Services } from '../services'
 import { Page } from '../services/auditService'
@@ -8,9 +9,11 @@ import {
   buildPagination,
   containerTypeLabel,
   DEFAULT_PAGE_SIZE,
+  isPrisonerNumber,
   parsePropertyListQuery,
   statusTag,
 } from '../utils/propertyList'
+import { partitionContainers, resolveCurrentPrisonName } from '../utils/personProperty'
 
 export default function routes({ auditService, prisonerPropertyService, userService }: Services): Router {
   const router = Router()
@@ -71,6 +74,42 @@ export default function routes({ auditService, prisonerPropertyService, userServ
         text: statusTag(status).text,
         checked: statuses.includes(status),
       })),
+    })
+  })
+
+  router.get('/prisoner/:prisonerNumber', async (req, res, next) => {
+    const { token, username } = res.locals.user
+    const { prisonerNumber } = req.params
+
+    // Caseload protection: a user without an active caseload has no establishment context, so they
+    // shouldn't reach person-level property. Consistent with the establishment list guard.
+    const { activeCaseloadId } = await userService.getActiveCaseload(token)
+    if (!activeCaseloadId) {
+      return res.render('pages/noCaseload')
+    }
+
+    if (!isPrisonerNumber(prisonerNumber)) {
+      return next(createError(404, 'Prisoner not found'))
+    }
+
+    const containers = await prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username)
+
+    await auditService.logPageView(Page.PRISONER_PROPERTY, {
+      who: username,
+      subjectId: prisonerNumber,
+      subjectType: 'PRISONER_NUMBER',
+      correlationId: req.id,
+    })
+
+    const { active, past } = partitionContainers(containers)
+
+    return res.render('pages/prisonerProperty', {
+      prisonerNumber,
+      prisonerName: containers[0]?.prisonerName ?? null,
+      currentPrisonName: resolveCurrentPrisonName(containers),
+      active,
+      past,
+      backUrl: '/',
     })
   })
 

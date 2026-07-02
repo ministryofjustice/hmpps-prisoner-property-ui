@@ -4,12 +4,27 @@ import {
   buildPagination,
   containerLocation,
   containerTypeLabel,
+  isPrisonerNumber,
   parsePropertyListQuery,
   searchToFilters,
   statusTag,
 } from './propertyList'
 
 describe('propertyList utils', () => {
+  describe('isPrisonerNumber', () => {
+    it('accepts a valid prison number', () => {
+      expect(isPrisonerNumber('A1234BC')).toBe(true)
+      expect(isPrisonerNumber('a1234bc')).toBe(true)
+    })
+
+    it('rejects anything that is not a prison number', () => {
+      expect(isPrisonerNumber('not-a-number')).toBe(false)
+      expect(isPrisonerNumber('A1234B')).toBe(false)
+      expect(isPrisonerNumber('SN0001')).toBe(false)
+      expect(isPrisonerNumber('')).toBe(false)
+    })
+  })
+
   describe('statusTag', () => {
     it('maps known statuses to label + colour', () => {
       expect(statusTag('STORED')).toEqual({ text: 'Stored', classes: 'govuk-tag--blue' })

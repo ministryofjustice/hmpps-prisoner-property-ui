@@ -5,6 +5,7 @@ import express from 'express'
 import fs from 'fs'
 import { initialiseName, formatDate } from './utils'
 import { statusTag, containerTypeLabel, containerLocation } from './propertyList'
+import { removalOutcomeLabel } from './personProperty'
 import config from '../config'
 import logger from '../../logger'
 
@@ -46,4 +47,5 @@ export default function nunjucksSetup(app: express.Express): void {
   njkEnv.addFilter('statusTag', statusTag)
   njkEnv.addFilter('containerTypeLabel', containerTypeLabel)
   njkEnv.addFilter('containerLocation', containerLocation)
+  njkEnv.addFilter('removalOutcomeLabel', removalOutcomeLabel)
 }
