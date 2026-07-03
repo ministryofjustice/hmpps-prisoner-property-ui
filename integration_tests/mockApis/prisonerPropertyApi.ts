@@ -1,6 +1,7 @@
 import type { SuperAgentRequest } from 'superagent'
 import { stubFor, stubPing } from './wiremock'
 import type {
+  BoxLocation,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PropertyEvent,
@@ -70,6 +71,49 @@ export default {
         status: httpStatus,
         headers: { 'Content-Type': 'application/json;charset=UTF-8' },
         jsonBody: events,
+      },
+    }),
+
+  stubGetBoxLocations: (
+    { prisonId = 'MDI', locations = [] as BoxLocation[], priority = undefined as number | undefined } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'GET',
+        urlPath: `/prisoner-property-api/property-containers/prison/${prisonId}/box-locations`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: {
+          content: locations,
+          totalElements: locations.length,
+          totalPages: locations.length === 0 ? 0 : 1,
+          number: 0,
+          size: 20,
+          numberOfElements: locations.length,
+          first: true,
+          last: true,
+        },
+      },
+    }),
+
+  stubCreateContainer: (
+    { container = undefined as PrisonerPropertyContainer | undefined, priority = undefined as number | undefined } = {},
+    httpStatus = 201,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'POST',
+        urlPath: `/prisoner-property-api/property-containers`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: container ?? {},
       },
     }),
 }

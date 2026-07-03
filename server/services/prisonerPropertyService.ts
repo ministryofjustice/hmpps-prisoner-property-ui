@@ -1,5 +1,7 @@
 import PrisonerPropertyApiClient from '../data/prisonerPropertyApiClient'
 import type {
+  BoxLocation,
+  CreateContainerRequest,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PrisonPropertyListQuery,
@@ -24,5 +26,17 @@ export default class PrisonerPropertyService {
     username: string,
   ): Promise<RestPage<PrisonerPropertyGroup>> {
     return this.prisonerPropertyApiClient.getPrisonProperty(prisonId, query, username)
+  }
+
+  getBoxLocations(
+    prisonId: string,
+    query: { query?: string; page?: number; size?: number },
+    username: string,
+  ): Promise<RestPage<BoxLocation>> {
+    return this.prisonerPropertyApiClient.getBoxLocations(prisonId, query, username)
+  }
+
+  createContainer(body: CreateContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
+    return this.prisonerPropertyApiClient.createContainer(body, username)
   }
 }

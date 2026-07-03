@@ -71,6 +71,30 @@ export interface PropertyEvent {
   relatedContainerId: string | null
 }
 
+// A property box location within a prison (GET /property-containers/prison/{prisonId}/box-locations),
+// annotated with how many containers it currently holds. See BoxLocationDto in the API.
+export interface BoxLocation {
+  id: string
+  prisonId: string
+  code: string
+  localName: string | null
+  pathHierarchy: string
+  name: string
+  containerCount: number
+}
+
+// Payload to create a new container (POST /property-containers). See CreatePropertyContainerRequest
+// in the API. Required: prisonerNumber, prisonId, containerType, sealNumber.
+export interface CreateContainerRequest {
+  prisonerNumber: string
+  prisonId: string
+  containerType: ContainerType
+  sealNumber: string
+  previousSealNumber?: string
+  internalLocationId?: string
+  proposedDisposalDate?: string
+}
+
 // Filters + paging for the establishment-wide list (GET /property-containers/prison/{prisonId}).
 // All filters are exact-match on the API side; omit a field to leave it unfiltered.
 export interface PrisonPropertyListQuery {

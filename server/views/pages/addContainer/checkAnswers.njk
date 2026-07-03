@@ -1,0 +1,78 @@
+{% extends "../../partials/layout.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+
+{% set pageTitle = applicationName + " - Check your answers" %}
+{% set mainClasses = "govuk-body" %}
+
+{% set detailsUrl = "/prisoner/" + prisonerNumber + "/add-container/details" %}
+{% set locationUrl = "/prisoner/" + prisonerNumber + "/add-container/location" %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back", href: backUrl }) }}
+{% endblock %}
+
+{% block content %}
+  <h1 class="govuk-heading-xl" data-qa="check-answers-heading">Check your answers</h1>
+
+  {{ govukSummaryList({
+    attributes: { "data-qa": "prisoner-summary" },
+    rows: [
+      { key: { text: "Name" }, value: { text: prisonerName or "Unknown" } },
+      { key: { text: "Prison number" }, value: { text: prisonerNumber } },
+      { key: { text: "Prisoner establishment" }, value: { text: establishmentName or "Not known" } }
+    ]
+  }) }}
+
+  <h2 class="govuk-heading-m govuk-!-margin-top-6">Property container {{ journey.sealNumber }}</h2>
+
+  {{ govukSummaryList({
+    attributes: { "data-qa": "container-summary" },
+    rows: [
+      {
+        key: { text: "Seal number" },
+        value: { text: journey.sealNumber },
+        actions: { items: [{ href: detailsUrl, text: "Change", visuallyHiddenText: "seal number" }] }
+      },
+      {
+        key: { text: "Previous seal number" },
+        value: { text: journey.previousSealNumber or "None" },
+        actions: { items: [{ href: detailsUrl, text: "Change", visuallyHiddenText: "previous seal number" }] }
+      },
+      {
+        key: { text: "Property type" },
+        value: { text: journey.containerType | containerTypeLabel },
+        actions: { items: [{ href: detailsUrl, text: "Change", visuallyHiddenText: "property type" }] }
+      },
+      {
+        key: { text: "Disposal date" },
+        value: { text: (journey.proposedDisposalDate | formatDate) if journey.proposedDisposalDate else "No date set" },
+        actions: { items: [{ href: detailsUrl, text: "Change", visuallyHiddenText: "disposal date" }] }
+      },
+      {
+        key: { text: "Storage location" },
+        value: { text: journey.locationName },
+        actions: { items: [{ href: locationUrl, text: "Change", visuallyHiddenText: "storage location" }] }
+      },
+      {
+        key: { text: "Property status" },
+        value: { html: govukTag({ text: "Stored", classes: "govuk-tag--blue" }) }
+      }
+    ]
+  }) }}
+
+  {{ govukInsetText({
+    html: "<strong>You may also need to update paper property cards.</strong><br>If any details have changed, for example the seal number, make sure these are updated on any paper records."
+  }) }}
+
+  <form method="post" action="/prisoner/{{ prisonerNumber }}/add-container/confirm">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    {{ govukButton({ text: "Confirm", attributes: { "data-qa": "confirm" } }) }}
+  </form>
+
+  <p class="govuk-body"><a class="govuk-link" href="/prisoner/{{ prisonerNumber }}" data-qa="cancel">Cancel</a></p>
+{% endblock %}
