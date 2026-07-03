@@ -213,6 +213,37 @@ describe('GET /', () => {
       })
   })
 
+  it('renders an uppercase prisoner name in title case', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: 'MDI',
+      activeCaseloadName: 'Moorland (HMP & YOI)',
+      caseloadIds: ['MDI'],
+    })
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue({
+      ...emptyPage,
+      totalElements: 1,
+      totalPages: 1,
+      numberOfElements: 1,
+      content: [
+        {
+          prisonerNumber: 'A1234BC',
+          prisonerName: 'JOHN SMITH',
+          prisonerCurrentPrisonId: 'MDI',
+          prisonerCurrentPrisonName: 'Moorland (HMP & YOI)',
+          containers: [container({ prisonerName: 'JOHN SMITH' })],
+        },
+      ],
+    })
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('John Smith')
+        expect(res.text).not.toContain('JOHN SMITH')
+      })
+  })
+
   it('shows the no-caseload page and does not call the property API when there is no active caseload', async () => {
     userService.getActiveCaseload.mockResolvedValue({
       activeCaseloadId: null,
@@ -295,6 +326,28 @@ describe('GET /prisoner/:prisonerNumber', () => {
           Page.PRISONER_PROPERTY,
           expect.objectContaining({ who: user.username, subjectId: 'A1234BC', subjectType: 'PRISONER_NUMBER' }),
         )
+      })
+  })
+
+  it('renders the prisoner name in title case and the current establishment from the API field', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({
+        prisonerName: 'JOHN SMITH',
+        inPrisonersCurrentPrison: false,
+        prisonName: 'Leeds (HMP)',
+        prisonerCurrentPrisonName: 'Isle of Wight (HMP)',
+      }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('John Smith')
+        expect(res.text).not.toContain('JOHN SMITH')
+        // establishment comes from the authoritative field even though no property is held there
+        expect(res.text).toContain('Isle of Wight (HMP)')
       })
   })
 

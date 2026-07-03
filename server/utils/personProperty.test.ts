@@ -51,15 +51,30 @@ describe('partitionContainers', () => {
 })
 
 describe('resolveCurrentPrisonName', () => {
-  it('returns the prison name of a container held at the prisoners current prison', () => {
+  it('prefers the authoritative prisonerCurrentPrisonName even when no property is held there', () => {
     const containers = [
-      container({ inPrisonersCurrentPrison: false, prisonName: 'Leeds (HMP)' }),
-      container({ inPrisonersCurrentPrison: true, prisonName: 'Moorland (HMP & YOI)' }),
+      container({
+        inPrisonersCurrentPrison: false,
+        prisonName: 'Leeds (HMP)',
+        prisonerCurrentPrisonName: 'Isle of Wight (HMP)',
+      }),
+    ]
+    expect(resolveCurrentPrisonName(containers)).toBe('Isle of Wight (HMP)')
+  })
+
+  it('falls back to the holding prison of a container in the prisoners current prison', () => {
+    const containers = [
+      container({ inPrisonersCurrentPrison: false, prisonName: 'Leeds (HMP)', prisonerCurrentPrisonName: null }),
+      container({
+        inPrisonersCurrentPrison: true,
+        prisonName: 'Moorland (HMP & YOI)',
+        prisonerCurrentPrisonName: null,
+      }),
     ]
     expect(resolveCurrentPrisonName(containers)).toBe('Moorland (HMP & YOI)')
   })
 
-  it('returns null when no container is held at the prisoners current prison', () => {
+  it('returns null when neither the field nor a held container is available', () => {
     const containers = [container({ inPrisonersCurrentPrison: false, prisonName: 'Leeds (HMP)' })]
     expect(resolveCurrentPrisonName(containers)).toBeNull()
   })

@@ -6,7 +6,7 @@
 {% set mainClasses = "govuk-body" %}
 
 {% block beforeContent %}
-  {{ govukBackLink({ text: "Back to " + (prisonerName or prisonerNumber) + "'s property", href: backUrl }) }}
+  {{ govukBackLink({ text: "Back to " + ((prisonerName | convertToTitleCase) or prisonerNumber) + "'s property", href: backUrl }) }}
 {% endblock %}
 
 {% block content %}
@@ -16,7 +16,7 @@
   <p class="govuk-body" data-qa="container-summary">
     {{ container.containerType | containerTypeLabel }} container
     {% if container.currentSealNumber %}(seal {{ container.currentSealNumber }}){% endif %}
-    for {{ prisonerName or "Unknown" }} ({{ prisonerNumber }})
+    for {{ (prisonerName | convertToTitleCase) or "Unknown" }} ({{ prisonerNumber }})
   </p>
 
   {% if events.length == 0 %}

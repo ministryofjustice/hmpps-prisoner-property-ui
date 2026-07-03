@@ -22,7 +22,7 @@
   {{ govukSummaryList({
     attributes: { "data-qa": "prisoner-summary" },
     rows: [
-      { key: { text: "Name" }, value: { text: prisonerName or "Unknown" } },
+      { key: { text: "Name" }, value: { text: (prisonerName | convertToTitleCase) or "Unknown" } },
       { key: { text: "Prison number" }, value: { text: prisonerNumber } },
       { key: { text: "Prisoner establishment" }, value: { text: establishmentName or "Not known" } }
     ]

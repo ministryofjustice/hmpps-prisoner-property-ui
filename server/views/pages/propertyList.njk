@@ -70,7 +70,7 @@
         {% set cells = [] %}
         {% if loop.first %}
           {% set nameHtml %}
-            <a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}">{{ group.prisonerName or "Unknown" }}</a>
+            <a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}">{{ (group.prisonerName | convertToTitleCase) or "Unknown" }}</a>
             <div class="govuk-!-font-weight-regular">{{ group.prisonerNumber }}</div>
           {% endset %}
           {% set cells = (cells.push(
