@@ -59,6 +59,34 @@ test.describe('Establishment property list', () => {
     await expect(page.getByRole('cell', { name: 'Due for disposal' })).toBeVisible()
   })
 
+  test('keeps a prisoner and all their containers together in one grouped row-set', async ({ page }) => {
+    const multiContainer: PrisonerPropertyGroup = {
+      ...group,
+      containers: [
+        group.containers[0]!,
+        {
+          ...group.containers[0]!,
+          id: 'c2',
+          containerType: 'STANDARD',
+          currentSealNumber: 'SN0002',
+          currentStatus: 'DUE_FOR_TRANSFER_OUT',
+          currentLocationType: 'INTERNAL',
+          locationDescription: 'Reception A2',
+        },
+      ],
+    }
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [multiContainer], priority: 1 })
+    await page.goto('/')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    // The name link is shown once for the person (row-spanned across their two containers).
+    await expect(listPage.prisonerHeadings.getByRole('link', { name: /John Smith/ })).toHaveCount(1)
+    await expect(page.getByRole('cell', { name: 'SN8842K1' })).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'SN0002' })).toBeVisible()
+    await expect(page.getByRole('cell', { name: 'Due for transfer out' })).toBeVisible()
+  })
+
   test('lets a user search by prison number', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [], priority: 1 })

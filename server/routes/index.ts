@@ -55,6 +55,7 @@ export default function routes({ auditService, prisonerPropertyService, userServ
 
     return res.render('pages/propertyList', {
       establishmentName: activeCaseloadName,
+      canManage: canManageProperty(res.locals.user.userRoles),
       groups: result.content,
       pagination: buildPagination(
         page,

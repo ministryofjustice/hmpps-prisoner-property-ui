@@ -6,7 +6,7 @@ import type {
   PrisonPropertyListQuery,
 } from '../data/prisonerPropertyApiTypes'
 
-export const DEFAULT_PAGE_SIZE = 20
+export const DEFAULT_PAGE_SIZE = 50
 const PRISON_NUMBER_PATTERN = /^[A-Za-z]\d{4}[A-Za-z]{2}$/
 
 const STATUS_TAGS: Record<ContainerStatus, { text: string; classes: string }> = {

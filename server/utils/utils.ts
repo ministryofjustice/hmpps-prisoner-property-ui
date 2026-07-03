@@ -21,6 +21,13 @@ export const formatDate = (value?: string | null): string => {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+export const formatShortDate = (value?: string | null): string => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 export const formatDateTime = (value?: string | null): string => {
   if (!value) return ''
   const date = new Date(value)
