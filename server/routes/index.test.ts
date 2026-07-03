@@ -292,19 +292,19 @@ const withActiveCaseload = () =>
   })
 
 describe('GET /prisoner/:prisonerNumber', () => {
-  it('renders current and past property for the prisoner and audits the view', async () => {
+  it('variant A (prisoner here): splits property in this establishment from property due to transfer in', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
-      container({ id: 'c1', currentSealNumber: 'SN0001', currentStatus: 'STORED' }),
+      container({ id: 'c1', prisonId: 'MDI', prisonerCurrentPrisonId: 'MDI', currentSealNumber: 'SN0001' }),
       container({
         id: 'c2',
+        prisonId: 'LEI',
+        prisonName: 'Leeds (HMP)',
+        prisonerCurrentPrisonId: 'MDI',
+        inPrisonersCurrentPrison: false,
         currentSealNumber: 'SN0002',
         containerType: 'VALUABLES',
-        currentStatus: 'RETURNED',
-        removalOutcome: 'RETURNED',
-        removalDate: '2026-06-20',
-        inPrisonersCurrentPrison: false,
-        prisonName: 'Leeds (HMP)',
+        currentStatus: 'DUE_FOR_TRANSFER_OUT',
       }),
     ])
 
@@ -315,17 +315,47 @@ describe('GET /prisoner/:prisonerNumber', () => {
       .expect(res => {
         expect(res.text).toContain('John Smith')
         expect(res.text).toContain('A1234BC')
-        expect(res.text).toContain('Current property')
+        expect(res.text).toContain('Property in this establishment')
         expect(res.text).toContain('SN0001')
-        expect(res.text).toContain('Reception A1')
-        expect(res.text).toContain('Past property')
+        expect(res.text).toContain('Stored')
+        expect(res.text).toContain('Property due to be transferred in')
         expect(res.text).toContain('SN0002')
-        expect(res.text).toContain('Returned')
+        expect(res.text).toContain('Leeds (HMP)')
+        expect(res.text).toContain('Due for transfer in')
+        expect(res.text).not.toContain('no longer in this establishment')
         expect(prisonerPropertyService.getPropertyForPrisoner).toHaveBeenCalledWith('A1234BC', user.username)
         expect(auditService.logPageView).toHaveBeenCalledWith(
           Page.PRISONER_PROPERTY,
           expect.objectContaining({ who: user.username, subjectId: 'A1234BC', subjectType: 'PRISONER_NUMBER' }),
         )
+      })
+  })
+
+  it('variant B (prisoner has left): warns, shows Due for transfer out and the prisoner establishment', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({
+        id: 'c1',
+        prisonId: 'MDI',
+        prisonerCurrentPrisonId: 'IWI',
+        prisonerCurrentPrisonName: 'Isle of Wight (HMP)',
+        inPrisonersCurrentPrison: false,
+        currentSealNumber: 'SN0003',
+        currentStatus: 'DUE_FOR_TRANSFER_OUT',
+      }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('no longer in this establishment')
+        expect(res.text).toContain('Property in this establishment')
+        expect(res.text).toContain('SN0003')
+        expect(res.text).toContain('Due for transfer out')
+        expect(res.text).toContain('Isle of Wight (HMP)')
+        // the prisoner is not here, so nothing is due to transfer in
+        expect(res.text).not.toContain('Property due to be transferred in')
       })
   })
 

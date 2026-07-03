@@ -4,11 +4,13 @@ import AbstractPage from './abstractPage'
 export default class PrisonerPropertyPage extends AbstractPage {
   readonly name: Locator
 
-  readonly currentEstablishment: Locator
+  readonly prisonerEstablishment: Locator
 
-  readonly activeProperty: Locator
+  readonly inEstablishment: Locator
 
-  readonly pastProperty: Locator
+  readonly dueTransferIn: Locator
+
+  readonly leftWarning: Locator
 
   readonly noResults: Locator
 
@@ -19,9 +21,10 @@ export default class PrisonerPropertyPage extends AbstractPage {
   private constructor(page: Page) {
     super(page)
     this.name = page.getByTestId('prisoner-name')
-    this.currentEstablishment = page.getByTestId('current-establishment')
-    this.activeProperty = page.getByTestId('active-property')
-    this.pastProperty = page.getByTestId('past-property')
+    this.prisonerEstablishment = page.getByTestId('prisoner-establishment')
+    this.inEstablishment = page.getByTestId('in-establishment')
+    this.dueTransferIn = page.getByTestId('due-transfer-in')
+    this.leftWarning = page.getByTestId('left-establishment-warning')
     this.noResults = page.getByTestId('no-results')
     this.addProperty = page.getByTestId('add-property')
     this.successBanner = page.getByTestId('success-banner')

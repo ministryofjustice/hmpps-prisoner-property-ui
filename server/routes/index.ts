@@ -13,7 +13,7 @@ import {
   parsePropertyListQuery,
   statusTag,
 } from '../utils/propertyList'
-import { partitionContainers, resolveCurrentPrisonName } from '../utils/personProperty'
+import { buildPersonPropertyView } from '../utils/personProperty'
 import { validateDetails } from '../utils/addContainer'
 import requireManageRole, { canManageProperty } from '../middleware/requireManageRole'
 
@@ -106,14 +106,18 @@ export default function routes({ auditService, prisonerPropertyService, userServ
       correlationId: req.id,
     })
 
-    const { active, past } = partitionContainers(containers)
+    const { inEstablishment, dueToTransferIn, hasLeft, prisonerCurrentPrisonName } = buildPersonPropertyView(
+      containers,
+      activeCaseloadId,
+    )
 
     return res.render('pages/prisonerProperty', {
       prisonerNumber,
       prisonerName: containers[0]?.prisonerName ?? null,
-      currentPrisonName: resolveCurrentPrisonName(containers),
-      active,
-      past,
+      prisonerCurrentPrisonName,
+      hasLeft,
+      inEstablishment,
+      dueToTransferIn,
       canManage: canManageProperty(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
       backUrl: '/',
