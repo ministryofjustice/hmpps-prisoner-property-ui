@@ -3,7 +3,7 @@ import path from 'path'
 import nunjucks from 'nunjucks'
 import express from 'express'
 import fs from 'fs'
-import { initialiseName, formatDate, formatDateTime } from './utils'
+import { initialiseName, formatDate, formatShortDate, formatDateTime, convertToTitleCase } from './utils'
 import { statusTag, containerTypeLabel, containerLocation } from './propertyList'
 import { removalOutcomeLabel } from './personProperty'
 import { eventTypeLabel, eventDescription } from './containerHistory'
@@ -43,8 +43,10 @@ export default function nunjucksSetup(app: express.Express): void {
   )
 
   njkEnv.addFilter('initialiseName', initialiseName)
+  njkEnv.addFilter('convertToTitleCase', convertToTitleCase)
   njkEnv.addFilter('assetMap', (url: string) => assetManifest[url] || url)
   njkEnv.addFilter('formatDate', formatDate)
+  njkEnv.addFilter('formatShortDate', formatShortDate)
   njkEnv.addFilter('formatDateTime', formatDateTime)
   njkEnv.addFilter('statusTag', statusTag)
   njkEnv.addFilter('containerTypeLabel', containerTypeLabel)

@@ -16,6 +16,8 @@ export interface PrisonerPropertyContainer {
   prisonerName: string | null
   prisonId: string
   prisonName: string | null
+  prisonerCurrentPrisonId?: string | null
+  prisonerCurrentPrisonName?: string | null
   inPrisonersCurrentPrison: boolean
   containerType: ContainerType
   currentSealNumber: string | null

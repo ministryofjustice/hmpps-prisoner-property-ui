@@ -1,4 +1,4 @@
-import { convertToTitleCase, initialiseName } from './utils'
+import { convertToTitleCase, formatShortDate, initialiseName } from './utils'
 
 describe('convert to title case', () => {
   it.each([
@@ -13,6 +13,18 @@ describe('convert to title case', () => {
     ['Hyphenated', 'Robert-John SmiTH-jONes-WILSON', 'Robert-John Smith-Jones-Wilson'],
   ])('%s convertToTitleCase(%s, %s)', (_: string | null, a: string | null, expected: string) => {
     expect(convertToTitleCase(a)).toEqual(expected)
+  })
+})
+
+describe('format short date', () => {
+  it.each([
+    ['null', null, ''],
+    ['empty string', '', ''],
+    ['invalid', 'not-a-date', ''],
+    ['ISO datetime', '2026-06-01T10:00:00', '01/06/2026'],
+    ['ISO date', '2025-12-11', '11/12/2025'],
+  ])('%s formatShortDate(%s) = %s', (_: string, value: string | null, expected: string) => {
+    expect(formatShortDate(value)).toEqual(expected)
   })
 })
 

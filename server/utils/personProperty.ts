@@ -23,8 +23,12 @@ export const partitionContainers = (
 }
 
 /**
- * The prisoner's current establishment name, taken from a container held at the prisoner's current
- * prison. Returns null when none of the containers are held where the prisoner currently is.
+ * The prisoner's current establishment name. Prefers the authoritative `prisonerCurrentPrisonName`
+ * from the API (available even when the prisoner has no property at their current prison); falls back
+ * to the holding prison of a container flagged `inPrisonersCurrentPrison` for older API responses that
+ * don't carry the field yet. Null when neither is available.
  */
 export const resolveCurrentPrisonName = (containers: PrisonerPropertyContainer[]): string | null =>
-  containers.find(container => container.inPrisonersCurrentPrison)?.prisonName ?? null
+  containers.find(container => container.prisonerCurrentPrisonName)?.prisonerCurrentPrisonName ??
+  containers.find(container => container.inPrisonersCurrentPrison)?.prisonName ??
+  null

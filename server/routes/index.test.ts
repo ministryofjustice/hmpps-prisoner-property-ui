@@ -106,13 +106,90 @@ describe('GET /', () => {
         expect(res.text).toContain('Due for disposal')
         expect(prisonerPropertyService.getPrisonProperty).toHaveBeenCalledWith(
           'MDI',
-          expect.objectContaining({ page: 0, size: 20 }),
+          expect.objectContaining({ page: 0, size: 50 }),
           user.username,
         )
         expect(auditService.logPageView).toHaveBeenCalledWith(
           Page.PROPERTY_LIST,
           expect.objectContaining({ who: user.username, details: { prisonId: 'MDI' } }),
         )
+      })
+  })
+
+  it('renders one grouped row-set per prisoner: name, establishment and status', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: 'MDI',
+      activeCaseloadName: 'Moorland (HMP & YOI)',
+      caseloadIds: ['MDI'],
+    })
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue({
+      ...emptyPage,
+      totalElements: 1,
+      totalPages: 1,
+      numberOfElements: 1,
+      content: [
+        {
+          prisonerNumber: 'A1234BC',
+          prisonerName: 'John Smith',
+          prisonerCurrentPrisonId: 'LEI',
+          prisonerCurrentPrisonName: 'Leeds (HMP)',
+          containers: [
+            {
+              id: 'c1',
+              prisonerNumber: 'A1234BC',
+              prisonerName: 'John Smith',
+              prisonId: 'MDI',
+              prisonName: 'Moorland (HMP & YOI)',
+              inPrisonersCurrentPrison: false,
+              containerType: 'STANDARD',
+              currentSealNumber: 'SN0001',
+              currentStatus: 'STORED',
+              currentLocation: null,
+              currentLocationType: 'INTERNAL',
+              locationDescription: 'Reception A1',
+              proposedDisposalDate: null,
+              removalOutcome: null,
+              removalDate: null,
+              createDateTime: '2026-06-01T10:00:00',
+              createdByUserId: 'AUSER',
+              archived: false,
+            },
+            {
+              id: 'c2',
+              prisonerNumber: 'A1234BC',
+              prisonerName: 'John Smith',
+              prisonId: 'MDI',
+              prisonName: 'Moorland (HMP & YOI)',
+              inPrisonersCurrentPrison: false,
+              containerType: 'VALUABLES',
+              currentSealNumber: 'SN0002',
+              currentStatus: 'DUE_FOR_TRANSFER_OUT',
+              currentLocation: null,
+              currentLocationType: 'INTERNAL',
+              locationDescription: 'Reception A2',
+              proposedDisposalDate: null,
+              removalOutcome: null,
+              removalDate: null,
+              createDateTime: '2026-06-02T10:00:00',
+              createdByUserId: 'AUSER',
+              archived: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        // The name/link + establishment are row-spanned, so they appear once for the two containers.
+        expect(res.text.match(/href="\/prisoner\/A1234BC"/g)).toHaveLength(1)
+        expect(res.text).toContain('Leeds (HMP)')
+        expect(res.text).toContain('SN0001')
+        expect(res.text).toContain('SN0002')
+        expect(res.text).toContain('Due for transfer out')
+        expect(res.text).toContain('rowspan="2"')
       })
   })
 
@@ -133,6 +210,37 @@ describe('GET /', () => {
           expect.objectContaining({ prisonerNumber: 'A1234BC', containerType: 'STANDARD', status: ['STORED'] }),
           user.username,
         )
+      })
+  })
+
+  it('renders an uppercase prisoner name in title case', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: 'MDI',
+      activeCaseloadName: 'Moorland (HMP & YOI)',
+      caseloadIds: ['MDI'],
+    })
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue({
+      ...emptyPage,
+      totalElements: 1,
+      totalPages: 1,
+      numberOfElements: 1,
+      content: [
+        {
+          prisonerNumber: 'A1234BC',
+          prisonerName: 'JOHN SMITH',
+          prisonerCurrentPrisonId: 'MDI',
+          prisonerCurrentPrisonName: 'Moorland (HMP & YOI)',
+          containers: [container({ prisonerName: 'JOHN SMITH' })],
+        },
+      ],
+    })
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('John Smith')
+        expect(res.text).not.toContain('JOHN SMITH')
       })
   })
 
@@ -218,6 +326,28 @@ describe('GET /prisoner/:prisonerNumber', () => {
           Page.PRISONER_PROPERTY,
           expect.objectContaining({ who: user.username, subjectId: 'A1234BC', subjectType: 'PRISONER_NUMBER' }),
         )
+      })
+  })
+
+  it('renders the prisoner name in title case and the current establishment from the API field', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({
+        prisonerName: 'JOHN SMITH',
+        inPrisonersCurrentPrison: false,
+        prisonName: 'Leeds (HMP)',
+        prisonerCurrentPrisonName: 'Isle of Wight (HMP)',
+      }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('John Smith')
+        expect(res.text).not.toContain('JOHN SMITH')
+        // establishment comes from the authoritative field even though no property is held there
+        expect(res.text).toContain('Isle of Wight (HMP)')
       })
   })
 

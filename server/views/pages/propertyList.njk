@@ -63,40 +63,46 @@
   {% if groups.length == 0 %}
     <p class="govuk-body" data-qa="no-results">No property containers found.</p>
   {% else %}
+    {% set rows = [] %}
     {% for group in groups %}
-      <h2 class="govuk-heading-m govuk-!-margin-top-6" data-qa="prisoner-heading">
-        <a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}">
-          {{ group.prisonerName or "Unknown" }}
-          <span class="govuk-!-font-weight-regular">({{ group.prisonerNumber }})</span>
-        </a>
-      </h2>
-      <p class="govuk-body-s govuk-!-margin-bottom-2">
-        Current establishment: {{ group.prisonerCurrentPrisonName or "Not known" }}
-      </p>
-
-      {% set rows = [] %}
       {% for container in group.containers %}
         {% set statusData = container.currentStatus | statusTag %}
-        {% set rows = (rows.push([
+        {% set cells = [] %}
+        {% if loop.first %}
+          {% set nameHtml %}
+            <a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}">{{ (group.prisonerName | convertToTitleCase) or "Unknown" }}</a>
+            <div class="govuk-!-font-weight-regular">{{ group.prisonerNumber }}</div>
+          {% endset %}
+          {% set cells = (cells.push(
+            { html: nameHtml, rowspan: group.containers.length, attributes: { "data-qa": "prisoner-heading" } },
+            { text: group.prisonerCurrentPrisonName or "Not known", rowspan: group.containers.length }
+          ), cells) %}
+        {% endif %}
+        {% set cells = (cells.push(
           { text: container.currentSealNumber or "-" },
           { text: container.containerType | containerTypeLabel },
           { text: container | containerLocation },
-          { text: container.createDateTime | formatDate },
+          { text: container.createDateTime | formatShortDate },
           { html: govukTag({ text: statusData.text, classes: statusData.classes }) }
-        ]), rows) %}
+        ), cells) %}
+        {% set rows = (rows.push(cells), rows) %}
       {% endfor %}
-
-      {{ govukTable({
-        head: [
-          { text: "Seal number" },
-          { text: "Property type" },
-          { text: "Storage location" },
-          { text: "Added" },
-          { text: "Status" }
-        ],
-        rows: rows
-      }) }}
     {% endfor %}
+
+    {{ govukTable({
+      classes: "govuk-!-font-size-16",
+      attributes: { "data-qa": "property-list" },
+      head: [
+        { text: "Name" },
+        { text: "Prisoner establishment" },
+        { text: "Seal number" },
+        { text: "Property type" },
+        { text: "Storage location" },
+        { text: "Last updated" },
+        { text: "Property status" }
+      ],
+      rows: rows
+    }) }}
 
     {{ mojPagination(pagination) }}
   {% endif %}

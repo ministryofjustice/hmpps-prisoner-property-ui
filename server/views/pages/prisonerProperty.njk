@@ -23,7 +23,7 @@
   {% endif %}
 
   <h1 class="govuk-heading-xl govuk-!-margin-bottom-2" data-qa="prisoner-name">
-    {{ prisonerName or "Unknown" }}
+    {{ (prisonerName | convertToTitleCase) or "Unknown" }}
     <span class="govuk-!-font-weight-regular">({{ prisonerNumber }})</span>
   </h1>
   <p class="govuk-body" data-qa="current-establishment">
