@@ -10,6 +10,9 @@ export type StorageLocationType = 'INTERNAL' | 'BRANSTON'
 
 export type RemovalOutcome = 'DISPOSED' | 'RETURNED' | 'TRANSFERRED' | 'COMBINED'
 
+// Where the prisoner is, from prisoner-search: held in an establishment, in transit between prisons, or released.
+export type PrisonerMovementStatus = 'IN_ESTABLISHMENT' | 'IN_TRANSIT' | 'RELEASED'
+
 export interface PrisonerPropertyContainer {
   id: string
   prisonerNumber: string
@@ -18,6 +21,7 @@ export interface PrisonerPropertyContainer {
   prisonName: string | null
   prisonerCurrentPrisonId?: string | null
   prisonerCurrentPrisonName?: string | null
+  prisonerMovementStatus?: PrisonerMovementStatus | null
   inPrisonersCurrentPrison: boolean
   containerType: ContainerType
   currentSealNumber: string | null
@@ -40,7 +44,18 @@ export interface PrisonerPropertyGroup {
   prisonerName: string | null
   prisonerCurrentPrisonId: string | null
   prisonerCurrentPrisonName: string | null
+  prisonerMovementStatus?: PrisonerMovementStatus | null
   containers: PrisonerPropertyContainer[]
+}
+
+// Whole-prison property summary counts for the establishment summary tiles
+// (GET /property-containers/prison/{prisonId}/summary). See PrisonPropertySummaryDto in the API.
+export interface PrisonPropertySummary {
+  availableStorageLocations: number
+  storedOnSite: number
+  dueToTransferOut: number
+  dueToBeReturned: number
+  dueToBeDisposed: number
 }
 
 export type PropertyEventType =

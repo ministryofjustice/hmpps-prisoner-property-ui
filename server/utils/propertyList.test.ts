@@ -1,9 +1,10 @@
 import type { ParsedQs } from 'qs'
-import type { PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
+import type { PrisonerPropertyContainer, PrisonerPropertyGroup } from '../data/prisonerPropertyApiTypes'
 import {
   buildPagination,
   containerLocation,
   containerTypeLabel,
+  establishmentLabel,
   isPrisonerNumber,
   parsePropertyListQuery,
   searchToFilters,
@@ -60,6 +61,31 @@ describe('propertyList utils', () => {
       expect(
         containerLocation({ currentLocationType: null, locationDescription: null } as PrisonerPropertyContainer),
       ).toBe('-')
+    })
+  })
+
+  describe('establishmentLabel', () => {
+    const group = (fields: Partial<PrisonerPropertyGroup>): PrisonerPropertyGroup =>
+      ({ prisonerCurrentPrisonName: null, prisonerMovementStatus: null, ...fields }) as PrisonerPropertyGroup
+
+    it('describes a prisoner in transit as Transferring', () => {
+      expect(establishmentLabel(group({ prisonerMovementStatus: 'IN_TRANSIT' }))).toBe('Transferring')
+    })
+
+    it('describes a released prisoner as Released', () => {
+      expect(establishmentLabel(group({ prisonerMovementStatus: 'RELEASED' }))).toBe('Released')
+    })
+
+    it('shows the current establishment name when the prisoner is in an establishment', () => {
+      expect(
+        establishmentLabel(
+          group({ prisonerMovementStatus: 'IN_ESTABLISHMENT', prisonerCurrentPrisonName: 'Leeds (HMP)' }),
+        ),
+      ).toBe('Leeds (HMP)')
+    })
+
+    it('falls back to Not known when the establishment is unresolved', () => {
+      expect(establishmentLabel(group({ prisonerCurrentPrisonName: null }))).toBe('Not known')
     })
   })
 

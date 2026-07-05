@@ -16,6 +16,24 @@
     Prisoner property{% if establishmentName %} <span class="govuk-!-font-weight-regular">— {{ establishmentName }}</span>{% endif %}
   </h1>
 
+  {% if summary %}
+    {% set tiles = [
+      { text: "Available storage locations on-site", value: summary.availableStorageLocations, qa: "summary-available-locations" },
+      { text: "Property containers stored on-site", value: summary.storedOnSite, qa: "summary-stored" },
+      { text: "Property containers due to transfer out", value: summary.dueToTransferOut, qa: "summary-transfer-out" },
+      { text: "Property containers due to be returned", value: summary.dueToBeReturned, qa: "summary-returned" },
+      { text: "Property containers due to be disposed", value: summary.dueToBeDisposed, qa: "summary-disposed" }
+    ] %}
+    <div class="property-summary" data-qa="property-summary">
+      {% for tile in tiles %}
+        <div class="property-summary__card">
+          <p class="property-summary__caption">{{ tile.text }}</p>
+          <p class="property-summary__value" data-qa="{{ tile.qa }}">{{ tile.value }}</p>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   <form method="get" action="/" novalidate data-qa="property-search">
     {{ govukInput({
       label: { text: "Search by prison number or seal number" },
@@ -75,7 +93,7 @@
           {% endset %}
           {% set cells = (cells.push(
             { html: nameHtml, rowspan: group.containers.length, attributes: { "data-qa": "prisoner-heading" } },
-            { text: group.prisonerCurrentPrisonName or "Not known", rowspan: group.containers.length }
+            { text: group | establishmentLabel, rowspan: group.containers.length, attributes: { "data-qa": "prisoner-establishment" } }
           ), cells) %}
         {% endif %}
         {% set cells = (cells.push(

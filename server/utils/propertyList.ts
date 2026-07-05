@@ -3,6 +3,7 @@ import type {
   ContainerStatus,
   ContainerType,
   PrisonerPropertyContainer,
+  PrisonerPropertyGroup,
   PrisonPropertyListQuery,
 } from '../data/prisonerPropertyApiTypes'
 
@@ -39,6 +40,17 @@ export const containerTypeLabel = (type: ContainerType): string => CONTAINER_TYP
 export const containerLocation = (container: PrisonerPropertyContainer): string => {
   if (container.currentLocationType === 'BRANSTON') return 'Branston (offsite)'
   return container.locationDescription || '-'
+}
+
+/**
+ * The "Prisoner establishment" column label for a group. A prisoner mid-move has no resolvable
+ * establishment name, so describe their movement instead: in transit -> "Transferring", released ->
+ * "Released"; otherwise the current establishment name (or "Not known").
+ */
+export const establishmentLabel = (group: PrisonerPropertyGroup): string => {
+  if (group.prisonerMovementStatus === 'IN_TRANSIT') return 'Transferring'
+  if (group.prisonerMovementStatus === 'RELEASED') return 'Released'
+  return group.prisonerCurrentPrisonName || 'Not known'
 }
 
 const firstValue = (value: string | ParsedQs | (string | ParsedQs)[] | undefined): string | undefined =>

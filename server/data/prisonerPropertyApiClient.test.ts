@@ -37,6 +37,28 @@ describe('PrisonerPropertyApiClient', () => {
     })
   })
 
+  describe('getPrisonPropertySummary', () => {
+    it('should GET the prison property summary using a system token for the user and return the body', async () => {
+      const summary = {
+        availableStorageLocations: 150,
+        storedOnSite: 3000,
+        dueToTransferOut: 80,
+        dueToBeReturned: 0,
+        dueToBeDisposed: 40,
+      }
+
+      nock(config.apis.prisonerPropertyApi.url)
+        .get('/property-containers/prison/MDI/summary')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, summary)
+
+      const response = await prisonerPropertyApiClient.getPrisonPropertySummary('MDI', 'AUSER_GEN')
+
+      expect(response).toEqual(summary)
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+  })
+
   describe('getPrisonProperty', () => {
     it('should GET the prison property page with filters/paging as query params using a system token', async () => {
       const pageBody = { content: [] as PrisonerPropertyGroup[], totalElements: 0, totalPages: 0, number: 0, size: 20 }

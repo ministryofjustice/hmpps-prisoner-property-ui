@@ -8,6 +8,7 @@ import type {
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PrisonPropertyListQuery,
+  PrisonPropertySummary,
   PropertyEvent,
   RestPage,
 } from './prisonerPropertyApiTypes'
@@ -70,6 +71,18 @@ export default class PrisonerPropertyApiClient extends RestClient {
   ): Promise<RestPage<BoxLocation>> {
     return this.get<RestPage<BoxLocation>>(
       { path: `/property-containers/prison/${prisonId}/box-locations`, query: { ...query } },
+      asSystem(username),
+    )
+  }
+
+  /**
+   * Get the whole-prison property summary counts for a prison (for the establishment summary tiles).
+   * Called with a system token tied to the signed-in user (`asSystem(username)`); the system client
+   * must hold the ROLE_PRISONER_PROPERTY__RO role.
+   */
+  getPrisonPropertySummary(prisonId: string, username: string): Promise<PrisonPropertySummary> {
+    return this.get<PrisonPropertySummary>(
+      { path: `/property-containers/prison/${prisonId}/summary` },
       asSystem(username),
     )
   }

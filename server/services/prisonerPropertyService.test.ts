@@ -35,4 +35,20 @@ describe('PrisonerPropertyService', () => {
     expect(prisonerPropertyApiClient.getPrisonProperty).toHaveBeenCalledWith('MDI', query, 'AUSER_GEN')
     expect(result).toEqual(pageResult)
   })
+
+  it('should call getPrisonPropertySummary on the api client and return its result', async () => {
+    const summary = {
+      availableStorageLocations: 150,
+      storedOnSite: 3000,
+      dueToTransferOut: 80,
+      dueToBeReturned: 0,
+      dueToBeDisposed: 40,
+    }
+    prisonerPropertyApiClient.getPrisonPropertySummary.mockResolvedValue(summary)
+
+    const result = await prisonerPropertyService.getPrisonPropertySummary('MDI', 'AUSER_GEN')
+
+    expect(prisonerPropertyApiClient.getPrisonPropertySummary).toHaveBeenCalledWith('MDI', 'AUSER_GEN')
+    expect(result).toEqual(summary)
+  })
 })
