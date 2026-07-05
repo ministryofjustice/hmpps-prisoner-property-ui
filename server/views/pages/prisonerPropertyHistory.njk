@@ -1,0 +1,80 @@
+{% extends "../partials/layout.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/details/macro.njk" import govukDetails %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+
+{% set pageTitle = applicationName + " - Property history" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back to property list", href: backUrl }) }}
+{% endblock %}
+
+{% block content %}
+  {% if successMessage %}
+    {{ govukNotificationBanner({
+      type: "success",
+      text: successMessage,
+      attributes: { "data-qa": "success-banner" }
+    }) }}
+  {% endif %}
+
+  {% set activeTab = "history" %}
+  {% include "../partials/personHeader.njk" %}
+
+  {% if timeline.length == 0 %}
+    <p class="govuk-body" data-qa="no-history">No property history is available for this person.</p>
+  {% else %}
+    <div class="moj-timeline" data-qa="property-timeline">
+      {% for row in timeline %}
+        <div class="moj-timeline__item">
+          <div class="moj-timeline__header">
+            <h2 class="moj-timeline__title">
+              {% if row.tag %}{{ govukTag({ text: row.tag.text, classes: row.tag.classes }) }} {% endif %}{{ row.title }}
+            </h2>
+            <p class="moj-timeline__byline">{{ row.byline }}</p>
+          </div>
+          <p class="moj-timeline__date">
+            <time datetime="{{ row.dateTime }}">{{ row.dateTime | formatDateTime }}</time>
+          </p>
+          {% if row.details %}
+            <div class="moj-timeline__description">
+              {% set detailsHtml %}
+                <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-2">
+                  <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Type</dt>
+                    <dd class="govuk-summary-list__value">{{ row.details.containerType }}</dd>
+                  </div>
+                  <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Seal number</dt>
+                    <dd class="govuk-summary-list__value">{{ row.details.sealNumber or "-" }}</dd>
+                  </div>
+                  <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Status</dt>
+                    <dd class="govuk-summary-list__value">
+                      {% if row.details.status %}{{ govukTag({ text: row.details.status.text, classes: row.details.status.classes }) }}{% else %}-{% endif %}
+                    </dd>
+                  </div>
+                  <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">Location</dt>
+                    <dd class="govuk-summary-list__value">{{ row.details.location or "-" }}</dd>
+                  </div>
+                </dl>
+                <a class="govuk-link" href="{{ row.details.historyUrl }}">View full container history</a>
+              {% endset %}
+              {{ govukDetails({ summaryText: "Property container details", html: detailsHtml }) }}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {{ govukInsetText({
+      attributes: { "data-qa": "history-migration-note" },
+      html: "Property containers can now be managed in DPS. History events before " + migrationDate + " may not display in full."
+    }) }}
+  {% endif %}
+{% endblock %}

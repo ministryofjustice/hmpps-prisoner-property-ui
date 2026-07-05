@@ -124,6 +124,10 @@ export default {
   serviceUrls: {
     digitalPrison: get('DPS_URL', 'https://dps-dev.prison.service.justice.gov.uk', requiredInProduction),
   },
+  // Date the property records were migrated from NOMIS into DPS. Property history only begins after this
+  // date, so the timeline shows a closing note that earlier events may be incomplete. Placeholder until
+  // the real cut-over date is confirmed.
+  nomisMigrationDate: get('NOMIS_MIGRATION_DATE', '1 July 2026'),
   ingressUrl: get('INGRESS_URL', 'http://localhost:3000', requiredInProduction),
   environmentName: get('ENVIRONMENT_NAME', ''),
 }

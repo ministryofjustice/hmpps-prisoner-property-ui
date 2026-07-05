@@ -3,7 +3,6 @@
 {% from "govuk/components/back-link/macro.njk" import govukBackLink %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
-{% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 
@@ -23,19 +22,8 @@
     }) }}
   {% endif %}
 
-  {% include "../partials/prisonerBanner.njk" %}
-
-  <h1 class="govuk-heading-xl govuk-!-margin-bottom-2" data-qa="prisoner-name">
-    {{ (prisonerName | convertToTitleCase) or "Unknown" }}’s property
-  </h1>
-
-  {% if canManage %}
-    {{ govukButton({
-      text: "Add property",
-      href: "/prisoner/" + prisonerNumber + "/add-container",
-      attributes: { "data-qa": "add-property" }
-    }) }}
-  {% endif %}
+  {% set activeTab = "property" %}
+  {% include "../partials/personHeader.njk" %}
 
   {% if hasLeft %}
     {{ govukInsetText({

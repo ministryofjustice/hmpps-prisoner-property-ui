@@ -11,6 +11,7 @@ import type {
   BoxLocation,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
+  PrisonerTimelineItem,
   PropertyEvent,
   RestPage,
 } from '../data/prisonerPropertyApiTypes'
@@ -541,6 +542,123 @@ const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
   eventDate: null,
   relatedContainerId: null,
   ...overrides,
+})
+
+const timelineItem = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTimelineItem => ({
+  itemType: 'CONTAINER_EVENT',
+  eventId: 'e1',
+  eventType: 'CREATED_SEALED',
+  eventStatus: 'STORED',
+  eventDateTime: '2026-06-01T10:00:00',
+  eventDate: null,
+  eventUserId: 'AUSER',
+  systemGenerated: false,
+  prisonerName: null,
+  actingEstablishmentName: 'Leeds (HMP)',
+  fromPrisonName: null,
+  toPrisonName: null,
+  toStorageLocationType: null,
+  sealNumber: 'SN0001',
+  relatedContainerId: null,
+  containerId: 'c1',
+  containerType: 'STANDARD',
+  containerSealNumber: 'SN0001',
+  containerStatus: 'STORED',
+  containerLocationDescription: 'Reception A1',
+  ...overrides,
+})
+
+describe('GET /prisoner/:prisonerNumber/history', () => {
+  it('renders the whole-property timeline with tabs, tags, bylines and audits the view', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
+    prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([
+      timelineItem({
+        itemType: 'PRISONER_MOVEMENT',
+        eventType: null,
+        eventStatus: null,
+        systemGenerated: true,
+        prisonerName: 'JOHN SMITH',
+        actingEstablishmentName: 'Moorland (HMP & YOI)',
+        toPrisonName: 'Moorland (HMP & YOI)',
+        sealNumber: null,
+        containerId: null,
+      }),
+      timelineItem({
+        eventId: 'e2',
+        eventType: 'TRANSFERRED',
+        eventStatus: 'TRANSFER',
+        toPrisonName: 'Moorland (HMP & YOI)',
+      }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC/history')
+      .expect('Content-Type', /html/)
+      .expect(200)
+      .expect(res => {
+        // the shared header with the two tabs, the history tab current
+        expect(res.text).toContain('data-qa="tab-property"')
+        expect(res.text).toContain('data-qa="tab-history"')
+        expect(res.text).toContain('data-qa="property-timeline"')
+        // a container event line + status tag + byline
+        expect(res.text).toContain('Property container SN0001 transferred to Moorland (HMP &amp; YOI)')
+        expect(res.text).toContain('Transferred out')
+        expect(res.text).toContain('by AUSER, Leeds (HMP)')
+        // the prisoner movement line
+        expect(res.text).toContain('JOHN SMITH arrived at Moorland (HMP &amp; YOI)')
+        // the expandable container details + link
+        expect(res.text).toContain('Property container details')
+        expect(res.text).toContain('/prisoner/A1234BC/container/c1')
+        // the NOMIS-migration closing note
+        expect(res.text).toContain('History events before')
+        expect(prisonerPropertyService.getPrisonerPropertyHistory).toHaveBeenCalledWith('A1234BC', user.username)
+        expect(auditService.logPageView).toHaveBeenCalledWith(
+          Page.PRISONER_PROPERTY_HISTORY,
+          expect.objectContaining({ who: user.username, subjectId: 'A1234BC' }),
+        )
+      })
+  })
+
+  it('shows an empty state when the prisoner has no history', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([])
+
+    return request(app)
+      .get('/prisoner/A1234BC/history')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('No property history is available for this person.')
+      })
+  })
+
+  it('shows the no-caseload page and calls no APIs when there is no active caseload', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: null,
+      activeCaseloadName: null,
+      caseloadIds: [],
+    })
+
+    return request(app)
+      .get('/prisoner/A1234BC/history')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('You do not have an active caseload')
+        expect(prisonerPropertyService.getPrisonerPropertyHistory).not.toHaveBeenCalled()
+      })
+  })
+
+  it('returns 404 for an invalid prisoner number', async () => {
+    withActiveCaseload()
+
+    return request(app)
+      .get('/prisoner/not-a-number/history')
+      .expect(404)
+      .expect(() => {
+        expect(prisonerPropertyService.getPrisonerPropertyHistory).not.toHaveBeenCalled()
+      })
+  })
 })
 
 describe('GET /prisoner/:prisonerNumber/container/:id', () => {
