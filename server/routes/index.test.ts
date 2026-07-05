@@ -1,9 +1,11 @@
 import type { Express } from 'express'
+import { Readable } from 'stream'
 import request from 'supertest'
 import { appWithAllRoutes, flashProvider, user } from './testutils/appSetup'
 import AuditService, { Page } from '../services/auditService'
 import HmppsAuditClient from '../data/hmppsAuditClient'
 import PrisonerPropertyService from '../services/prisonerPropertyService'
+import PrisonerService from '../services/prisonerService'
 import UserService from '../services/userService'
 import type {
   BoxLocation,
@@ -12,13 +14,16 @@ import type {
   PropertyEvent,
   RestPage,
 } from '../data/prisonerPropertyApiTypes'
+import type { Prisoner } from '../data/prisonerSearchApiTypes'
 
 jest.mock('../services/auditService')
 jest.mock('../services/prisonerPropertyService')
+jest.mock('../services/prisonerService')
 jest.mock('../services/userService')
 
 const auditService = new AuditService({} as HmppsAuditClient) as jest.Mocked<AuditService>
 const prisonerPropertyService = new PrisonerPropertyService(null as never) as jest.Mocked<PrisonerPropertyService>
+const prisonerService = new PrisonerService(null as never, null as never) as jest.Mocked<PrisonerService>
 const userService = new UserService(null as never) as jest.Mocked<UserService>
 
 let app: Express
@@ -36,10 +41,13 @@ const emptyPage: RestPage<PrisonerPropertyGroup> = {
 
 beforeEach(() => {
   app = appWithAllRoutes({
-    services: { auditService, prisonerPropertyService, userService },
+    services: { auditService, prisonerPropertyService, prisonerService, userService },
     userSupplier: () => user,
   })
   auditService.logPageView.mockResolvedValue(undefined)
+  // Banner details default to a baseline prisoner so the property page renders; individual tests
+  // override this to exercise the banner's establishment-dependent fields.
+  prisonerService.getPrisonerDetails.mockResolvedValue(prisoner())
   // connect-flash always returns an array; the test harness mocks req.flash, so default it to empty.
   flashProvider.mockReturnValue([])
 })
@@ -284,6 +292,18 @@ const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPrope
   ...overrides,
 })
 
+const prisoner = (overrides: Partial<Prisoner> = {}): Prisoner => ({
+  prisonerNumber: 'A1234BC',
+  firstName: 'John',
+  lastName: 'Smith',
+  dateOfBirth: '2001-01-01',
+  prisonId: 'MDI',
+  prisonName: 'Moorland (HMP & YOI)',
+  cellLocation: 'F-3-042',
+  status: 'ACTIVE IN',
+  ...overrides,
+})
+
 const withActiveCaseload = () =>
   userService.getActiveCaseload.mockResolvedValue({
     activeCaseloadId: 'MDI',
@@ -359,16 +379,10 @@ describe('GET /prisoner/:prisonerNumber', () => {
       })
   })
 
-  it('renders the prisoner name in title case and the current establishment from the API field', async () => {
+  it('renders the prisoner name in title case in the heading and the establishment from prisoner-search', async () => {
     withActiveCaseload()
-    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
-      container({
-        prisonerName: 'JOHN SMITH',
-        inPrisonersCurrentPrison: false,
-        prisonName: 'Leeds (HMP)',
-        prisonerCurrentPrisonName: 'Isle of Wight (HMP)',
-      }),
-    ])
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'JOHN SMITH' })])
+    prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonName: 'Isle of Wight (HMP)' }))
 
     return request(app)
       .get('/prisoner/A1234BC')
@@ -376,7 +390,7 @@ describe('GET /prisoner/:prisonerNumber', () => {
       .expect(res => {
         expect(res.text).toContain('John Smith')
         expect(res.text).not.toContain('JOHN SMITH')
-        // establishment comes from the authoritative field even though no property is held there
+        // establishment on the banner comes from prisoner-search
         expect(res.text).toContain('Isle of Wight (HMP)')
       })
   })
@@ -418,6 +432,97 @@ describe('GET /prisoner/:prisonerNumber', () => {
       .expect(404)
       .expect(() => {
         expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
+      })
+  })
+
+  it('renders the prisoner banner with cell number and status when the prisoner is in this establishment', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerService.getPrisonerDetails.mockResolvedValue(
+      prisoner({ prisonId: 'MDI', cellLocation: 'F-3-042', status: 'ACTIVE IN', dateOfBirth: '2001-01-01' }),
+    )
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(prisonerService.getPrisonerDetails).toHaveBeenCalledWith('A1234BC', user.username)
+        // name in "Lastname, Firstname" order, linking to the DPS profile
+        expect(res.text).toContain('Smith, John')
+        expect(res.text).toContain('/prisoner/A1234BC"')
+        expect(res.text).toContain('01/01/2001')
+        expect(res.text).toContain('Cell number')
+        expect(res.text).toContain('F-3-042')
+        expect(res.text).toContain('ACTIVE IN')
+        expect(res.text).toContain('/prisoner/A1234BC/image')
+      })
+  })
+
+  it('omits cell number and status from the banner when the prisoner is not in this establishment', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerService.getPrisonerDetails.mockResolvedValue(
+      prisoner({ prisonId: 'LEI', cellLocation: 'A-1-001', status: 'ACTIVE OUT' }),
+    )
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Smith, John')
+        expect(res.text).not.toContain('Cell number')
+        expect(res.text).not.toContain('A-1-001')
+        expect(res.text).not.toContain('ACTIVE OUT')
+      })
+  })
+
+  it('still renders the page with a fallback banner when prisoner-search is unavailable', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
+    prisonerService.getPrisonerDetails.mockRejectedValue(new Error('prisoner-search down'))
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('data-qa="prisoner-banner"')
+        expect(res.text).toContain('John Smith')
+        expect(res.text).not.toContain('Cell number')
+      })
+  })
+})
+
+describe('GET /prisoner/:prisonerNumber/image', () => {
+  it('streams the prisoner image from prison-api', async () => {
+    withActiveCaseload()
+    prisonerService.getPrisonerImage.mockResolvedValue(Readable.from(['image-bytes']))
+
+    return request(app)
+      .get('/prisoner/A1234BC/image')
+      .expect(200)
+      .expect('Content-Type', /image\/jpeg/)
+      .expect(res => {
+        expect(prisonerService.getPrisonerImage).toHaveBeenCalledWith('A1234BC', user.username)
+        expect(res.body.toString()).toContain('image-bytes')
+      })
+  })
+
+  it('redirects to the placeholder when no image is available', async () => {
+    withActiveCaseload()
+    prisonerService.getPrisonerImage.mockRejectedValue(new Error('404 Not Found'))
+
+    return request(app)
+      .get('/prisoner/A1234BC/image')
+      .expect(302)
+      .expect('Location', '/assets/images/prisoner-image-withheld.svg')
+  })
+
+  it('returns 404 for an invalid prisoner number', async () => {
+    return request(app)
+      .get('/prisoner/not-a-number/image')
+      .expect(404)
+      .expect(() => {
+        expect(prisonerService.getPrisonerImage).not.toHaveBeenCalled()
       })
   })
 })
@@ -532,7 +637,7 @@ const boxPage = (locations: BoxLocation[]): RestPage<BoxLocation> => ({
 const manageUser = { ...user, userRoles: ['PRISONERPROP__MANAGE'] }
 const manageApp = () =>
   appWithAllRoutes({
-    services: { auditService, prisonerPropertyService, userService },
+    services: { auditService, prisonerPropertyService, prisonerService, userService },
     userSupplier: () => manageUser,
   })
 

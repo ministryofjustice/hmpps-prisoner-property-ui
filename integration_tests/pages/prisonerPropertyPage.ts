@@ -4,7 +4,21 @@ import AbstractPage from './abstractPage'
 export default class PrisonerPropertyPage extends AbstractPage {
   readonly name: Locator
 
-  readonly prisonerEstablishment: Locator
+  readonly banner: Locator
+
+  readonly bannerName: Locator
+
+  readonly bannerPrisonerNumber: Locator
+
+  readonly bannerDob: Locator
+
+  readonly bannerEstablishment: Locator
+
+  readonly bannerCell: Locator
+
+  readonly bannerStatus: Locator
+
+  readonly bannerPhoto: Locator
 
   readonly inEstablishment: Locator
 
@@ -21,7 +35,14 @@ export default class PrisonerPropertyPage extends AbstractPage {
   private constructor(page: Page) {
     super(page)
     this.name = page.getByTestId('prisoner-name')
-    this.prisonerEstablishment = page.getByTestId('prisoner-establishment')
+    this.banner = page.getByTestId('prisoner-banner')
+    this.bannerName = page.getByTestId('banner-name')
+    this.bannerPrisonerNumber = page.getByTestId('banner-prisoner-number')
+    this.bannerDob = page.getByTestId('banner-dob')
+    this.bannerEstablishment = page.getByTestId('banner-establishment')
+    this.bannerCell = page.getByTestId('banner-cell')
+    this.bannerStatus = page.getByTestId('banner-status')
+    this.bannerPhoto = page.getByTestId('banner-photo')
     this.inEstablishment = page.getByTestId('in-establishment')
     this.dueTransferIn = page.getByTestId('due-transfer-in')
     this.leftWarning = page.getByTestId('left-establishment-warning')

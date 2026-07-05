@@ -81,6 +81,24 @@ export default {
       },
       agent: new AgentConfig(Number(get('PRISONER_PROPERTY_API_TIMEOUT_RESPONSE', 5000))),
     },
+    prisonerSearchApi: {
+      url: get('PRISONER_SEARCH_API_URL', 'http://localhost:8083', requiredInProduction),
+      healthPath: '/health/ping',
+      timeout: {
+        response: Number(get('PRISONER_SEARCH_API_TIMEOUT_RESPONSE', 5000)),
+        deadline: Number(get('PRISONER_SEARCH_API_TIMEOUT_DEADLINE', 5000)),
+      },
+      agent: new AgentConfig(Number(get('PRISONER_SEARCH_API_TIMEOUT_RESPONSE', 5000))),
+    },
+    prisonApi: {
+      url: get('PRISON_API_URL', 'http://localhost:8084', requiredInProduction),
+      healthPath: '/health/ping',
+      timeout: {
+        response: Number(get('PRISON_API_TIMEOUT_RESPONSE', 5000)),
+        deadline: Number(get('PRISON_API_TIMEOUT_DEADLINE', 5000)),
+      },
+      agent: new AgentConfig(Number(get('PRISON_API_TIMEOUT_RESPONSE', 5000))),
+    },
     componentApi: {
       url: get('COMPONENT_API_URL', 'http://localhost:8082', requiredInProduction),
       healthPath: '/ping',

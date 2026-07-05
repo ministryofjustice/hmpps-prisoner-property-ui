@@ -14,12 +14,23 @@ import {
   statusTag,
 } from '../utils/propertyList'
 import { buildPersonPropertyView } from '../utils/personProperty'
+import { buildPrisonerBanner, fallbackPrisonerBanner } from '../utils/prisonerBanner'
+import type { Prisoner } from '../data/prisonerSearchApiTypes'
 import { validateDetails } from '../utils/addContainer'
+import logger from '../../logger'
 import requireManageRole, { canManageProperty } from '../middleware/requireManageRole'
 
 const BOX_PAGE_SIZE = 20
 
-export default function routes({ auditService, prisonerPropertyService, userService }: Services): Router {
+// The prisoner image placeholder shown when prison-api has no photo (or the call fails).
+const PRISONER_IMAGE_PLACEHOLDER = '/assets/images/prisoner-image-withheld.svg'
+
+export default function routes({
+  auditService,
+  prisonerPropertyService,
+  prisonerService,
+  userService,
+}: Services): Router {
   const router = Router()
 
   router.get('/', async (req, res, _next) => {
@@ -97,7 +108,15 @@ export default function routes({ auditService, prisonerPropertyService, userServ
       return next(createError(404, 'Prisoner not found'))
     }
 
-    const containers = await prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username)
+    // Fetch property and prisoner details together. Prisoner-search feeds the banner but is not
+    // essential to the page, so a failure there falls back to a minimal banner rather than 500ing.
+    const [containers, prisoner] = await Promise.all([
+      prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username),
+      prisonerService.getPrisonerDetails(prisonerNumber, username).catch((error: Error): Prisoner | null => {
+        logger.warn(`Failed to load prisoner-search details for ${prisonerNumber}: ${error.message}`)
+        return null
+      }),
+    ])
 
     await auditService.logPageView(Page.PRISONER_PROPERTY, {
       who: username,
@@ -111,17 +130,43 @@ export default function routes({ auditService, prisonerPropertyService, userServ
       activeCaseloadId,
     )
 
+    const banner = prisoner
+      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId)
+      : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
+
     return res.render('pages/prisonerProperty', {
       prisonerNumber,
       prisonerName: containers[0]?.prisonerName ?? null,
       prisonerCurrentPrisonName,
       hasLeft,
+      banner,
       inEstablishment,
       dueToTransferIn,
       canManage: canManageProperty(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
       backUrl: '/',
     })
+  })
+
+  router.get('/prisoner/:prisonerNumber/image', async (req, res, next) => {
+    const { username } = res.locals.user
+    const { prisonerNumber } = req.params
+
+    if (!isPrisonerNumber(prisonerNumber)) {
+      return next(createError(404, 'Prisoner not found'))
+    }
+
+    // Proxy the prisoner's photo from prison-api. When there is no image (or the call fails) redirect
+    // to the "Photo withheld for security reasons" placeholder so the banner always renders.
+    try {
+      const image = await prisonerService.getPrisonerImage(prisonerNumber, username)
+      res.type('image/jpeg')
+      res.set('Cache-Control', 'private, max-age=300')
+      return image.pipe(res)
+    } catch (error) {
+      logger.warn(`Failed to load prisoner image for ${prisonerNumber}: ${error.message}`)
+      return res.redirect(PRISONER_IMAGE_PLACEHOLDER)
+    }
   })
 
   router.get('/prisoner/:prisonerNumber/container/:id', async (req, res, next) => {

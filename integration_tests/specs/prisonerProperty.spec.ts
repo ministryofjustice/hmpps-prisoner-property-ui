@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { login, resetStubs } from '../testUtils'
 import prisonerPropertyApi from '../mockApis/prisonerPropertyApi'
+import prisonerSearchApi from '../mockApis/prisonerSearchApi'
 import PropertyListPage from '../pages/propertyListPage'
 import PrisonerPropertyPage from '../pages/prisonerPropertyPage'
 import type { PrisonerPropertyContainer, PrisonerPropertyGroup } from '../../server/data/prisonerPropertyApiTypes'
@@ -119,5 +120,58 @@ test.describe('Person property view', () => {
 
     const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
     await expect(prisonerPage.noResults).toBeVisible()
+  })
+
+  test('shows the prisoner banner with cell number and status when the prisoner is in this establishment', async ({
+    page,
+  }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [inEstablishmentContainer],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC')
+
+    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(prisonerPage.banner).toBeVisible()
+    await expect(prisonerPage.bannerName).toContainText('Smith, John')
+    await expect(prisonerPage.bannerPrisonerNumber).toContainText('A1234BC')
+    await expect(prisonerPage.bannerDob).toContainText('01/01/2001')
+    await expect(prisonerPage.bannerEstablishment).toContainText('Moorland (HMP & YOI)')
+    await expect(prisonerPage.bannerCell).toContainText('F-3-042')
+    await expect(prisonerPage.bannerStatus).toContainText('ACTIVE IN')
+  })
+
+  test('hides cell number and status from the banner when the prisoner is not in this establishment', async ({
+    page,
+  }) => {
+    await login(page)
+    // Prisoner is now at Leeds, not the viewing caseload (MDI).
+    await prisonerSearchApi.stubGetPrisoner({
+      prisoner: {
+        prisonerNumber: 'A1234BC',
+        firstName: 'John',
+        lastName: 'Smith',
+        dateOfBirth: '2001-01-01',
+        prisonId: 'LEI',
+        prisonName: 'Leeds (HMP)',
+        cellLocation: 'A-1-001',
+        status: 'ACTIVE OUT',
+      },
+      priority: 1,
+    })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [inEstablishmentContainer],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC')
+
+    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(prisonerPage.banner).toBeVisible()
+    await expect(prisonerPage.bannerName).toContainText('Smith, John')
+    await expect(prisonerPage.bannerCell).toBeHidden()
+    await expect(prisonerPage.bannerStatus).toBeHidden()
   })
 })

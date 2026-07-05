@@ -23,13 +23,11 @@
     }) }}
   {% endif %}
 
+  {% include "../partials/prisonerBanner.njk" %}
+
   <h1 class="govuk-heading-xl govuk-!-margin-bottom-2" data-qa="prisoner-name">
     {{ (prisonerName | convertToTitleCase) or "Unknown" }}’s property
   </h1>
-  <p class="govuk-body" data-qa="prisoner-establishment">
-    Prison number: {{ prisonerNumber }}<br>
-    Current establishment: {{ prisonerCurrentPrisonName or "Not known" }}
-  </p>
 
   {% if canManage %}
     {{ govukButton({
