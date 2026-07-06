@@ -7,6 +7,7 @@ import type {
   CreateContainerRequest,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
+  PrisonerTimelineItem,
   PrisonPropertyListQuery,
   PropertyEvent,
   RestPage,
@@ -39,6 +40,20 @@ export default class PrisonerPropertyApiClient extends RestClient {
    */
   getContainerEvents(id: string, username: string): Promise<PropertyEvent[]> {
     return this.get<PropertyEvent[]>({ path: `/property-containers/${id}/events` }, asSystem(username))
+  }
+
+  /**
+   * Get a prisoner's whole-property history timeline (every event across all their containers,
+   * interleaved newest first, plus prisoner-movement items).
+   *
+   * Called with a system token tied to the signed-in user (`asSystem(username)`). The system client
+   * must hold the ROLE_PRISONER_PROPERTY__RO role.
+   */
+  getPrisonerPropertyHistory(prisonerNumber: string, username: string): Promise<PrisonerTimelineItem[]> {
+    return this.get<PrisonerTimelineItem[]>(
+      { path: `/property-containers/prisoner/${prisonerNumber}/events` },
+      asSystem(username),
+    )
   }
 
   /**

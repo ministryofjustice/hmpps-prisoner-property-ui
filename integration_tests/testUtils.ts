@@ -4,6 +4,7 @@ import hmppsAuth, { type UserToken } from './mockApis/hmppsAuth'
 import frontendComponents from './mockApis/frontendComponents'
 import manageUsersApi from './mockApis/manageUsersApi'
 import prisonerPropertyApi from './mockApis/prisonerPropertyApi'
+import prisonerSearchApi from './mockApis/prisonerSearchApi'
 import { resetStubs } from './mockApis/wiremock'
 
 export { resetStubs }
@@ -33,6 +34,9 @@ export const login = async (
     // an empty property page by default. Specs can re-stub for specific data before navigating.
     manageUsersApi.stubGetMyCaseloads(),
     prisonerPropertyApi.stubGetPrisonProperty(),
+    // Prisoner banner defaults: prisoner-search details plus a 404 image (falls back to the placeholder).
+    prisonerSearchApi.stubGetPrisoner(),
+    prisonerSearchApi.stubGetPrisonerImage(),
   ])
   return attemptHmppsAuthLogin(page)
 }

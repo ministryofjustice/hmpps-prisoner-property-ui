@@ -1,0 +1,39 @@
+<div class="prisoner-banner" data-qa="prisoner-banner">
+  <img
+    class="prisoner-banner__photo"
+    src="/prisoner/{{ banner.prisonerNumber }}/image"
+    alt="Photo of {{ banner.name }}"
+    data-qa="banner-photo"
+  >
+
+  <dl class="prisoner-banner__details">
+    <div class="prisoner-banner__detail prisoner-banner__detail--name">
+      <dt>
+        <a class="govuk-link" href="{{ banner.profileUrl }}" data-qa="banner-name">{{ banner.name }}</a>
+      </dt>
+      <dd data-qa="banner-prisoner-number">{{ banner.prisonerNumber }}</dd>
+    </div>
+
+    <div class="prisoner-banner__detail">
+      <dt>Date of birth</dt>
+      <dd data-qa="banner-dob">{{ (banner.dateOfBirth | formatShortDate) or "Not known" }}</dd>
+    </div>
+
+    <div class="prisoner-banner__detail">
+      <dt>Establishment</dt>
+      <dd data-qa="banner-establishment">{{ banner.establishment or "Not known" }}</dd>
+    </div>
+
+    {% if banner.inThisEstablishment %}
+      <div class="prisoner-banner__detail">
+        <dt>Cell number</dt>
+        <dd data-qa="banner-cell">{{ banner.cellLocation or "Not known" }}</dd>
+      </div>
+
+      <div class="prisoner-banner__detail">
+        <dt>Status</dt>
+        <dd data-qa="banner-status">{{ banner.status or "Not known" }}</dd>
+      </div>
+    {% endif %}
+  </dl>
+</div>

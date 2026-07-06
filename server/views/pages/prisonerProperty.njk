@@ -3,7 +3,7 @@
 {% from "govuk/components/back-link/macro.njk" import govukBackLink %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
-{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 
 {% set pageTitle = applicationName + " - Person property" %}
@@ -22,85 +22,85 @@
     }) }}
   {% endif %}
 
-  <h1 class="govuk-heading-xl govuk-!-margin-bottom-2" data-qa="prisoner-name">
-    {{ (prisonerName | convertToTitleCase) or "Unknown" }}
-    <span class="govuk-!-font-weight-regular">({{ prisonerNumber }})</span>
-  </h1>
-  <p class="govuk-body" data-qa="current-establishment">
-    Current establishment: {{ currentPrisonName or "Not known" }}
-  </p>
+  {% set activeTab = "property" %}
+  {% include "../partials/personHeader.njk" %}
 
-  {% if canManage %}
-    {{ govukButton({
-      text: "Add property",
-      href: "/prisoner/" + prisonerNumber + "/add-container",
-      attributes: { "data-qa": "add-property" }
+  {% if hasLeft %}
+    {{ govukInsetText({
+      attributes: { "data-qa": "left-establishment-warning" },
+      html: "<strong>This person is no longer in this establishment.</strong><br>You should check if their property is still in storage at this establishment and update the details if necessary."
     }) }}
   {% endif %}
 
-  {% if active.length == 0 and past.length == 0 %}
+  {% if inEstablishment.length == 0 and dueToTransferIn.length == 0 %}
     <p class="govuk-body" data-qa="no-results">No property found for this person.</p>
   {% else %}
-    <h2 class="govuk-heading-l govuk-!-margin-top-6">Current property</h2>
-    {% if active.length == 0 %}
-      <p class="govuk-body" data-qa="no-active-property">No property is currently being held for this person.</p>
+    <h2 class="govuk-heading-l govuk-!-margin-top-6">Property in this establishment</h2>
+    {% if inEstablishment.length == 0 %}
+      <p class="govuk-body" data-qa="no-in-establishment">No property is being held in this establishment for this person.</p>
     {% else %}
-      {% set activeRows = [] %}
-      {% for container in active %}
-        {% set statusData = container.currentStatus | statusTag %}
-        {% set heldAt = container.prisonName or "-" %}
-        {% if not container.inPrisonersCurrentPrison and container.prisonName %}
-          {% set heldAt = container.prisonName + " (elsewhere)" %}
+      {% set inEstablishmentHead = [{ text: "Seal number" }] %}
+      {% if hasLeft %}
+        {% set inEstablishmentHead = (inEstablishmentHead.push({ text: "Prisoner establishment" }), inEstablishmentHead) %}
+      {% endif %}
+      {% set inEstablishmentHead = (inEstablishmentHead.push(
+        { text: "Property type" },
+        { text: "Storage location" },
+        { text: "Disposal date" },
+        { text: "Last updated" },
+        { text: "Property status" },
+        { text: "Actions" }
+      ), inEstablishmentHead) %}
+
+      {% set inEstablishmentRows = [] %}
+      {% for row in inEstablishment %}
+        {% set cells = [{ text: row.container.currentSealNumber or "-" }] %}
+        {% if hasLeft %}
+          {% set cells = (cells.push({ text: prisonerCurrentPrisonName or "Not known" }), cells) %}
         {% endif %}
-        {% set activeRows = (activeRows.push([
-          { text: container.currentSealNumber or "-" },
-          { text: container.containerType | containerTypeLabel },
-          { text: heldAt },
-          { text: container | containerLocation },
-          { text: container.createDateTime | formatDate },
-          { html: govukTag({ text: statusData.text, classes: statusData.classes }) },
-          { html: '<a class="govuk-link" href="/prisoner/' + prisonerNumber + '/container/' + container.id + '">View history</a>' }
-        ]), activeRows) %}
+        {% set cells = (cells.push(
+          { text: row.container.containerType | containerTypeLabel },
+          { text: row.container | containerLocation },
+          { text: (row.container.proposedDisposalDate | formatShortDate) or "No date set" },
+          { text: row.container.createDateTime | formatShortDate },
+          { html: govukTag({ text: row.status.text, classes: row.status.classes }) },
+          { html: '<a class="govuk-link" href="/prisoner/' + prisonerNumber + '/container/' + row.container.id + '">View history</a>' }
+        ), cells) %}
+        {% set inEstablishmentRows = (inEstablishmentRows.push(cells), inEstablishmentRows) %}
       {% endfor %}
 
       {{ govukTable({
-        attributes: { "data-qa": "active-property" },
-        head: [
-          { text: "Seal number" },
-          { text: "Property type" },
-          { text: "Held at" },
-          { text: "Storage location" },
-          { text: "Added" },
-          { text: "Status" },
-          { text: "History" }
-        ],
-        rows: activeRows
+        attributes: { "data-qa": "in-establishment" },
+        head: inEstablishmentHead,
+        rows: inEstablishmentRows
       }) }}
     {% endif %}
 
-    {% if past.length %}
-      <h2 class="govuk-heading-l govuk-!-margin-top-6">Past property</h2>
-      {% set pastRows = [] %}
-      {% for container in past %}
-        {% set pastRows = (pastRows.push([
-          { text: container.currentSealNumber or "-" },
-          { text: container.containerType | containerTypeLabel },
-          { text: container.removalOutcome | removalOutcomeLabel },
-          { text: container.removalDate | formatDate },
-          { html: '<a class="govuk-link" href="/prisoner/' + prisonerNumber + '/container/' + container.id + '">View history</a>' }
-        ]), pastRows) %}
+    {% if dueToTransferIn.length %}
+      <h2 class="govuk-heading-l govuk-!-margin-top-6">Property due to be transferred in</h2>
+      {% set transferInRows = [] %}
+      {% for row in dueToTransferIn %}
+        {% set transferInRows = (transferInRows.push([
+          { text: row.container.currentSealNumber or "-" },
+          { text: row.container.containerType | containerTypeLabel },
+          { text: row.container.prisonName or "-" },
+          { text: (row.container.proposedDisposalDate | formatShortDate) or "No date set" },
+          { text: row.container.createDateTime | formatShortDate },
+          { html: govukTag({ text: row.status.text, classes: row.status.classes }) }
+        ]), transferInRows) %}
       {% endfor %}
 
       {{ govukTable({
-        attributes: { "data-qa": "past-property" },
+        attributes: { "data-qa": "due-transfer-in" },
         head: [
           { text: "Seal number" },
           { text: "Property type" },
-          { text: "Outcome" },
-          { text: "Removed on" },
-          { text: "History" }
+          { text: "Establishment" },
+          { text: "Disposal date" },
+          { text: "Last updated" },
+          { text: "Property status" }
         ],
-        rows: pastRows
+        rows: transferInRows
       }) }}
     {% endif %}
   {% endif %}

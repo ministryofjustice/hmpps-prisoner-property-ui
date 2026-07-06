@@ -4,6 +4,7 @@ import type {
   CreateContainerRequest,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
+  PrisonerTimelineItem,
   PrisonPropertyListQuery,
   PropertyEvent,
   RestPage,
@@ -18,6 +19,10 @@ export default class PrisonerPropertyService {
 
   getContainerEvents(id: string, username: string): Promise<PropertyEvent[]> {
     return this.prisonerPropertyApiClient.getContainerEvents(id, username)
+  }
+
+  getPrisonerPropertyHistory(prisonerNumber: string, username: string): Promise<PrisonerTimelineItem[]> {
+    return this.prisonerPropertyApiClient.getPrisonerPropertyHistory(prisonerNumber, username)
   }
 
   getPrisonProperty(
