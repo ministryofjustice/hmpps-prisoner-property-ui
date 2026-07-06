@@ -1,24 +1,30 @@
 import type { Express } from 'express'
+import { Readable } from 'stream'
 import request from 'supertest'
 import { appWithAllRoutes, flashProvider, user } from './testutils/appSetup'
 import AuditService, { Page } from '../services/auditService'
 import HmppsAuditClient from '../data/hmppsAuditClient'
 import PrisonerPropertyService from '../services/prisonerPropertyService'
+import PrisonerService from '../services/prisonerService'
 import UserService from '../services/userService'
 import type {
   BoxLocation,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
+  PrisonerTimelineItem,
   PropertyEvent,
   RestPage,
 } from '../data/prisonerPropertyApiTypes'
+import type { Prisoner } from '../data/prisonerSearchApiTypes'
 
 jest.mock('../services/auditService')
 jest.mock('../services/prisonerPropertyService')
+jest.mock('../services/prisonerService')
 jest.mock('../services/userService')
 
 const auditService = new AuditService({} as HmppsAuditClient) as jest.Mocked<AuditService>
 const prisonerPropertyService = new PrisonerPropertyService(null as never) as jest.Mocked<PrisonerPropertyService>
+const prisonerService = new PrisonerService(null as never, null as never) as jest.Mocked<PrisonerService>
 const userService = new UserService(null as never) as jest.Mocked<UserService>
 
 let app: Express
@@ -36,13 +42,16 @@ const emptyPage: RestPage<PrisonerPropertyGroup> = {
 
 beforeEach(() => {
   app = appWithAllRoutes({
-    services: { auditService, prisonerPropertyService, userService },
+    services: { auditService, prisonerPropertyService, prisonerService, userService },
     userSupplier: () => user,
   })
   auditService.logPageView.mockResolvedValue(undefined)
   // The list route always fetches the summary. Default it to null so existing tests render without the
   // bar; tests that assert the bar override this.
   prisonerPropertyService.getPrisonPropertySummary.mockResolvedValue(null as never)
+  // Banner details default to a baseline prisoner so the property page renders; individual tests
+  // override this to exercise the banner's establishment-dependent fields.
+  prisonerService.getPrisonerDetails.mockResolvedValue(prisoner())
   // connect-flash always returns an array; the test harness mocks req.flash, so default it to empty.
   flashProvider.mockReturnValue([])
 })
@@ -353,6 +362,18 @@ const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPrope
   ...overrides,
 })
 
+const prisoner = (overrides: Partial<Prisoner> = {}): Prisoner => ({
+  prisonerNumber: 'A1234BC',
+  firstName: 'John',
+  lastName: 'Smith',
+  dateOfBirth: '2001-01-01',
+  prisonId: 'MDI',
+  prisonName: 'Moorland (HMP & YOI)',
+  cellLocation: 'F-3-042',
+  status: 'ACTIVE IN',
+  ...overrides,
+})
+
 const withActiveCaseload = () =>
   userService.getActiveCaseload.mockResolvedValue({
     activeCaseloadId: 'MDI',
@@ -361,19 +382,19 @@ const withActiveCaseload = () =>
   })
 
 describe('GET /prisoner/:prisonerNumber', () => {
-  it('renders current and past property for the prisoner and audits the view', async () => {
+  it('variant A (prisoner here): splits property in this establishment from property due to transfer in', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
-      container({ id: 'c1', currentSealNumber: 'SN0001', currentStatus: 'STORED' }),
+      container({ id: 'c1', prisonId: 'MDI', prisonerCurrentPrisonId: 'MDI', currentSealNumber: 'SN0001' }),
       container({
         id: 'c2',
+        prisonId: 'LEI',
+        prisonName: 'Leeds (HMP)',
+        prisonerCurrentPrisonId: 'MDI',
+        inPrisonersCurrentPrison: false,
         currentSealNumber: 'SN0002',
         containerType: 'VALUABLES',
-        currentStatus: 'RETURNED',
-        removalOutcome: 'RETURNED',
-        removalDate: '2026-06-20',
-        inPrisonersCurrentPrison: false,
-        prisonName: 'Leeds (HMP)',
+        currentStatus: 'DUE_FOR_TRANSFER_OUT',
       }),
     ])
 
@@ -384,12 +405,14 @@ describe('GET /prisoner/:prisonerNumber', () => {
       .expect(res => {
         expect(res.text).toContain('John Smith')
         expect(res.text).toContain('A1234BC')
-        expect(res.text).toContain('Current property')
+        expect(res.text).toContain('Property in this establishment')
         expect(res.text).toContain('SN0001')
-        expect(res.text).toContain('Reception A1')
-        expect(res.text).toContain('Past property')
+        expect(res.text).toContain('Stored')
+        expect(res.text).toContain('Property due to be transferred in')
         expect(res.text).toContain('SN0002')
-        expect(res.text).toContain('Returned')
+        expect(res.text).toContain('Leeds (HMP)')
+        expect(res.text).toContain('Due for transfer in')
+        expect(res.text).not.toContain('no longer in this establishment')
         expect(prisonerPropertyService.getPropertyForPrisoner).toHaveBeenCalledWith('A1234BC', user.username)
         expect(auditService.logPageView).toHaveBeenCalledWith(
           Page.PRISONER_PROPERTY,
@@ -398,14 +421,17 @@ describe('GET /prisoner/:prisonerNumber', () => {
       })
   })
 
-  it('renders the prisoner name in title case and the current establishment from the API field', async () => {
+  it('variant B (prisoner has left): warns, shows Due for transfer out and the prisoner establishment', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
       container({
-        prisonerName: 'JOHN SMITH',
-        inPrisonersCurrentPrison: false,
-        prisonName: 'Leeds (HMP)',
+        id: 'c1',
+        prisonId: 'MDI',
+        prisonerCurrentPrisonId: 'IWI',
         prisonerCurrentPrisonName: 'Isle of Wight (HMP)',
+        inPrisonersCurrentPrison: false,
+        currentSealNumber: 'SN0003',
+        currentStatus: 'DUE_FOR_TRANSFER_OUT',
       }),
     ])
 
@@ -413,9 +439,28 @@ describe('GET /prisoner/:prisonerNumber', () => {
       .get('/prisoner/A1234BC')
       .expect(200)
       .expect(res => {
+        expect(res.text).toContain('no longer in this establishment')
+        expect(res.text).toContain('Property in this establishment')
+        expect(res.text).toContain('SN0003')
+        expect(res.text).toContain('Due for transfer out')
+        expect(res.text).toContain('Isle of Wight (HMP)')
+        // the prisoner is not here, so nothing is due to transfer in
+        expect(res.text).not.toContain('Property due to be transferred in')
+      })
+  })
+
+  it('renders the prisoner name in title case in the heading and the establishment from prisoner-search', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'JOHN SMITH' })])
+    prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonName: 'Isle of Wight (HMP)' }))
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
         expect(res.text).toContain('John Smith')
         expect(res.text).not.toContain('JOHN SMITH')
-        // establishment comes from the authoritative field even though no property is held there
+        // establishment on the banner comes from prisoner-search
         expect(res.text).toContain('Isle of Wight (HMP)')
       })
   })
@@ -459,6 +504,97 @@ describe('GET /prisoner/:prisonerNumber', () => {
         expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
       })
   })
+
+  it('renders the prisoner banner with cell number and status when the prisoner is in this establishment', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerService.getPrisonerDetails.mockResolvedValue(
+      prisoner({ prisonId: 'MDI', cellLocation: 'F-3-042', status: 'ACTIVE IN', dateOfBirth: '2001-01-01' }),
+    )
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(prisonerService.getPrisonerDetails).toHaveBeenCalledWith('A1234BC', user.username)
+        // name in "Lastname, Firstname" order, linking to the DPS profile
+        expect(res.text).toContain('Smith, John')
+        expect(res.text).toContain('/prisoner/A1234BC"')
+        expect(res.text).toContain('01/01/2001')
+        expect(res.text).toContain('Cell number')
+        expect(res.text).toContain('F-3-042')
+        expect(res.text).toContain('ACTIVE IN')
+        expect(res.text).toContain('/prisoner/A1234BC/image')
+      })
+  })
+
+  it('omits cell number and status from the banner when the prisoner is not in this establishment', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerService.getPrisonerDetails.mockResolvedValue(
+      prisoner({ prisonId: 'LEI', cellLocation: 'A-1-001', status: 'ACTIVE OUT' }),
+    )
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Smith, John')
+        expect(res.text).not.toContain('Cell number')
+        expect(res.text).not.toContain('A-1-001')
+        expect(res.text).not.toContain('ACTIVE OUT')
+      })
+  })
+
+  it('still renders the page with a fallback banner when prisoner-search is unavailable', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
+    prisonerService.getPrisonerDetails.mockRejectedValue(new Error('prisoner-search down'))
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('data-qa="prisoner-banner"')
+        expect(res.text).toContain('John Smith')
+        expect(res.text).not.toContain('Cell number')
+      })
+  })
+})
+
+describe('GET /prisoner/:prisonerNumber/image', () => {
+  it('streams the prisoner image from prison-api', async () => {
+    withActiveCaseload()
+    prisonerService.getPrisonerImage.mockResolvedValue(Readable.from(['image-bytes']))
+
+    return request(app)
+      .get('/prisoner/A1234BC/image')
+      .expect(200)
+      .expect('Content-Type', /image\/jpeg/)
+      .expect(res => {
+        expect(prisonerService.getPrisonerImage).toHaveBeenCalledWith('A1234BC', user.username)
+        expect(res.body.toString()).toContain('image-bytes')
+      })
+  })
+
+  it('redirects to the placeholder when no image is available', async () => {
+    withActiveCaseload()
+    prisonerService.getPrisonerImage.mockRejectedValue(new Error('404 Not Found'))
+
+    return request(app)
+      .get('/prisoner/A1234BC/image')
+      .expect(302)
+      .expect('Location', '/assets/images/prisoner-image-withheld.svg')
+  })
+
+  it('returns 404 for an invalid prisoner number', async () => {
+    return request(app)
+      .get('/prisoner/not-a-number/image')
+      .expect(404)
+      .expect(() => {
+        expect(prisonerService.getPrisonerImage).not.toHaveBeenCalled()
+      })
+  })
 })
 
 const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
@@ -475,6 +611,123 @@ const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
   eventDate: null,
   relatedContainerId: null,
   ...overrides,
+})
+
+const timelineItem = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTimelineItem => ({
+  itemType: 'CONTAINER_EVENT',
+  eventId: 'e1',
+  eventType: 'CREATED_SEALED',
+  eventStatus: 'STORED',
+  eventDateTime: '2026-06-01T10:00:00',
+  eventDate: null,
+  eventUserId: 'AUSER',
+  systemGenerated: false,
+  prisonerName: null,
+  actingEstablishmentName: 'Leeds (HMP)',
+  fromPrisonName: null,
+  toPrisonName: null,
+  toStorageLocationType: null,
+  sealNumber: 'SN0001',
+  relatedContainerId: null,
+  containerId: 'c1',
+  containerType: 'STANDARD',
+  containerSealNumber: 'SN0001',
+  containerStatus: 'STORED',
+  containerLocationDescription: 'Reception A1',
+  ...overrides,
+})
+
+describe('GET /prisoner/:prisonerNumber/history', () => {
+  it('renders the whole-property timeline with tabs, tags, bylines and audits the view', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
+    prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([
+      timelineItem({
+        itemType: 'PRISONER_MOVEMENT',
+        eventType: null,
+        eventStatus: null,
+        systemGenerated: true,
+        prisonerName: 'JOHN SMITH',
+        actingEstablishmentName: 'Moorland (HMP & YOI)',
+        toPrisonName: 'Moorland (HMP & YOI)',
+        sealNumber: null,
+        containerId: null,
+      }),
+      timelineItem({
+        eventId: 'e2',
+        eventType: 'TRANSFERRED',
+        eventStatus: 'TRANSFER',
+        toPrisonName: 'Moorland (HMP & YOI)',
+      }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC/history')
+      .expect('Content-Type', /html/)
+      .expect(200)
+      .expect(res => {
+        // the shared header with the two tabs, the history tab current
+        expect(res.text).toContain('data-qa="tab-property"')
+        expect(res.text).toContain('data-qa="tab-history"')
+        expect(res.text).toContain('data-qa="property-timeline"')
+        // a container event line + status tag + byline
+        expect(res.text).toContain('Property container SN0001 transferred to Moorland (HMP &amp; YOI)')
+        expect(res.text).toContain('Transferred out')
+        expect(res.text).toContain('by AUSER, Leeds (HMP)')
+        // the prisoner movement line
+        expect(res.text).toContain('JOHN SMITH arrived at Moorland (HMP &amp; YOI)')
+        // the expandable container details + link
+        expect(res.text).toContain('Property container details')
+        expect(res.text).toContain('/prisoner/A1234BC/container/c1')
+        // the NOMIS-migration closing note
+        expect(res.text).toContain('History events before')
+        expect(prisonerPropertyService.getPrisonerPropertyHistory).toHaveBeenCalledWith('A1234BC', user.username)
+        expect(auditService.logPageView).toHaveBeenCalledWith(
+          Page.PRISONER_PROPERTY_HISTORY,
+          expect.objectContaining({ who: user.username, subjectId: 'A1234BC' }),
+        )
+      })
+  })
+
+  it('shows an empty state when the prisoner has no history', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([])
+
+    return request(app)
+      .get('/prisoner/A1234BC/history')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('No property history is available for this person.')
+      })
+  })
+
+  it('shows the no-caseload page and calls no APIs when there is no active caseload', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: null,
+      activeCaseloadName: null,
+      caseloadIds: [],
+    })
+
+    return request(app)
+      .get('/prisoner/A1234BC/history')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('You do not have an active caseload')
+        expect(prisonerPropertyService.getPrisonerPropertyHistory).not.toHaveBeenCalled()
+      })
+  })
+
+  it('returns 404 for an invalid prisoner number', async () => {
+    withActiveCaseload()
+
+    return request(app)
+      .get('/prisoner/not-a-number/history')
+      .expect(404)
+      .expect(() => {
+        expect(prisonerPropertyService.getPrisonerPropertyHistory).not.toHaveBeenCalled()
+      })
+  })
 })
 
 describe('GET /prisoner/:prisonerNumber/container/:id', () => {
@@ -571,7 +824,7 @@ const boxPage = (locations: BoxLocation[]): RestPage<BoxLocation> => ({
 const manageUser = { ...user, userRoles: ['PRISONERPROP__MANAGE'] }
 const manageApp = () =>
   appWithAllRoutes({
-    services: { auditService, prisonerPropertyService, userService },
+    services: { auditService, prisonerPropertyService, prisonerService, userService },
     userSupplier: () => manageUser,
   })
 

@@ -73,7 +73,7 @@ test.describe('Container history timeline', () => {
     await page.goto('/prisoner/A1234BC')
 
     const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
-    await prisonerPage.activeProperty.getByRole('link', { name: 'View history' }).click()
+    await prisonerPage.inEstablishment.getByRole('link', { name: 'View history' }).click()
 
     await expect(page).toHaveURL(/\/prisoner\/A1234BC\/container\/c1$/)
     const historyPage = await ContainerHistoryPage.verifyOnPage(page)

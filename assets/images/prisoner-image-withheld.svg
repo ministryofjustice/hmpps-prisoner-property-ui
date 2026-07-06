@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 130" role="img" aria-label="Photo withheld for security reasons">
+  <rect width="100" height="130" fill="#f3f2f1"/>
+  <!-- Silhouette -->
+  <circle cx="50" cy="46" r="22" fill="#c3d1df"/>
+  <path d="M12 130 C12 96 30 82 50 82 C70 82 88 96 88 130 Z" fill="#c3d1df"/>
+  <!-- Withheld banner -->
+  <rect x="0" y="56" width="100" height="20" fill="#0b2e4f"/>
+  <text x="50" y="64" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="6.5" font-weight="bold">Photo withheld for</text>
+  <text x="50" y="72" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="6.5" font-weight="bold">security reasons</text>
+</svg>

@@ -1,5 +1,10 @@
 import type { PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
-import { partitionContainers, removalOutcomeLabel, resolveCurrentPrisonName } from './personProperty'
+import {
+  buildPersonPropertyView,
+  partitionContainers,
+  removalOutcomeLabel,
+  resolveCurrentPrisonName,
+} from './personProperty'
 
 const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPropertyContainer => ({
   id: 'c1',
@@ -81,5 +86,79 @@ describe('resolveCurrentPrisonName', () => {
 
   it('returns null for no containers', () => {
     expect(resolveCurrentPrisonName([])).toBeNull()
+  })
+})
+
+describe('buildPersonPropertyView', () => {
+  // Viewed establishment = MDI throughout.
+  it('variant A: prisoner is here - splits held property (Stored) from property due to transfer in', () => {
+    const here = container({ id: 'here', prisonId: 'MDI', prisonerCurrentPrisonId: 'MDI', currentStatus: 'STORED' })
+    const elsewhere = container({
+      id: 'away',
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      prisonerCurrentPrisonId: 'MDI',
+      inPrisonersCurrentPrison: false,
+      currentStatus: 'DUE_FOR_TRANSFER_OUT',
+    })
+
+    const view = buildPersonPropertyView([here, elsewhere], 'MDI')
+
+    expect(view.hasLeft).toBe(false)
+    expect(view.inEstablishment.map(r => r.container.id)).toEqual(['here'])
+    expect(view.inEstablishment[0]!.status).toEqual({ text: 'Stored', classes: 'govuk-tag--green' })
+    expect(view.dueToTransferIn.map(r => r.container.id)).toEqual(['away'])
+    expect(view.dueToTransferIn[0]!.status).toEqual({ text: 'Due for transfer in', classes: 'govuk-tag--blue' })
+  })
+
+  it('variant B: prisoner has left - held property becomes Due for transfer out with no transfer-in section', () => {
+    const leftBehind = container({
+      id: 'left',
+      prisonId: 'MDI',
+      prisonerCurrentPrisonId: 'IWI',
+      prisonerCurrentPrisonName: 'Isle of Wight (HMP)',
+      inPrisonersCurrentPrison: false,
+      currentStatus: 'DUE_FOR_TRANSFER_OUT',
+    })
+
+    const view = buildPersonPropertyView([leftBehind], 'MDI')
+
+    expect(view.hasLeft).toBe(true)
+    expect(view.prisonerCurrentPrisonName).toBe('Isle of Wight (HMP)')
+    expect(view.inEstablishment[0]!.status).toEqual({ text: 'Due for transfer out', classes: 'govuk-tag--grey' })
+    expect(view.dueToTransferIn).toEqual([])
+  })
+
+  it('shows Due for disposal regardless of establishment or perspective', () => {
+    const hereDisposal = container({
+      prisonId: 'MDI',
+      prisonerCurrentPrisonId: 'MDI',
+      currentStatus: 'DISPOSAL_REQUIRED',
+    })
+    const awayDisposal = container({
+      id: 'away',
+      prisonId: 'LEI',
+      prisonerCurrentPrisonId: 'MDI',
+      currentStatus: 'DISPOSAL_REQUIRED',
+    })
+
+    const view = buildPersonPropertyView([hereDisposal, awayDisposal], 'MDI')
+
+    expect(view.inEstablishment[0]!.status.text).toBe('Due for disposal')
+    expect(view.dueToTransferIn[0]!.status.text).toBe('Due for disposal')
+  })
+
+  it('excludes removed containers', () => {
+    const removed = container({ prisonId: 'MDI', prisonerCurrentPrisonId: 'MDI', removalOutcome: 'RETURNED' })
+    const view = buildPersonPropertyView([removed], 'MDI')
+    expect(view.inEstablishment).toEqual([])
+    expect(view.dueToTransferIn).toEqual([])
+  })
+
+  it('treats an unknown current prison as "here" (never claims the prisoner has left)', () => {
+    const held = container({ prisonId: 'MDI', prisonerCurrentPrisonId: null })
+    const view = buildPersonPropertyView([held], 'MDI')
+    expect(view.hasLeft).toBe(false)
+    expect(view.inEstablishment[0]!.status.text).toBe('Stored')
   })
 })

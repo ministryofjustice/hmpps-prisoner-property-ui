@@ -5,6 +5,7 @@ import type {
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PrisonPropertySummary,
+  PrisonerTimelineItem,
   PropertyEvent,
 } from '../../server/data/prisonerPropertyApiTypes'
 
@@ -99,6 +100,27 @@ export default {
         status: httpStatus,
         headers: { 'Content-Type': 'application/json;charset=UTF-8' },
         jsonBody: events,
+      },
+    }),
+
+  stubGetPrisonerPropertyHistory: (
+    {
+      prisonerNumber = 'A1234BC',
+      items = [] as PrisonerTimelineItem[],
+      priority = undefined as number | undefined,
+    } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'GET',
+        urlPath: `/prisoner-property-api/property-containers/prisoner/${prisonerNumber}/events`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: items,
       },
     }),
 

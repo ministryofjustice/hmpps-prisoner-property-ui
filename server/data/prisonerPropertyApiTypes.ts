@@ -88,6 +88,36 @@ export interface PropertyEvent {
   relatedContainerId: string | null
 }
 
+export type TimelineItemType = 'CONTAINER_EVENT' | 'PRISONER_MOVEMENT'
+
+// A single item in a prisoner's whole-property history timeline
+// (GET /property-containers/prisoner/{prisonerNumber}/events), newest first. See
+// PrisonerTimelineItemDto in the API for the source of truth. Prison and location ids are already
+// resolved to names; seal number and acting establishment are the values as at that point in the
+// container's history. Container fields are null for prisoner-movement items.
+export interface PrisonerTimelineItem {
+  itemType: TimelineItemType
+  eventId: string
+  eventType: PropertyEventType | null
+  eventStatus: ContainerStatus | null
+  eventDateTime: string
+  eventDate: string | null
+  eventUserId: string
+  systemGenerated: boolean
+  prisonerName: string | null
+  actingEstablishmentName: string | null
+  fromPrisonName: string | null
+  toPrisonName: string | null
+  toStorageLocationType: StorageLocationType | null
+  sealNumber: string | null
+  relatedContainerId: string | null
+  containerId: string | null
+  containerType: ContainerType | null
+  containerSealNumber: string | null
+  containerStatus: ContainerStatus | null
+  containerLocationDescription: string | null
+}
+
 // A property box location within a prison (GET /property-containers/prison/{prisonId}/box-locations),
 // annotated with how many containers it currently holds. See BoxLocationDto in the API.
 export interface BoxLocation {
