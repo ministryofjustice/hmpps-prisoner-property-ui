@@ -11,5 +11,6 @@ $govuk-page-width: $moj-page-width;
 @import "@ministryofjustice/hmpps-connect-dps-components/dist/assets/header-bar";
 
 @import './components/header-bar';
+@import './components/summary-cards';
 @import './components/prisoner-banner';
 @import './overrides/local';

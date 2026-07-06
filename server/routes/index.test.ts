@@ -46,6 +46,9 @@ beforeEach(() => {
     userSupplier: () => user,
   })
   auditService.logPageView.mockResolvedValue(undefined)
+  // The list route always fetches the summary. Default it to null so existing tests render without the
+  // bar; tests that assert the bar override this.
+  prisonerPropertyService.getPrisonPropertySummary.mockResolvedValue(null as never)
   // Banner details default to a baseline prisoner so the property page renders; individual tests
   // override this to exercise the banner's establishment-dependent fields.
   prisonerService.getPrisonerDetails.mockResolvedValue(prisoner())
@@ -267,6 +270,72 @@ describe('GET /', () => {
         expect(res.text).toContain('You do not have an active caseload')
         expect(prisonerPropertyService.getPrisonProperty).not.toHaveBeenCalled()
         expect(auditService.logPageView).not.toHaveBeenCalled()
+      })
+  })
+
+  it('renders the summary tiles when the summary service returns counts', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+    prisonerPropertyService.getPrisonPropertySummary.mockResolvedValue({
+      availableStorageLocations: 150,
+      storedOnSite: 3000,
+      dueToTransferOut: 80,
+      dueToBeReturned: 0,
+      dueToBeDisposed: 40,
+    })
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Available storage locations on-site')
+        expect(res.text).toContain('150')
+        expect(res.text).toContain('Property containers stored on-site')
+        expect(res.text).toContain('3000')
+        expect(res.text).toContain('Property containers due to transfer out')
+        expect(res.text).toContain('Property containers due to be disposed')
+        expect(prisonerPropertyService.getPrisonPropertySummary).toHaveBeenCalledWith('MDI', user.username)
+      })
+  })
+
+  it('still renders the list (without the summary bar) when the summary fetch fails', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+    prisonerPropertyService.getPrisonPropertySummary.mockRejectedValue(new Error('not deployed yet'))
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).not.toContain('data-qa="property-summary"')
+        expect(res.text).toContain('No property containers found.')
+      })
+  })
+
+  it('describes a mid-move prisoner in the establishment column', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue({
+      ...emptyPage,
+      totalElements: 1,
+      totalPages: 1,
+      numberOfElements: 1,
+      content: [
+        {
+          prisonerNumber: 'A1234BC',
+          prisonerName: 'John Smith',
+          prisonerCurrentPrisonId: null,
+          prisonerCurrentPrisonName: null,
+          prisonerMovementStatus: 'IN_TRANSIT',
+          containers: [container({})],
+        },
+      ],
+    })
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Transferring')
       })
   })
 })

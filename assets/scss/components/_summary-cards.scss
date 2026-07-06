@@ -1,0 +1,35 @@
+// Summary tiles across the top of the establishment property list. A responsive row of bordered
+// cards, each a bold caption above a large count.
+.property-summary {
+  @include govuk-responsive-margin(6, 'bottom');
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: govuk-spacing(3);
+
+  @include govuk-media-query($from: tablet) {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  &__card {
+    @include govuk-responsive-padding(3);
+    border: 1px solid $govuk-border-colour;
+    border-bottom: govuk-spacing(1) solid govuk-colour('blue');
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  &__caption {
+    @include govuk-font($size: 19, $weight: 'bold');
+    @include govuk-responsive-margin(2, 'bottom');
+  }
+
+  &__value {
+    @include govuk-font($size: 36, $weight: 'bold');
+    margin: 0;
+  }
+
+  @media print {
+    display: none;
+  }
+}

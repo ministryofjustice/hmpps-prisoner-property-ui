@@ -39,6 +39,46 @@ test.describe('Establishment property list', () => {
     await resetStubs()
   })
 
+  test('shows the summary tiles with whole-prison counts', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [], priority: 1 })
+    await prisonerPropertyApi.stubGetPrisonPropertySummary({
+      prisonId: 'MDI',
+      summary: {
+        availableStorageLocations: 150,
+        storedOnSite: 3000,
+        dueToTransferOut: 80,
+        dueToBeReturned: 70,
+        dueToBeDisposed: 40,
+      },
+      priority: 1,
+    })
+    await page.goto('/')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await expect(listPage.summary).toBeVisible()
+    await expect(listPage.summaryValue('summary-available-locations')).toHaveText('150')
+    await expect(listPage.summaryValue('summary-stored')).toHaveText('3000')
+    await expect(listPage.summaryValue('summary-transfer-out')).toHaveText('80')
+    await expect(listPage.summaryValue('summary-returned')).toHaveText('70')
+    await expect(listPage.summaryValue('summary-disposed')).toHaveText('40')
+  })
+
+  test('describes a released prisoner in the establishment column', async ({ page }) => {
+    const released: PrisonerPropertyGroup = {
+      ...group,
+      prisonerCurrentPrisonId: 'OUT',
+      prisonerCurrentPrisonName: null,
+      prisonerMovementStatus: 'RELEASED',
+    }
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [released], priority: 1 })
+    await page.goto('/')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await expect(listPage.prisonerEstablishments).toContainText('Released')
+  })
+
   test('shows property grouped by prisoner with status tags for the active caseload', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })

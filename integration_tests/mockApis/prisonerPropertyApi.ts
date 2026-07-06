@@ -4,6 +4,7 @@ import type {
   BoxLocation,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
+  PrisonPropertySummary,
   PrisonerTimelineItem,
   PropertyEvent,
 } from '../../server/data/prisonerPropertyApiTypes'
@@ -55,6 +56,33 @@ export default {
           first: true,
           last: true,
         },
+      },
+    }),
+
+  stubGetPrisonPropertySummary: (
+    {
+      prisonId = 'MDI',
+      summary = {
+        availableStorageLocations: 0,
+        storedOnSite: 0,
+        dueToTransferOut: 0,
+        dueToBeReturned: 0,
+        dueToBeDisposed: 0,
+      } as PrisonPropertySummary,
+      priority = undefined as number | undefined,
+    } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'GET',
+        urlPath: `/prisoner-property-api/property-containers/prison/${prisonId}/summary`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: summary,
       },
     }),
 

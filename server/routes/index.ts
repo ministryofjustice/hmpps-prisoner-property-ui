@@ -52,7 +52,12 @@ export default function routes({
       DEFAULT_PAGE_SIZE,
     )
 
-    const result = await prisonerPropertyService.getPrisonProperty(activeCaseloadId, apiQuery, username)
+    // The summary counts come from a separate endpoint. Fetch it alongside the list, but degrade
+    // gracefully: if it fails (e.g. the endpoint isn't deployed yet) render the list without the bar.
+    const [result, summary] = await Promise.all([
+      prisonerPropertyService.getPrisonProperty(activeCaseloadId, apiQuery, username),
+      prisonerPropertyService.getPrisonPropertySummary(activeCaseloadId, username).catch((): null => null),
+    ])
 
     await auditService.logPageView(Page.PROPERTY_LIST, {
       who: username,
@@ -69,6 +74,7 @@ export default function routes({
     return res.render('pages/propertyList', {
       establishmentName: activeCaseloadName,
       canManage: canManageProperty(res.locals.user.userRoles),
+      summary,
       groups: result.content,
       pagination: buildPagination(
         page,

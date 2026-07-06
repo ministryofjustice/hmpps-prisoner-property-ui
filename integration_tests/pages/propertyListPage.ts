@@ -10,6 +10,10 @@ export default class PropertyListPage extends AbstractPage {
 
   readonly prisonerHeadings: Locator
 
+  readonly prisonerEstablishments: Locator
+
+  readonly summary: Locator
+
   readonly noResults: Locator
 
   private constructor(page: Page) {
@@ -18,7 +22,13 @@ export default class PropertyListPage extends AbstractPage {
     this.searchInput = page.locator('#q')
     this.searchButton = page.getByRole('button', { name: 'Search' })
     this.prisonerHeadings = page.getByTestId('prisoner-heading')
+    this.prisonerEstablishments = page.getByTestId('prisoner-establishment')
+    this.summary = page.getByTestId('property-summary')
     this.noResults = page.getByTestId('no-results')
+  }
+
+  summaryValue(qa: string): Locator {
+    return this.page.getByTestId(qa)
   }
 
   static async verifyOnPage(page: Page): Promise<PropertyListPage> {
