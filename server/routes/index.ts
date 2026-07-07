@@ -46,7 +46,7 @@ export default function routes({
       return res.render('pages/noCaseload')
     }
 
-    const { search, containerTypes, statuses, storageLocation, page, apiQuery } = parsePropertyListQuery(
+    const { search, containerTypes, statuses, includeRemoved, page, apiQuery } = parsePropertyListQuery(
       req.query,
       DEFAULT_PAGE_SIZE,
     )
@@ -68,12 +68,13 @@ export default function routes({
     if (search) baseQueryParams.set('q', search)
     containerTypes.forEach(type => baseQueryParams.append('containerType', type))
     statuses.forEach(status => baseQueryParams.append('status', status))
-    if (storageLocation) baseQueryParams.set('storageLocation', storageLocation)
+    if (includeRemoved) baseQueryParams.set('includeRemoved', 'true')
 
     return res.render('pages/propertyList', {
       establishmentName: activeCaseloadName,
       canManage: canManageProperty(res.locals.user.userRoles),
       dpsUrl: config.serviceUrls.digitalPrison,
+      includeRemoved,
       summary,
       groups: result.content,
       pagination: buildPagination(

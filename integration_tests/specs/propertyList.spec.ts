@@ -169,14 +169,15 @@ test.describe('Establishment property list', () => {
     await expect(listPage.filters.getByRole('checkbox', { name: 'Standard' })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer out' })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for disposal' })).toBeEnabled()
+    // Returned/disposed is wired to the API's includeRemoved flag.
+    await expect(
+      listPage.filters.getByRole('checkbox', { name: 'Show property that has been returned or disposed of' }),
+    ).toBeEnabled()
     // The remaining groups are placeholders until the API supports them.
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for return' })).toBeDisabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeDisabled()
     await expect(
       listPage.filters.getByRole('checkbox', { name: 'Property for people in this establishment' }),
-    ).toBeDisabled()
-    await expect(
-      listPage.filters.getByRole('checkbox', { name: 'Show property that has been returned or disposed of' }),
     ).toBeDisabled()
   })
 
