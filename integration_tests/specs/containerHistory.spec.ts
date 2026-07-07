@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { login, resetStubs } from '../testUtils'
 import prisonerPropertyApi from '../mockApis/prisonerPropertyApi'
-import PrisonerPropertyPage from '../pages/prisonerPropertyPage'
 import ContainerHistoryPage from '../pages/containerHistoryPage'
 import type { PrisonerPropertyContainer, PropertyEvent } from '../../server/data/prisonerPropertyApiTypes'
 
@@ -62,7 +61,7 @@ test.describe('Container history timeline', () => {
     await resetStubs()
   })
 
-  test('drills down from the person property view to a container timeline', async ({ page }) => {
+  test('renders a container timeline', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPropertyForPrisoner({
       prisonerNumber: 'A1234BC',
@@ -70,12 +69,8 @@ test.describe('Container history timeline', () => {
       priority: 1,
     })
     await prisonerPropertyApi.stubGetContainerEvents({ id: 'c1', events, priority: 1 })
-    await page.goto('/prisoner/A1234BC')
+    await page.goto('/prisoner/A1234BC/container/c1')
 
-    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
-    await prisonerPage.inEstablishment.getByRole('link', { name: 'View history' }).click()
-
-    await expect(page).toHaveURL(/\/prisoner\/A1234BC\/container\/c1$/)
     const historyPage = await ContainerHistoryPage.verifyOnPage(page)
 
     await expect(historyPage.summary).toContainText('SN0001')

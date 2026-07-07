@@ -113,6 +113,82 @@ test.describe('Person property view', () => {
     await expect(prisonerPage.dueTransferIn).toBeHidden()
   })
 
+  test('shows a breadcrumb back to Digital Prison Services and the property list', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [inEstablishmentContainer],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC')
+
+    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(prisonerPage.breadcrumbs.getByRole('link', { name: 'Digital Prison Services' })).toBeVisible()
+    await expect(prisonerPage.breadcrumbs.getByRole('link', { name: 'Prisoner property' })).toHaveAttribute('href', '/')
+  })
+
+  test('shows selection, per-row actions and the combine button for a user with the manage role', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [inEstablishmentContainer],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC')
+
+    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(prisonerPage.selectAllHeader).toBeVisible()
+    // MOJ multi-select injects a "Select all" toggle into the header, plus a per-row checkbox.
+    await expect(prisonerPage.inEstablishment.getByRole('checkbox', { name: 'Select all' })).toBeVisible()
+    await expect(prisonerPage.inEstablishment.getByRole('checkbox', { name: 'Select SN0001' })).toBeVisible()
+    await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Change' })).toBeVisible()
+    await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Remove' })).toBeVisible()
+    await expect(prisonerPage.combineButton).toBeVisible()
+  })
+
+  test('hides selection, actions and the combine button from a user without the manage role', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [inEstablishmentContainer],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC')
+
+    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(prisonerPage.selectAllHeader).toBeHidden()
+    await expect(prisonerPage.inEstablishment.getByRole('checkbox')).toBeHidden()
+    await expect(prisonerPage.combineButton).toBeHidden()
+  })
+
+  test('sorts the in-establishment table by last updated when the column header is clicked', async ({ page }) => {
+    const older: PrisonerPropertyContainer = {
+      ...inEstablishmentContainer,
+      id: 'c-old',
+      currentSealNumber: 'SN-OLD',
+      createDateTime: '2020-01-01T10:00:00',
+    }
+    const newer: PrisonerPropertyContainer = {
+      ...inEstablishmentContainer,
+      id: 'c-new',
+      currentSealNumber: 'SN-NEW',
+      createDateTime: '2026-12-31T10:00:00',
+    }
+    await login(page)
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [newer, older],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC')
+
+    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
+    // Sortable-table wraps the header text in a button.
+    await prisonerPage.inEstablishment.getByRole('button', { name: 'Last updated' }).click()
+    const firstRowSeal = prisonerPage.inEstablishment.locator('tbody tr').first().getByRole('cell').first()
+    await expect(firstRowSeal).toContainText('SN-OLD')
+  })
+
   test('shows an empty state when the prisoner has no property', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPropertyForPrisoner({ prisonerNumber: 'A1234BC', containers: [], priority: 1 })
