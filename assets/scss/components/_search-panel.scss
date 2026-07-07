@@ -1,0 +1,49 @@
+// Grey "Search for property" panel on the establishment list. A full-bleed light-grey band that
+// holds the search box, an inline Search + Clear search, and the collapsible filters, matching the
+// alpha design.
+.app-search-panel {
+  background-color: govuk-colour('light-grey');
+  @include govuk-responsive-margin(6, 'bottom');
+  @include govuk-responsive-padding(6);
+
+  // Bleed the grey band to the edges of the page-width container.
+  margin-left: govuk-spacing(-3);
+  margin-right: govuk-spacing(-3);
+
+  @include govuk-media-query($from: tablet) {
+    margin-left: govuk-spacing(-6);
+    margin-right: govuk-spacing(-6);
+  }
+
+  // Input, Search button and Clear-search link on a single baseline-aligned row.
+  &__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: govuk-spacing(3);
+  }
+
+  &__input,
+  &__button {
+    margin-bottom: 0;
+  }
+
+  &__clear {
+    // Sit the link on the button's baseline rather than the row's bottom edge.
+    margin-bottom: govuk-spacing(2);
+  }
+
+  &__filters {
+    @include govuk-responsive-margin(4, 'top');
+    margin-bottom: 0;
+  }
+}
+
+// Lay a checkbox group's items out horizontally (the filter groups in the design), wrapping on
+// narrow viewports.
+.app-checkboxes--inline {
+  .govuk-checkboxes__item {
+    display: inline-block;
+    margin-right: govuk-spacing(4);
+  }
+}

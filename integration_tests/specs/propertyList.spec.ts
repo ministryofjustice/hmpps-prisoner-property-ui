@@ -139,6 +139,69 @@ test.describe('Establishment property list', () => {
     await expect(listPage.noResults).toBeVisible()
   })
 
+  test('shows a breadcrumb back to Digital Prison Services', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await expect(listPage.breadcrumbs.getByRole('link', { name: 'Digital Prison Services' })).toBeVisible()
+    await expect(listPage.breadcrumbs).toContainText('Prisoner property')
+  })
+
+  test('renders pagination above and below the table', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await expect(listPage.pagination).toHaveCount(2)
+  })
+
+  test('exposes the four filter groups with disabled placeholders for unsupported filters', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await listPage.filters.locator('summary').click() // expand the collapsed filters
+    // Property type + the two mapped statuses are real, submittable checkboxes.
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Standard' })).toBeEnabled()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer out' })).toBeEnabled()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for disposal' })).toBeEnabled()
+    // The remaining groups are placeholders until the API supports them.
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for return' })).toBeDisabled()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeDisabled()
+    await expect(
+      listPage.filters.getByRole('checkbox', { name: 'Property for people in this establishment' }),
+    ).toBeDisabled()
+    await expect(
+      listPage.filters.getByRole('checkbox', { name: 'Show property that has been returned or disposed of' }),
+    ).toBeDisabled()
+  })
+
+  test('shows the Add button and per-row actions for a user with the manage role', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await expect(listPage.addButton).toBeVisible()
+    await expect(listPage.table.getByRole('columnheader', { name: 'Actions' })).toBeVisible()
+    await expect(listPage.table.getByRole('link', { name: 'Change' })).toBeVisible()
+    await expect(listPage.table.getByRole('link', { name: 'Remove' })).toBeVisible()
+  })
+
+  test('hides the Add button and actions from a user without the manage role', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await expect(listPage.addButton).toBeHidden()
+    await expect(listPage.table.getByRole('columnheader', { name: 'Actions' })).toBeHidden()
+  })
+
   test('shows the no-caseload page and no property when the user has no active caseload', async ({ page }) => {
     await login(page)
     await manageUsersApi.stubGetMyCaseloads(null, 1)

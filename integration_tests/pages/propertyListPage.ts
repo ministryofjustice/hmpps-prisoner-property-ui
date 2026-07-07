@@ -16,6 +16,18 @@ export default class PropertyListPage extends AbstractPage {
 
   readonly noResults: Locator
 
+  readonly breadcrumbs: Locator
+
+  readonly addButton: Locator
+
+  readonly clearSearch: Locator
+
+  readonly filters: Locator
+
+  readonly pagination: Locator
+
+  readonly table: Locator
+
   private constructor(page: Page) {
     super(page)
     this.heading = page.locator('h1', { hasText: 'Prisoner property' })
@@ -25,6 +37,12 @@ export default class PropertyListPage extends AbstractPage {
     this.prisonerEstablishments = page.getByTestId('prisoner-establishment')
     this.summary = page.getByTestId('property-summary')
     this.noResults = page.getByTestId('no-results')
+    this.breadcrumbs = page.locator('.govuk-breadcrumbs')
+    this.addButton = page.getByTestId('add-container')
+    this.clearSearch = page.getByRole('link', { name: 'Clear search' })
+    this.filters = page.getByTestId('filters')
+    this.pagination = page.locator('.moj-pagination')
+    this.table = page.getByTestId('property-list')
   }
 
   summaryValue(qa: string): Locator {

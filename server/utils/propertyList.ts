@@ -73,7 +73,7 @@ export const searchToFilters = (search?: string): Pick<PrisonPropertyListQuery, 
 
 export interface ParsedPropertyListQuery {
   search: string
-  containerType?: ContainerType
+  containerTypes: ContainerType[]
   statuses: ContainerStatus[]
   storageLocation?: string
   page: number
@@ -83,10 +83,9 @@ export interface ParsedPropertyListQuery {
 /** Parse and whitelist the establishment-list request query into filter + paging values. */
 export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_SIZE): ParsedPropertyListQuery => {
   const search = firstValue(reqQuery.q) ?? ''
-  const containerTypeRaw = firstValue(reqQuery.containerType)
-  const containerType = ALL_CONTAINER_TYPES.includes(containerTypeRaw as ContainerType)
-    ? (containerTypeRaw as ContainerType)
-    : undefined
+  const containerTypes = toArray(reqQuery.containerType).filter((type): type is ContainerType =>
+    ALL_CONTAINER_TYPES.includes(type as ContainerType),
+  )
   const statuses = toArray(reqQuery.status).filter((status): status is ContainerStatus =>
     ALL_STATUSES.includes(status as ContainerStatus),
   )
@@ -96,14 +95,15 @@ export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_S
 
   const apiQuery: PrisonPropertyListQuery = {
     ...searchToFilters(search),
-    containerType,
+    // TODO(MAPB-follow-up): send the whole array once the API supports multi-select property type.
+    containerType: containerTypes[0],
     status: statuses.length ? statuses : undefined,
     storageLocation,
     page: page - 1, // API pages are zero-based
     size,
   }
 
-  return { search, containerType, statuses, storageLocation, page, apiQuery }
+  return { search, containerTypes, statuses, storageLocation, page, apiQuery }
 }
 
 export interface PaginationItem {

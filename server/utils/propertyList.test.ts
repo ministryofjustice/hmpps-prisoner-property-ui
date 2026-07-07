@@ -116,7 +116,7 @@ describe('propertyList utils', () => {
       const result = parsePropertyListQuery(reqQuery, 20)
 
       expect(result.search).toBe('A1234BC')
-      expect(result.containerType).toBe('VALUABLES')
+      expect(result.containerTypes).toEqual(['VALUABLES'])
       expect(result.statuses).toEqual(['STORED'])
       expect(result.page).toBe(3)
       expect(result.apiQuery).toEqual({
@@ -133,9 +133,17 @@ describe('propertyList utils', () => {
       const result = parsePropertyListQuery({ containerType: 'NOPE', page: '0' } as unknown as ParsedQs, 20)
 
       expect(result.page).toBe(1)
-      expect(result.containerType).toBeUndefined()
+      expect(result.containerTypes).toEqual([])
+      expect(result.apiQuery.containerType).toBeUndefined()
       expect(result.apiQuery.status).toBeUndefined()
       expect(result.apiQuery.page).toBe(0)
+    })
+
+    it('accepts multiple container types but sends only the first to the API for now', () => {
+      const result = parsePropertyListQuery({ containerType: ['STANDARD', 'VALUABLES'] } as unknown as ParsedQs, 20)
+
+      expect(result.containerTypes).toEqual(['STANDARD', 'VALUABLES'])
+      expect(result.apiQuery.containerType).toBe('STANDARD')
     })
   })
 

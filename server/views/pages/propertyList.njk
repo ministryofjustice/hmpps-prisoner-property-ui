@@ -1,8 +1,8 @@
 {% extends "../partials/layout.njk" %}
 
+{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
 {% from "govuk/components/input/macro.njk" import govukInput %}
 {% from "govuk/components/button/macro.njk" import govukButton %}
-{% from "govuk/components/select/macro.njk" import govukSelect %}
 {% from "govuk/components/checkboxes/macro.njk" import govukCheckboxes %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
@@ -11,10 +11,25 @@
 {% set pageTitle = applicationName + " - Property" %}
 {% set mainClasses = "govuk-body" %}
 
+{% block beforeContent %}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: "Prisoner property" }
+  ] }) }}
+{% endblock %}
+
 {% block content %}
-  <h1 class="govuk-heading-xl">
+  <h1 class="govuk-heading-xl govuk-!-margin-bottom-4">
     Prisoner property{% if establishmentName %} <span class="govuk-!-font-weight-regular">— {{ establishmentName }}</span>{% endif %}
   </h1>
+
+  {% if canManage %}
+    {{ govukButton({
+      text: "Add a property container",
+      href: "#",
+      attributes: { "data-qa": "add-container" }
+    }) }}
+  {% endif %}
 
   {% if summary %}
     {% set tiles = [
@@ -34,53 +49,89 @@
     </div>
   {% endif %}
 
-  <form method="get" action="/" novalidate data-qa="property-search">
-    {{ govukInput({
-      label: { text: "Search by prison number or seal number" },
-      id: "q",
-      name: "q",
-      value: search,
-      classes: "govuk-input--width-20"
-    }) }}
+  <div class="app-search-panel">
+    <form method="get" action="/" novalidate data-qa="property-search">
+      <h2 class="govuk-heading-m">Search for property</h2>
+      <p class="govuk-hint">You can search by prison number, seal number or storage location number</p>
 
-    <details class="govuk-details" data-qa="filters">
-      <summary class="govuk-details__summary">
-        <span class="govuk-details__summary-text">Filters</span>
-      </summary>
-      <div class="govuk-details__text">
-        {{ govukSelect({
-          id: "containerType",
-          name: "containerType",
-          label: { text: "Property type" },
-          items: containerTypeItems
-        }) }}
-
-        {{ govukCheckboxes({
-          idPrefix: "status",
-          name: "status",
-          classes: "govuk-checkboxes--small",
-          fieldset: { legend: { text: "Status" } },
-          items: statusItems
-        }) }}
-
+      <div class="app-search-panel__row">
         {{ govukInput({
-          label: { text: "Storage location" },
-          hint: { text: "Location code, or 'Branston' for offsite storage" },
-          id: "storageLocation",
-          name: "storageLocation",
-          value: storageLocation,
-          classes: "govuk-input--width-20"
+          label: { text: "Search for property", classes: "govuk-visually-hidden" },
+          id: "q",
+          name: "q",
+          value: search,
+          classes: "govuk-input--width-20",
+          formGroup: { classes: "app-search-panel__input" }
         }) }}
+        {{ govukButton({ text: "Search", classes: "app-search-panel__button" }) }}
+        <a class="govuk-link app-search-panel__clear" href="/">Clear search</a>
       </div>
-    </details>
 
-    {{ govukButton({ text: "Search" }) }}
-    <a class="govuk-link govuk-!-margin-left-2" href="/">Clear search</a>
-  </form>
+      <details class="govuk-details app-search-panel__filters" data-qa="filters">
+        <summary class="govuk-details__summary">
+          <span class="govuk-details__summary-text">Filters</span>
+        </summary>
+        <div class="govuk-details__text">
+          {{ govukCheckboxes({
+            idPrefix: "containerType",
+            name: "containerType",
+            classes: "govuk-checkboxes--small app-checkboxes--inline",
+            fieldset: { legend: { text: "By property type", classes: "govuk-fieldset__legend--s" } },
+            items: containerTypeItems
+          }) }}
+
+          {{ govukCheckboxes({
+            idPrefix: "status",
+            name: "status",
+            classes: "govuk-checkboxes--small app-checkboxes--inline",
+            fieldset: { legend: { text: "By property status", classes: "govuk-fieldset__legend--s" } },
+            items: statusItems
+          }) }}
+
+          {{ govukCheckboxes({
+            idPrefix: "personLocation",
+            name: "personLocation",
+            classes: "govuk-checkboxes--small app-checkboxes--inline",
+            fieldset: { legend: { text: "By person location", classes: "govuk-fieldset__legend--s" } },
+            items: [
+              { value: "IN_ESTABLISHMENT", text: "Property for people in this establishment", disabled: true },
+              { value: "LEFT_ESTABLISHMENT", text: "Property for people no longer in this establishment", disabled: true }
+            ]
+          }) }}
+
+          {{ govukCheckboxes({
+            idPrefix: "includeRemoved",
+            name: "includeRemoved",
+            classes: "govuk-checkboxes--small",
+            fieldset: { legend: { text: "By property returned or disposed", classes: "govuk-fieldset__legend--s" } },
+            items: [
+              { value: "true", text: "Show property that has been returned or disposed of", disabled: true }
+            ]
+          }) }}
+
+          {{ govukButton({ text: "Apply filters" }) }}
+          <a class="govuk-link govuk-!-margin-left-2" href="/">Clear filters</a>
+        </div>
+      </details>
+    </form>
+  </div>
 
   {% if groups.length == 0 %}
     <p class="govuk-body" data-qa="no-results">No property containers found.</p>
   {% else %}
+    {% set tableHead = [
+      { text: "Name" },
+      { text: "Prisoner establishment" },
+      { text: "Seal number" },
+      { text: "Property type" },
+      { text: "Storage location" },
+      { text: "Last updated" },
+      { text: "Property status" }
+    ] %}
+    {% if canManage %}
+      {% set tableHead = (tableHead.push({ text: "Actions" }), tableHead) %}
+    {% endif %}
+
     {% set rows = [] %}
     {% for group in groups %}
       {% for container in group.containers %}
@@ -103,22 +154,19 @@
           { text: container.createDateTime | formatShortDate },
           { html: govukTag({ text: statusData.text, classes: statusData.classes }) }
         ), cells) %}
+        {% if canManage %}
+          {% set cells = (cells.push({ html: '<a class="govuk-link" href="#">Change</a> | <a class="govuk-link" href="#">Remove</a>' }), cells) %}
+        {% endif %}
         {% set rows = (rows.push(cells), rows) %}
       {% endfor %}
     {% endfor %}
 
+    {{ mojPagination(pagination) }}
+
     {{ govukTable({
       classes: "govuk-!-font-size-16",
       attributes: { "data-qa": "property-list" },
-      head: [
-        { text: "Name" },
-        { text: "Prisoner establishment" },
-        { text: "Seal number" },
-        { text: "Property type" },
-        { text: "Storage location" },
-        { text: "Last updated" },
-        { text: "Property status" }
-      ],
+      head: tableHead,
       rows: rows
     }) }}
 
