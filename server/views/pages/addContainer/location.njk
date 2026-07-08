@@ -4,7 +4,10 @@
 {% from "govuk/components/input/macro.njk" import govukInput %}
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
 {% from "moj/components/pagination/macro.njk" import mojPagination %}
+
+{% set emptySearchError = "Search for a storage location or select an available location" %}
 
 {% set pageTitle = applicationName + " - Select a storage location" %}
 {% set mainClasses = "govuk-body" %}
@@ -18,6 +21,10 @@
     {{ govukNotificationBanner({ titleText: "There is a problem", text: errorBanner, attributes: { "data-qa": "error-banner" } }) }}
   {% endif %}
 
+  {% if searchError %}
+    {{ govukErrorSummary({ titleText: "There is a problem", errorList: [{ text: emptySearchError, href: "#query" }] }) }}
+  {% endif %}
+
   <h1 class="govuk-heading-xl" data-qa="location-heading">Select a storage location for container {{ sealNumber }}</h1>
 
   <form method="get" novalidate data-qa="location-search" class="govuk-!-margin-bottom-6">
@@ -28,7 +35,8 @@
         id: "query",
         name: "query",
         value: query,
-        classes: "govuk-input--width-20"
+        classes: "govuk-input--width-20",
+        errorMessage: { text: emptySearchError } if searchError else undefined
       }) }}
     </div>
     {{ govukButton({ text: "Search", classes: "govuk-!-margin-bottom-0" }) }}

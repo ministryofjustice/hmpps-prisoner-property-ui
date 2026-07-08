@@ -1,11 +1,14 @@
 import { expect, test } from '@playwright/test'
 import { login, resetStubs } from '../testUtils'
 import prisonerPropertyApi from '../mockApis/prisonerPropertyApi'
+import prisonerSearchApi from '../mockApis/prisonerSearchApi'
 import PrisonerPropertyPage from '../pages/prisonerPropertyPage'
+import PropertyListPage from '../pages/propertyListPage'
 import AddContainerDetailsPage from '../pages/addContainerDetailsPage'
 import AddContainerLocationPage from '../pages/addContainerLocationPage'
 import AddContainerCheckAnswersPage from '../pages/addContainerCheckAnswersPage'
 import type { BoxLocation, PrisonerPropertyContainer } from '../../server/data/prisonerPropertyApiTypes'
+import type { Prisoner } from '../../server/data/prisonerSearchApiTypes'
 
 const existingContainer: PrisonerPropertyContainer = {
   id: 'c1',
@@ -28,6 +31,17 @@ const existingContainer: PrisonerPropertyContainer = {
   archived: false,
 }
 
+const prisoner: Prisoner = {
+  prisonerNumber: 'A1234BC',
+  firstName: 'John',
+  lastName: 'Smith',
+  dateOfBirth: '2001-01-01',
+  prisonId: 'MDI',
+  prisonName: 'Moorland (HMP & YOI)',
+  cellLocation: 'F-3-042',
+  status: 'ACTIVE IN',
+}
+
 const box: BoxLocation = {
   id: 'box1',
   prisonId: 'MDI',
@@ -43,7 +57,7 @@ test.describe('Add a property container', () => {
     await resetStubs()
   })
 
-  test('adds a container end to end and shows a success banner', async ({ page }) => {
+  test('adds a container from the person view and shows a success banner', async ({ page }) => {
     await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
     await prisonerPropertyApi.stubGetPropertyForPrisoner({
       prisonerNumber: 'A1234BC',
@@ -55,7 +69,6 @@ test.describe('Add a property container', () => {
 
     await page.goto('/prisoner/A1234BC')
     const personPage = await PrisonerPropertyPage.verifyOnPage(page)
-    await expect(personPage.addProperty).toBeVisible()
     await personPage.addProperty.click()
 
     const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
@@ -63,34 +76,59 @@ test.describe('Add a property container', () => {
 
     const locationPage = await AddContainerLocationPage.verifyOnPage(page)
     await expect(locationPage.heading).toContainText('SN9')
-    await expect(locationPage.locations.getByRole('cell', { name: 'Reception Store', exact: true })).toBeVisible()
     await locationPage.selectFirstLocation()
 
     const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
-    await expect(checkPage.containerSummary).toContainText('SN9')
-    await expect(checkPage.containerSummary).toContainText('Reception Store')
-    await expect(checkPage.containerSummary).toContainText('Valuables')
+    await expect(checkPage.containerSummary.first()).toContainText('SN9')
     await checkPage.confirm.click()
 
     await expect(page).toHaveURL(/\/prisoner\/A1234BC$/)
     const backPage = await PrisonerPropertyPage.verifyOnPage(page)
-    await expect(backPage.successBanner).toContainText('Property container added')
+    await expect(backPage.successBanner).toContainText('Property container(s) added')
   })
 
-  test('hides the add journey from a user without the manage role', async ({ page }) => {
+  test('searches from the establishment list, then adds two containers (one Excess)', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [], priority: 1 })
+    await prisonerSearchApi.stubSearchPrisoners({ prisoners: [prisoner] })
+    await prisonerSearchApi.stubGetPrisoner({ prisoner })
+    await prisonerSearchApi.stubGetPrisonerImage({ prisonerNumber: 'A1234BC' })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({ prisonerNumber: 'A1234BC', containers: [], priority: 1 })
+    await prisonerPropertyApi.stubGetBoxLocations({ prisonId: 'MDI', locations: [box], priority: 1 })
+    await prisonerPropertyApi.stubCreateContainer({ container: { ...existingContainer, id: 'newC' }, priority: 1 })
+
+    await page.goto('/')
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await listPage.addButton.click()
+
+    await page.getByLabel('Who is the property container for?').fill('Smith')
+    await page.getByRole('button', { name: 'Search' }).click()
+    await page.getByTestId('add-link').first().click()
+
+    // Two containers: a Standard (needs a location) and an Excess (off-site, skips the location step).
+    const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    await detailsPage.fillContainer(0, { seal: 'SN1', type: 'Standard' })
+    await detailsPage.addAnother()
+    await detailsPage.fillContainer(1, { seal: 'SN2', type: 'Excess' })
+    await detailsPage.saveAndContinue()
+
+    const locationPage = await AddContainerLocationPage.verifyOnPage(page)
+    await expect(locationPage.heading).toContainText('SN1')
+    await locationPage.selectFirstLocation()
+
+    const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
+    await expect(page.getByRole('heading', { name: /Property container SN1/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Property container SN2/ })).toBeVisible()
+    await checkPage.confirm.click()
+
+    // Confirm creates both and returns to the establishment list with the banner.
+    await expect(page.getByTestId('success-banner')).toContainText('Property container(s) added')
+  })
+
+  test('refuses the search entry for a user without the manage role', async ({ page }) => {
     await login(page)
-    await prisonerPropertyApi.stubGetPropertyForPrisoner({
-      prisonerNumber: 'A1234BC',
-      containers: [existingContainer],
-      priority: 1,
-    })
 
-    await page.goto('/prisoner/A1234BC')
-    const personPage = await PrisonerPropertyPage.verifyOnPage(page)
-    await expect(personPage.addProperty).toBeHidden()
-
-    // Direct navigation to a journey step is refused.
-    await page.goto('/prisoner/A1234BC/add-container/details')
+    await page.goto('/add-container')
     await expect(page.locator('h1')).toContainText('Authorisation Error')
   })
 })

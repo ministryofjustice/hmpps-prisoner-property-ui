@@ -2,6 +2,7 @@ import { Readable } from 'stream'
 import PrisonerSearchApiClient from '../data/prisonerSearchApiClient'
 import PrisonApiClient from '../data/prisonApiClient'
 import type { Prisoner } from '../data/prisonerSearchApiTypes'
+import type { RestPage } from '../data/prisonerPropertyApiTypes'
 
 export default class PrisonerService {
   constructor(
@@ -11,6 +12,16 @@ export default class PrisonerService {
 
   getPrisonerDetails(prisonerNumber: string, username: string): Promise<Prisoner> {
     return this.prisonerSearchApiClient.getPrisoner(prisonerNumber, username)
+  }
+
+  searchPrisoners(
+    term: string,
+    prisonId: string,
+    page: number,
+    size: number,
+    username: string,
+  ): Promise<RestPage<Prisoner>> {
+    return this.prisonerSearchApiClient.searchPrisoners(term, prisonId, page, size, username)
   }
 
   getPrisonerImage(prisonerNumber: string, username: string): Promise<Readable> {

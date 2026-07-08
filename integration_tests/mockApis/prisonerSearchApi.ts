@@ -38,6 +38,33 @@ export default {
       },
     }),
 
+  // Stub the keyword search (POST /keyword) - matches on path so any term/prison returns these prisoners.
+  stubSearchPrisoners: ({
+    prisoners = [defaultPrisoner],
+    priority = undefined as number | undefined,
+  } = {}): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'POST',
+        urlPath: `/prisoner-search-api/keyword`,
+      },
+      response: {
+        status: 200,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: {
+          content: prisoners,
+          totalElements: prisoners.length,
+          totalPages: prisoners.length ? 1 : 0,
+          number: 0,
+          size: 50,
+          numberOfElements: prisoners.length,
+          first: true,
+          last: true,
+        },
+      },
+    }),
+
   // Stub a prisoner image. Defaults to a 404 so the app falls back to the "Photo withheld" placeholder.
   stubGetPrisonerImage: (
     { prisonerNumber = 'A1234BC', priority = undefined as number | undefined } = {},
