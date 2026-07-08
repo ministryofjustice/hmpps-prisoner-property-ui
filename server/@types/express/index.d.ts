@@ -23,12 +23,27 @@ export interface RemoveContainerJourney {
   toPrisonId?: string
 }
 
+// Working state for the multi-step "combine property containers" journey. Cleared on confirm/cancel.
+// The sources are the ticked containers from the person view; the rest describe the new combined
+// container. `locationType` is BRANSTON (off-site) for excess property, otherwise INTERNAL.
+export interface CombineJourney {
+  prisonerNumber: string
+  sourceContainerIds: string[]
+  sealNumber?: string
+  containerType?: ContainerType
+  proposedDisposalDate?: string // ISO yyyy-mm-dd
+  locationType?: 'INTERNAL' | 'BRANSTON'
+  internalLocationId?: string
+  locationName?: string
+}
+
 export declare module 'express-session' {
   // Declare that the session will potentially contain these additional fields
   interface SessionData {
     returnTo: string
     addContainerJourney?: AddContainerJourney
     removeContainerJourney?: RemoveContainerJourney
+    combineJourney?: CombineJourney
   }
 }
 

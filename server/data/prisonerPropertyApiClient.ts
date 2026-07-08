@@ -4,6 +4,7 @@ import config from '../config'
 import logger from '../../logger'
 import type {
   BoxLocation,
+  CombineContainersRequest,
   CreateContainerRequest,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
@@ -119,6 +120,18 @@ export default class PrisonerPropertyApiClient extends RestClient {
   removeContainer(id: string, body: RemoveContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
     return this.post<PrisonerPropertyContainer>(
       { path: `/property-containers/${id}/remove`, data: { ...body } },
+      asSystem(username),
+    )
+  }
+
+  /**
+   * Combine two or more of a prisoner's containers into a new sealed container. Called with a system
+   * token tied to the signed-in user (`asSystem(username)`); the system client must hold the
+   * ROLE_PRISONER_PROPERTY__RW role.
+   */
+  combineContainers(body: CombineContainersRequest, username: string): Promise<PrisonerPropertyContainer> {
+    return this.post<PrisonerPropertyContainer>(
+      { path: `/property-containers/combine`, data: { ...body } },
       asSystem(username),
     )
   }

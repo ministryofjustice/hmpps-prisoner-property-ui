@@ -1,6 +1,7 @@
 import PrisonerPropertyApiClient from '../data/prisonerPropertyApiClient'
 import type {
   BoxLocation,
+  CombineContainersRequest,
   CreateContainerRequest,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
@@ -53,5 +54,9 @@ export default class PrisonerPropertyService {
 
   removeContainer(id: string, body: RemoveContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
     return this.prisonerPropertyApiClient.removeContainer(id, body, username)
+  }
+
+  combineContainers(body: CombineContainersRequest, username: string): Promise<PrisonerPropertyContainer> {
+    return this.prisonerPropertyApiClient.combineContainers(body, username)
   }
 }
