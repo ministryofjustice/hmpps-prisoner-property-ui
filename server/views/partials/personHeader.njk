@@ -3,7 +3,7 @@
 
 {% include "./prisonerBanner.njk" %}
 
-<h1 class="govuk-heading-xl govuk-!-margin-bottom-2" data-qa="prisoner-name">
+<h1 class="govuk-heading-l govuk-!-margin-bottom-2" data-qa="prisoner-name">
   {{ (prisonerName | convertToTitleCase) or "Unknown" }}’s property
 </h1>
 
@@ -15,20 +15,22 @@
   }) }}
 {% endif %}
 
-{{ mojSubNavigation({
-  label: "Property sub navigation",
-  items: [
-    {
-      text: "Property",
-      href: "/prisoner/" + prisonerNumber,
-      active: activeTab == "property",
-      attributes: { "data-qa": "tab-property" }
-    },
-    {
-      text: "Property history",
-      href: "/prisoner/" + prisonerNumber + "/history",
-      active: activeTab == "history",
-      attributes: { "data-qa": "tab-history" }
-    }
-  ]
-}) }}
+<div class="app-property-tabs">
+  {{ mojSubNavigation({
+    label: "Property sub navigation",
+    items: [
+      {
+        text: "Property",
+        href: "/prisoner/" + prisonerNumber,
+        active: activeTab == "property",
+        attributes: { "data-qa": "tab-property" }
+      },
+      {
+        text: "Property history",
+        href: "/prisoner/" + prisonerNumber + "/history",
+        active: activeTab == "history",
+        attributes: { "data-qa": "tab-history" }
+      }
+    ]
+  }) }}
+</div>

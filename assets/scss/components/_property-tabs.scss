@@ -1,0 +1,38 @@
+// Render the MOJ sub-navigation (used for the person's Property / Property history tabs) with a
+// GOV.UK tab-like appearance: inactive tabs on a light-grey background, the active tab white and
+// sitting on top of the list's bottom border.
+.app-property-tabs {
+  .moj-sub-navigation__list {
+    display: flex;
+    border-bottom: 1px solid $govuk-border-colour;
+    margin-bottom: govuk-spacing(6);
+  }
+
+  .moj-sub-navigation__item {
+    margin-right: govuk-spacing(1);
+    border: 0;
+  }
+
+  .moj-sub-navigation__link {
+    display: block;
+    padding: govuk-spacing(2) govuk-spacing(4);
+    background-color: govuk-colour("light-grey");
+    border: 1px solid $govuk-border-colour;
+    border-bottom: 0;
+    text-decoration: none;
+
+    &:link,
+    &:visited {
+      color: $govuk-link-colour;
+    }
+
+    &[aria-current="page"] {
+      position: relative;
+      margin-bottom: -1px;
+      padding-bottom: calc(#{govuk-spacing(2)} + 1px);
+      background-color: govuk-colour("white");
+      color: $govuk-text-colour;
+      font-weight: bold;
+    }
+  }
+}
