@@ -7,7 +7,6 @@ import {
   establishmentLabel,
   isPrisonerNumber,
   parsePropertyListQuery,
-  searchToFilters,
   statusTag,
 } from './propertyList'
 
@@ -89,52 +88,43 @@ describe('propertyList utils', () => {
     })
   })
 
-  describe('searchToFilters', () => {
-    it('routes a full prison number to prisonerNumber (uppercased)', () => {
-      expect(searchToFilters('a1234bc')).toEqual({ prisonerNumber: 'A1234BC' })
-    })
-
-    it('routes anything else to sealNumber', () => {
-      expect(searchToFilters('SN8842K1')).toEqual({ sealNumber: 'SN8842K1' })
-    })
-
-    it('returns nothing for an empty search', () => {
-      expect(searchToFilters('')).toEqual({})
-    })
-  })
-
   describe('parsePropertyListQuery', () => {
     it('parses filters, whitelists values and makes the API page zero-based', () => {
       const reqQuery = {
         q: 'A1234BC',
-        containerType: 'VALUABLES',
+        containerType: ['STANDARD', 'VALUABLES'],
         status: ['STORED', 'BOGUS'],
-        storageLocation: 'PB5638',
+        includeRemoved: 'true',
         page: '3',
       } as unknown as ParsedQs
 
       const result = parsePropertyListQuery(reqQuery, 20)
 
       expect(result.search).toBe('A1234BC')
-      expect(result.containerType).toBe('VALUABLES')
+      expect(result.containerTypes).toEqual(['STANDARD', 'VALUABLES'])
       expect(result.statuses).toEqual(['STORED'])
+      expect(result.includeRemoved).toBe(true)
       expect(result.page).toBe(3)
       expect(result.apiQuery).toEqual({
-        prisonerNumber: 'A1234BC',
-        containerType: 'VALUABLES',
+        query: 'A1234BC',
+        containerType: ['STANDARD', 'VALUABLES'],
         status: ['STORED'],
-        storageLocation: 'PB5638',
+        includeRemoved: true,
         page: 2,
         size: 20,
       })
     })
 
-    it('defaults page to 1 and drops invalid container types / empty status', () => {
+    it('defaults page to 1 and drops invalid container types / empty status / unticked includeRemoved', () => {
       const result = parsePropertyListQuery({ containerType: 'NOPE', page: '0' } as unknown as ParsedQs, 20)
 
       expect(result.page).toBe(1)
-      expect(result.containerType).toBeUndefined()
+      expect(result.containerTypes).toEqual([])
+      expect(result.includeRemoved).toBe(false)
+      expect(result.apiQuery.query).toBeUndefined()
+      expect(result.apiQuery.containerType).toBeUndefined()
       expect(result.apiQuery.status).toBeUndefined()
+      expect(result.apiQuery.includeRemoved).toBeUndefined()
       expect(result.apiQuery.page).toBe(0)
     })
   })

@@ -214,12 +214,17 @@ describe('GET /', () => {
     prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
 
     return request(app)
-      .get('/?q=A1234BC&containerType=STANDARD&status=STORED')
+      .get('/?q=A1234BC&containerType=STANDARD&status=STORED&includeRemoved=true')
       .expect(200)
       .expect(() => {
         expect(prisonerPropertyService.getPrisonProperty).toHaveBeenCalledWith(
           'MDI',
-          expect.objectContaining({ prisonerNumber: 'A1234BC', containerType: 'STANDARD', status: ['STORED'] }),
+          expect.objectContaining({
+            query: 'A1234BC',
+            containerType: ['STANDARD'],
+            status: ['STORED'],
+            includeRemoved: true,
+          }),
           user.username,
         )
       })

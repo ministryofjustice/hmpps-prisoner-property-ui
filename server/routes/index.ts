@@ -5,7 +5,6 @@ import type { Services } from '../services'
 import { Page } from '../services/auditService'
 import {
   ALL_CONTAINER_TYPES,
-  ALL_STATUSES,
   buildPagination,
   containerTypeLabel,
   DEFAULT_PAGE_SIZE,
@@ -47,7 +46,7 @@ export default function routes({
       return res.render('pages/noCaseload')
     }
 
-    const { search, containerType, statuses, storageLocation, page, apiQuery } = parsePropertyListQuery(
+    const { search, containerTypes, statuses, includeRemoved, page, apiQuery } = parsePropertyListQuery(
       req.query,
       DEFAULT_PAGE_SIZE,
     )
@@ -67,13 +66,14 @@ export default function routes({
 
     const baseQueryParams = new URLSearchParams()
     if (search) baseQueryParams.set('q', search)
-    if (containerType) baseQueryParams.set('containerType', containerType)
+    containerTypes.forEach(type => baseQueryParams.append('containerType', type))
     statuses.forEach(status => baseQueryParams.append('status', status))
-    if (storageLocation) baseQueryParams.set('storageLocation', storageLocation)
+    if (includeRemoved) baseQueryParams.set('includeRemoved', 'true')
 
     return res.render('pages/propertyList', {
       establishmentName: activeCaseloadName,
       canManage: canManageProperty(res.locals.user.userRoles),
+      includeRemoved,
       summary,
       groups: result.content,
       pagination: buildPagination(
@@ -84,20 +84,27 @@ export default function routes({
         baseQueryParams.toString(),
       ),
       search,
-      storageLocation,
-      containerTypeItems: [
-        { value: '', text: 'All property types' },
-        ...ALL_CONTAINER_TYPES.map(type => ({
-          value: type,
-          text: containerTypeLabel(type),
-          selected: type === containerType,
-        })),
-      ],
-      statusItems: ALL_STATUSES.map(status => ({
-        value: status,
-        text: statusTag(status).text,
-        checked: statuses.includes(status),
+      containerTypeItems: ALL_CONTAINER_TYPES.map(type => ({
+        value: type,
+        text: containerTypeLabel(type),
+        checked: containerTypes.includes(type),
       })),
+      // Only the two statuses that map to a ContainerStatus are wired; the other two are disabled
+      // placeholders until the API models "due for return" / "due for transfer in".
+      statusItems: [
+        { value: 'DISPOSAL_REQUIRED_PLACEHOLDER', text: 'Due for return', disabled: true },
+        {
+          value: 'DISPOSAL_REQUIRED',
+          text: statusTag('DISPOSAL_REQUIRED').text,
+          checked: statuses.includes('DISPOSAL_REQUIRED'),
+        },
+        {
+          value: 'DUE_FOR_TRANSFER_OUT',
+          text: statusTag('DUE_FOR_TRANSFER_OUT').text,
+          checked: statuses.includes('DUE_FOR_TRANSFER_OUT'),
+        },
+        { value: 'TRANSFER_IN_PLACEHOLDER', text: 'Due for transfer in', disabled: true },
+      ],
     })
   })
 

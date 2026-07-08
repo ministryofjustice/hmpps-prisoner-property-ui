@@ -143,13 +143,16 @@ export interface CreateContainerRequest {
 }
 
 // Filters + paging for the establishment-wide list (GET /property-containers/prison/{prisonId}).
-// All filters are exact-match on the API side; omit a field to leave it unfiltered.
+// `query` is a free-text OR match over prisoner number, seal number and storage location; the other
+// filters are exact-match. Omit a field to leave it unfiltered.
 export interface PrisonPropertyListQuery {
+  query?: string
   prisonerNumber?: string
   sealNumber?: string
-  containerType?: ContainerType
+  containerType?: ContainerType[]
   status?: ContainerStatus[]
   storageLocation?: string
+  includeRemoved?: boolean
   page?: number
   size?: number
 }

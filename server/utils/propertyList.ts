@@ -61,21 +61,11 @@ const toArray = (value: string | ParsedQs | (string | ParsedQs)[] | undefined): 
     .map(item => item?.toString().trim())
     .filter((item): item is string => Boolean(item))
 
-/**
- * Route a single free-text search term to an exact-match API filter: a full prison number
- * (e.g. A1234BC) filters by prisonerNumber, anything else is treated as a seal number.
- * (Name search is not supported by the API yet.)
- */
-export const searchToFilters = (search?: string): Pick<PrisonPropertyListQuery, 'prisonerNumber' | 'sealNumber'> => {
-  if (!search) return {}
-  return PRISON_NUMBER_PATTERN.test(search) ? { prisonerNumber: search.toUpperCase() } : { sealNumber: search }
-}
-
 export interface ParsedPropertyListQuery {
   search: string
-  containerType?: ContainerType
+  containerTypes: ContainerType[]
   statuses: ContainerStatus[]
-  storageLocation?: string
+  includeRemoved: boolean
   page: number
   apiQuery: PrisonPropertyListQuery
 }
@@ -83,27 +73,27 @@ export interface ParsedPropertyListQuery {
 /** Parse and whitelist the establishment-list request query into filter + paging values. */
 export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_SIZE): ParsedPropertyListQuery => {
   const search = firstValue(reqQuery.q) ?? ''
-  const containerTypeRaw = firstValue(reqQuery.containerType)
-  const containerType = ALL_CONTAINER_TYPES.includes(containerTypeRaw as ContainerType)
-    ? (containerTypeRaw as ContainerType)
-    : undefined
+  const containerTypes = toArray(reqQuery.containerType).filter((type): type is ContainerType =>
+    ALL_CONTAINER_TYPES.includes(type as ContainerType),
+  )
   const statuses = toArray(reqQuery.status).filter((status): status is ContainerStatus =>
     ALL_STATUSES.includes(status as ContainerStatus),
   )
-  const storageLocation = firstValue(reqQuery.storageLocation)
+  const includeRemoved = firstValue(reqQuery.includeRemoved) === 'true'
   const parsedPage = Number.parseInt(firstValue(reqQuery.page) ?? '1', 10)
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
 
   const apiQuery: PrisonPropertyListQuery = {
-    ...searchToFilters(search),
-    containerType,
+    // The API `query` param does an OR match over prisoner number, seal number and storage location.
+    query: search || undefined,
+    containerType: containerTypes.length ? containerTypes : undefined,
     status: statuses.length ? statuses : undefined,
-    storageLocation,
+    includeRemoved: includeRemoved || undefined,
     page: page - 1, // API pages are zero-based
     size,
   }
 
-  return { search, containerType, statuses, storageLocation, page, apiQuery }
+  return { search, containerTypes, statuses, includeRemoved, page, apiQuery }
 }
 
 export interface PaginationItem {
