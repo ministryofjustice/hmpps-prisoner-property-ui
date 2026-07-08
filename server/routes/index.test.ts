@@ -1198,3 +1198,181 @@ describe('Remove container journey - steps', () => {
       })
   })
 })
+
+describe('Combine containers journey', () => {
+  const twoContainers = () => [
+    container({ id: 'c1', currentSealNumber: 'SN0001' }),
+    container({ id: 'c2', currentSealNumber: 'SN0002' }),
+  ]
+
+  it('renders the combine form (posting to the start route) for a user with the manage role', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(twoContainers())
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('action="/prisoner/A1234BC/combine"')
+        expect(res.text).toContain('Combine selected property containers')
+      })
+  })
+
+  it('forbids the journey for a user without the manage role', async () => {
+    withActiveCaseload()
+
+    return request(app)
+      .post('/prisoner/A1234BC/combine')
+      .type('form')
+      .send({ containerIds: ['c1', 'c2'] })
+      .expect(403)
+      .expect(() => {
+        expect(userService.getActiveCaseload).not.toHaveBeenCalled()
+      })
+  })
+
+  it('redirects back to the person view with an error when fewer than two are selected', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(twoContainers())
+
+    await request(manageApp())
+      .post('/prisoner/A1234BC/combine')
+      .type('form')
+      .send({ containerIds: 'c1' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC')
+
+    expect(flashProvider).toHaveBeenCalledWith('error', expect.stringContaining('two or more'))
+  })
+
+  it('walks start -> details -> location -> check -> confirm and combines the containers', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(twoContainers())
+    prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
+    prisonerPropertyService.combineContainers.mockResolvedValue(container({ id: 'newC' }))
+
+    const agent = request.agent(manageApp())
+
+    await agent
+      .post('/prisoner/A1234BC/combine')
+      .type('form')
+      .send({ containerIds: ['c1', 'c2'] })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/combine/details')
+
+    await agent
+      .get('/prisoner/A1234BC/combine/details')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Combine containers')
+        expect(res.text).toContain('SN0001')
+        expect(res.text).toContain('SN0002')
+      })
+
+    await agent
+      .post('/prisoner/A1234BC/combine/details')
+      .type('form')
+      .send({ sealNumber: 'NEW9', containerType: 'STANDARD' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/combine/location')
+
+    await agent
+      .post('/prisoner/A1234BC/combine/location')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/combine/check')
+
+    await agent
+      .get('/prisoner/A1234BC/combine/check')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Check your answers')
+        expect(res.text).toContain('NEW9')
+        expect(res.text).toContain('Reception Store')
+      })
+
+    await agent
+      .post('/prisoner/A1234BC/combine/confirm')
+      .type('form')
+      .send({})
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC')
+
+    expect(prisonerPropertyService.combineContainers).toHaveBeenCalledWith(
+      {
+        sourceContainerIds: ['c1', 'c2'],
+        containerType: 'STANDARD',
+        sealNumber: 'NEW9',
+        internalLocationId: 'box1',
+        locationType: 'INTERNAL',
+      },
+      user.username,
+    )
+    expect(flashProvider).toHaveBeenCalledWith('success', 'Property containers combined')
+    expect(auditService.logPageView).toHaveBeenCalledWith(
+      Page.COMBINE_PROPERTY_CONTAINERS,
+      expect.objectContaining({
+        subjectId: 'A1234BC',
+        details: { containerId: 'newC', sourceContainerIds: ['c1', 'c2'] },
+      }),
+    )
+  })
+
+  it('skips the storage-location step for excess (off-site) property', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(twoContainers())
+    prisonerPropertyService.combineContainers.mockResolvedValue(container({ id: 'newC' }))
+
+    const agent = request.agent(manageApp())
+    await agent
+      .post('/prisoner/A1234BC/combine')
+      .type('form')
+      .send({ containerIds: ['c1', 'c2'] })
+
+    await agent
+      .post('/prisoner/A1234BC/combine/details')
+      .type('form')
+      .send({ sealNumber: 'NEW9', containerType: 'EXCESS' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/combine/check')
+
+    await agent.post('/prisoner/A1234BC/combine/confirm').type('form').send({}).expect(302)
+
+    expect(prisonerPropertyService.combineContainers).toHaveBeenCalledWith(
+      {
+        sourceContainerIds: ['c1', 'c2'],
+        containerType: 'EXCESS',
+        sealNumber: 'NEW9',
+        internalLocationId: undefined,
+        locationType: 'BRANSTON',
+      },
+      user.username,
+    )
+  })
+
+  it('redirects back to details with an error when the new seal number is already in use (409)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(twoContainers())
+    prisonerPropertyService.combineContainers.mockRejectedValue({ responseStatus: 409 })
+
+    const agent = request.agent(manageApp())
+    await agent
+      .post('/prisoner/A1234BC/combine')
+      .type('form')
+      .send({ containerIds: ['c1', 'c2'] })
+    await agent
+      .post('/prisoner/A1234BC/combine/details')
+      .type('form')
+      .send({ sealNumber: 'NEW9', containerType: 'EXCESS' })
+
+    await agent
+      .post('/prisoner/A1234BC/combine/confirm')
+      .type('form')
+      .send({})
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/combine/details')
+
+    expect(flashProvider).toHaveBeenCalledWith('error', expect.stringContaining('seal number'))
+  })
+})

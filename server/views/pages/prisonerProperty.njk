@@ -26,6 +26,14 @@
     }) }}
   {% endif %}
 
+  {% if errorMessage %}
+    {{ govukNotificationBanner({
+      titleText: "There is a problem",
+      text: errorMessage,
+      attributes: { "data-qa": "error-banner" }
+    }) }}
+  {% endif %}
+
   {% set activeTab = "property" %}
   {% include "../partials/personHeader.njk" %}
 
@@ -88,21 +96,19 @@
         {% set inEstablishmentRows = (inEstablishmentRows.push(cells), inEstablishmentRows) %}
       {% endfor %}
 
-      {% if canManage %}<div data-module="moj-multi-select">{% endif %}
+      {% if canManage %}<form method="post" action="/prisoner/{{ prisonerNumber }}/combine"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><div data-module="moj-multi-select">{% endif %}
         {{ govukTable({
           attributes: { "data-qa": "in-establishment", "data-module": "moj-sortable-table" },
           head: inEstablishmentHead,
           rows: inEstablishmentRows
         }) }}
-      {% if canManage %}</div>{% endif %}
-
-      {% if canManage %}
+      {% if canManage %}</div>
         {{ govukButton({
           text: "Combine selected property containers",
           classes: "govuk-button--secondary",
           attributes: { "data-qa": "combine-selected" }
         }) }}
-      {% endif %}
+      </form>{% endif %}
     {% endif %}
 
     {% if dueToTransferIn.length %}

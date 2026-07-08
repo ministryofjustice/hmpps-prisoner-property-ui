@@ -187,4 +187,21 @@ export default {
         jsonBody: container ?? {},
       },
     }),
+
+  stubCombineContainers: (
+    { container = undefined as PrisonerPropertyContainer | undefined, priority = undefined as number | undefined } = {},
+    httpStatus = 201,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'POST',
+        urlPath: `/prisoner-property-api/property-containers/combine`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: container ?? {},
+      },
+    }),
 }

@@ -160,6 +160,18 @@ export interface RemoveContainerRequest {
   toPrisonId?: string
 }
 
+// Payload to combine two or more containers into a new sealed container (POST
+// /property-containers/combine). See CombineContainersRequest in the API. The sources must all belong
+// to one prisoner + prison and be active. `locationType` defaults to INTERNAL when an internal location
+// id is given; use BRANSTON (with no internal location) for off-site excess property.
+export interface CombineContainersRequest {
+  sourceContainerIds: string[]
+  containerType: ContainerType
+  sealNumber: string
+  internalLocationId?: string
+  locationType?: StorageLocationType
+}
+
 // Filters + paging for the establishment-wide list (GET /property-containers/prison/{prisonId}).
 // `query` is a free-text OR match over prisoner number, seal number and storage location; the other
 // filters are exact-match. Omit a field to leave it unfiltered.
