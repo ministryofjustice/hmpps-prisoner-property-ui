@@ -14,6 +14,7 @@ import type {
   PropertyEvent,
   RemoveContainerRequest,
   RestPage,
+  UpdateContainerRequest,
 } from './prisonerPropertyApiTypes'
 
 export default class PrisonerPropertyApiClient extends RestClient {
@@ -132,6 +133,18 @@ export default class PrisonerPropertyApiClient extends RestClient {
   combineContainers(body: CombineContainersRequest, username: string): Promise<PrisonerPropertyContainer> {
     return this.post<PrisonerPropertyContainer>(
       { path: `/property-containers/combine`, data: { ...body } },
+      asSystem(username),
+    )
+  }
+
+  /**
+   * Change a container's editable details (type, seal, disposal date, storage location). Called with a
+   * system token tied to the signed-in user (`asSystem(username)`); the system client must hold the
+   * ROLE_PRISONER_PROPERTY__RW role.
+   */
+  updateContainer(id: string, body: UpdateContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
+    return this.put<PrisonerPropertyContainer>(
+      { path: `/property-containers/${id}`, data: { ...body } },
       asSystem(username),
     )
   }

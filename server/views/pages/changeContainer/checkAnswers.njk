@@ -1,0 +1,58 @@
+{% extends "../../partials/layout.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+
+{% set pageTitle = applicationName + " - Check your answers" %}
+{% set mainClasses = "govuk-body" %}
+
+{% set detailsUrl = "/prisoner/" + prisonerNumber + "/change-container/" + journey.containerId %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back", href: backUrl }) }}
+{% endblock %}
+
+{% block content %}
+  <h1 class="govuk-heading-xl" data-qa="check-answers-heading">Check your answers</h1>
+
+  {{ govukSummaryList({
+    attributes: { "data-qa": "prisoner-summary" },
+    rows: [
+      { key: { text: "Name" }, value: { text: (prisonerName | convertToTitleCase) or "Unknown" } },
+      { key: { text: "Prison number" }, value: { text: prisonerNumber } },
+      { key: { text: "Prisoner establishment" }, value: { text: prisonerEstablishment or "Not known" } }
+    ]
+  }) }}
+
+  <h2 class="govuk-heading-m govuk-!-margin-top-6">
+    Property container {{ journey.sealNumber }}
+    <span class="govuk-!-font-weight-regular govuk-!-font-size-19 govuk-!-margin-left-3">
+      <a class="govuk-link" href="{{ detailsUrl }}" data-qa="change-details">Change<span class="govuk-visually-hidden"> the property container details</span></a>
+    </span>
+  </h2>
+
+  {{ govukSummaryList({
+    attributes: { "data-qa": "container-summary" },
+    rows: [
+      { key: { text: "Seal number" }, value: { text: journey.sealNumber } },
+      { key: { text: "Property type" }, value: { text: journey.containerType | containerTypeLabel } },
+      { key: { text: "Disposal date" }, value: { text: (journey.proposedDisposalDate | formatDate) if journey.proposedDisposalDate else "No date set" } },
+      { key: { text: "Storage location" }, value: { text: storageLocation or "Not set" } },
+      { key: { text: "Property status" }, value: { html: govukTag({ text: status.text, classes: status.classes }) } }
+    ]
+  }) }}
+
+  {{ govukInsetText({
+    html: "<strong>You may also need to update paper property cards.</strong><br>If any details have changed, for example the seal number, make sure these are updated on any paper records."
+  }) }}
+
+  <form method="post" action="/prisoner/{{ prisonerNumber }}/change-container/{{ journey.containerId }}/confirm">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    {{ govukButton({ text: "Confirm", attributes: { "data-qa": "confirm" } }) }}
+  </form>
+
+  <p class="govuk-body"><a class="govuk-link" href="/prisoner/{{ prisonerNumber }}" data-qa="cancel">Cancel</a></p>
+{% endblock %}

@@ -1376,3 +1376,188 @@ describe('Combine containers journey', () => {
     expect(flashProvider).toHaveBeenCalledWith('error', expect.stringContaining('seal number'))
   })
 })
+
+describe('Change container journey', () => {
+  it('renders a Change link on the person view for a user with the manage role', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('/prisoner/A1234BC/change-container/c1?from=person')
+      })
+  })
+
+  it('forbids the journey for a user without the manage role', async () => {
+    withActiveCaseload()
+
+    return request(app)
+      .get('/prisoner/A1234BC/change-container/c1')
+      .expect(403)
+      .expect(() => {
+        expect(userService.getActiveCaseload).not.toHaveBeenCalled()
+      })
+  })
+
+  it('renders the change form prefilled with the current details', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ currentSealNumber: 'SN0001', containerType: 'VALUABLES' }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC/change-container/c1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Change property container SN0001')
+        expect(res.text).toContain('value="SN0001"')
+        expect(res.text).toContain('Remove container')
+        expect(res.text).toContain('/prisoner/A1234BC/remove-container/c1?from=person')
+      })
+  })
+
+  it('re-renders the change form with an error when the seal number is missing', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    return agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ containerType: 'STANDARD', locationChoice: 'current' })
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+      })
+  })
+
+  it('keeps the current location and updates the container', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.updateContainer.mockResolvedValue(container({}))
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ sealNumber: 'SN0001', containerType: 'VALUABLES', locationChoice: 'current' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/check')
+
+    await agent
+      .get('/prisoner/A1234BC/change-container/c1/check')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Check your answers')
+        expect(res.text).toContain('Valuables')
+      })
+
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1/confirm')
+      .type('form')
+      .send({})
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC')
+
+    expect(prisonerPropertyService.updateContainer).toHaveBeenCalledWith(
+      'c1',
+      {
+        containerType: 'VALUABLES',
+        sealNumber: 'SN0001',
+        internalLocationId: undefined,
+        proposedDisposalDate: undefined,
+      },
+      user.username,
+    )
+    expect(flashProvider).toHaveBeenCalledWith('success', 'Property container updated')
+    expect(auditService.logPageView).toHaveBeenCalledWith(
+      Page.CHANGE_PROPERTY_CONTAINER,
+      expect.objectContaining({ subjectId: 'A1234BC', details: { containerId: 'c1' } }),
+    )
+  })
+
+  it('walks the new-location path and updates the container with the chosen box', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
+    prisonerPropertyService.updateContainer.mockResolvedValue(container({}))
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ sealNumber: 'SN0001', containerType: 'STANDARD', locationChoice: 'new' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/location')
+
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1/location')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/check')
+
+    await agent.post('/prisoner/A1234BC/change-container/c1/confirm').type('form').send({}).expect(302)
+
+    expect(prisonerPropertyService.updateContainer).toHaveBeenCalledWith(
+      'c1',
+      { containerType: 'STANDARD', sealNumber: 'SN0001', internalLocationId: 'box1', proposedDisposalDate: undefined },
+      user.username,
+    )
+  })
+
+  it('redirects back to the change form with an error when the seal number is already in use (409)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.updateContainer.mockRejectedValue({ responseStatus: 409 })
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ sealNumber: 'SN0001', containerType: 'STANDARD', locationChoice: 'current' })
+
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1/confirm')
+      .type('form')
+      .send({})
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1')
+
+    expect(flashProvider).toHaveBeenCalledWith('error', expect.stringContaining('seal number'))
+  })
+
+  it('shows an overdue disposal warning when the disposal date has passed', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ proposedDisposalDate: '2020-01-01' }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC/change-container/c1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('is overdue')
+      })
+  })
+
+  it('shows a due-for-disposal info banner when the disposal date is in the future', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ proposedDisposalDate: '2999-01-01' }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC/change-container/c1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('due for disposal on')
+      })
+  })
+})

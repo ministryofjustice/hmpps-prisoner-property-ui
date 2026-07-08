@@ -164,7 +164,7 @@
           { html: govukTag({ text: statusData.text, classes: statusData.classes }) }
         ), cells) %}
         {% if canManage %}
-          {% set actionsHtml %}<a class="govuk-link" href="#">Change</a> | <a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}/remove-container/{{ container.id }}?from=list" data-qa="remove-link">Remove<span class="govuk-visually-hidden"> {{ container.currentSealNumber }}</span></a>{% endset %}
+          {% set actionsHtml %}<a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}/change-container/{{ container.id }}?from=list" data-qa="change-link">Change<span class="govuk-visually-hidden"> {{ container.currentSealNumber }}</span></a> | <a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}/remove-container/{{ container.id }}?from=list" data-qa="remove-link">Remove<span class="govuk-visually-hidden"> {{ container.currentSealNumber }}</span></a>{% endset %}
           {% set cells = (cells.push({ html: actionsHtml }), cells) %}
         {% endif %}
         {% set rows = (rows.push(cells), rows) %}
