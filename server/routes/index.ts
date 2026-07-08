@@ -100,10 +100,13 @@ export default function routes({
         text: containerTypeLabel(type),
         checked: containerTypes.includes(type),
       })),
-      // Only the two statuses that map to a ContainerStatus are wired; the other two are disabled
-      // placeholders until the API models "due for return" / "due for transfer in".
+      // "Due for transfer in" stays a disabled placeholder until the API models the receiving-prison view.
       statusItems: [
-        { value: 'DISPOSAL_REQUIRED_PLACEHOLDER', text: 'Due for return', disabled: true },
+        {
+          value: 'DUE_FOR_RETURN',
+          text: statusTag('DUE_FOR_RETURN').text,
+          checked: statuses.includes('DUE_FOR_RETURN'),
+        },
         {
           value: 'DISPOSAL_REQUIRED',
           text: statusTag('DISPOSAL_REQUIRED').text,

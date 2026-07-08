@@ -127,6 +127,19 @@ test.describe('Establishment property list', () => {
     await expect(page.getByRole('cell', { name: 'Due for transfer out' })).toBeVisible()
   })
 
+  test('renders a Due for return tag for a released prisoner’s property', async ({ page }) => {
+    const dueForReturn: PrisonerPropertyGroup = {
+      ...group,
+      containers: [{ ...group.containers[0]!, currentStatus: 'DUE_FOR_RETURN' }],
+    }
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [dueForReturn], priority: 1 })
+    await page.goto('/')
+
+    await PropertyListPage.verifyOnPage(page)
+    await expect(page.getByRole('cell', { name: 'Due for return' })).toBeVisible()
+  })
+
   test('lets a user search by prison number', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [], priority: 1 })
@@ -165,8 +178,9 @@ test.describe('Establishment property list', () => {
 
     const listPage = await PropertyListPage.verifyOnPage(page)
     await listPage.filters.locator('summary').click() // expand the collapsed filters
-    // Property type + the two mapped statuses are real, submittable checkboxes.
+    // Property type + the mapped statuses are real, submittable checkboxes.
     await expect(listPage.filters.getByRole('checkbox', { name: 'Standard' })).toBeEnabled()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for return' })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer out' })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for disposal' })).toBeEnabled()
     // Returned/disposed is wired to the API's includeRemoved flag.
@@ -174,7 +188,6 @@ test.describe('Establishment property list', () => {
       listPage.filters.getByRole('checkbox', { name: 'Show property that has been returned or disposed of' }),
     ).toBeEnabled()
     // The remaining groups are placeholders until the API supports them.
-    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for return' })).toBeDisabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeDisabled()
     await expect(
       listPage.filters.getByRole('checkbox', { name: 'Property for people in this establishment' }),
