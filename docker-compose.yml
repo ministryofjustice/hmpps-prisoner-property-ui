@@ -9,9 +9,32 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_PASSWORD=prisoner-property
-      - POSTGRES_USER=prisoner-property
+      - POSTGRES_PASSWORD=prisoner_property
+      - POSTGRES_USER=prisoner_property
       - POSTGRES_DB=prisoner-property
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prisoner_property -d prisoner-property"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  locations-inside-prison-db:
+    image: postgres
+    networks:
+      - hmpps
+    container_name: locations-inside-prison-db
+    restart: unless-stopped
+    ports:
+      - "5436:5432"
+    environment:
+      - POSTGRES_PASSWORD=locations_inside_prison
+      - POSTGRES_USER=locations_inside_prison
+      - POSTGRES_DB=locations_inside_prison
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U locations_inside_prison -d locations_inside_prison"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   auth-db:
     image: postgres:18
@@ -25,6 +48,11 @@ services:
       - POSTGRES_PASSWORD=admin_password
       - POSTGRES_USER=admin
       - POSTGRES_DB=auth-db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d auth-db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   manage-users-db:
     image: postgres:18
@@ -38,6 +66,29 @@ services:
       - POSTGRES_PASSWORD=admin_password
       - POSTGRES_USER=admin
       - POSTGRES_DB=manage-users-db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d manage-users-db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  prison-register-db:
+    image: postgres:18
+    networks:
+      - hmpps
+    container_name: prison-register-db
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_PASSWORD=prison-register
+      - POSTGRES_USER=prison-register
+      - POSTGRES_DB=prison-register
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U prison-register -d prison-register"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   hmpps-auth:
     image: ghcr.io/ministryofjustice/hmpps-auth:latest
@@ -45,11 +96,16 @@ services:
       - hmpps
     container_name: hmpps-auth
     depends_on:
-      - auth-db
+      auth-db:
+        condition: service_healthy
     ports:
       - "9090:8080"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/auth/health" ]
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     environment:
       - SERVER_PORT=8080
       - SPRING_PROFILES_ACTIVE=dev,local-postgres,manage-users-api,nomis
@@ -68,7 +124,11 @@ services:
     ports:
       - "8081:8080"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ping" ]
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     environment:
       - SERVER_PORT=8080
       - SPRING_PROFILES_ACTIVE=dev
@@ -80,14 +140,20 @@ services:
     networks:
       - hmpps
     depends_on:
-      - hmpps-auth
-      - hmpps-external-users-api
-      - nomis-user-roles-api
-      - manage-users-db
+      hmpps-auth:
+        condition: service_healthy
+      nomis-user-roles-api:
+        condition: service_healthy
+      manage-users-db:
+        condition: service_healthy
     ports:
       - "8082:8080"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ping" ]
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     environment:
       - SERVER_PORT=8080
       - SPRING_PROFILES_ACTIVE=dev,local-docker
@@ -98,38 +164,87 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://manage-users-db:5432/manage-users-db
       - HMPPS_SQS_LOCALSTACK_URL=http://localstack:4566
 
-  hmpps-external-users-api:
-    image: ghcr.io/ministryofjustice/hmpps-external-users-api:latest
-    container_name: hmpps-external-users-api
+  prison-register:
+    image: ghcr.io/ministryofjustice/prison-register:latest
+    container_name: prison-register
+    ports:
+      - "8084:8080"
+    depends_on:
+      hmpps-auth:
+        condition: service_healthy
+      prison-register-db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
     networks:
       - hmpps
-    depends_on:
-      - hmpps-auth
-    ports:
-      - "8088:8080"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ping" ]
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     environment:
       - SERVER_PORT=8080
-      - SPRING_PROFILES_ACTIVE=dev,local-postgres
+      - SPRING_PROFILES_ACTIVE=dev
       - API_BASE_URL_OAUTH=http://hmpps-auth:8080/auth
-      - SPRING_R2DBC_URL=r2dbc:postgresql://auth-db:5432/auth-db?sslmode=prefer
-      - SPRING_FLYWAY_URL=jdbc:postgresql://auth-db:5432/auth-db?sslmode=prefer
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://prison-register-db:5432/prison-register?sslmode=prefer
       - HMPPS_SQS_LOCALSTACK_URL=http://localstack:4566
 
-  prisoner-property-api:
-    image: ghcr.io/ministryofjustice/hmpps-prisoner-property-api:latest
-    container_name: prisoner-property-api
+  locations-inside-prison-api:
+    image: ghcr.io/ministryofjustice/hmpps-locations-inside-prison-api:latest
+    container_name: locations-inside-prison-api
     depends_on:
-      - hmpps-auth
-      - prisoner-property-db
-      - localstack
+      hmpps-auth:
+        condition: service_healthy
+      locations-inside-prison-db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
     networks:
       - hmpps
     ports:
       - "8090:8080"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health/ping" ]
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    environment:
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=seed
+      - API_BASE_URL_OAUTH=http://hmpps-auth:8080/auth
+      - API_BASE_URL_PRISONER_SEARCH=http://prisoner-search:8080
+      - API_BASE_URL_PRISON_REGISTER=http://prison-register:8080
+      - API_BASE_URL_MANAGE_USERS=http://manage-users-api:8080
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://locations-inside-prison-db:5432/locations_inside_prison?sslmode=prefer
+      - HMPPS_SQS_LOCALSTACK_URL=http://localstack:4566
+      - LOCATIONS_INSIDE_PRISON_API_CLIENT_ID=hmpps-locations-inside-prison-api
+      - LOCATIONS_INSIDE_PRISON_API_CLIENT_SECRET=clientsecret
+
+  prisoner-property-api:
+    image: ghcr.io/ministryofjustice/hmpps-prisoner-property-api:latest
+    container_name: prisoner-property-api
+    depends_on:
+      prisoner-property-db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      hmpps-auth:
+        condition: service_healthy
+      locations-inside-prison-api:
+        condition: service_healthy
+    networks:
+      - hmpps
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     environment:
       - SERVER_PORT=8080
       - SPRING_PROFILES_ACTIVE=dev
@@ -141,6 +256,16 @@ services:
       - PRISONER_PROPERTY_API_CLIENT_ID=hmpps-prisoner-property-api
       - PRISONER_PROPERTY_API_CLIENT_SECRET=clientsecret
 
+  prisoner-search:
+    image: wiremock/wiremock:latest
+    networks:
+      - hmpps
+    container_name: prisoner-search
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./wiremock:/home/wiremock
+
   localstack:
     image: localstack/localstack:community-archive
     networks:
@@ -149,6 +274,11 @@ services:
     ports:
       - "4566:4566"
       - "8999:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal sqs list-queues && awslocal sns list-topics"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
     environment:
       - DEBUG=${DEBUG- }
       - DOCKER_HOST=unix:///var/run/docker.sock
@@ -175,9 +305,12 @@ services:
         GIT_BRANCH: main
     network_mode: "host"
     depends_on:
-      - manage-users-api
-      - hmpps-auth
-      - prisoner-property-api
+      manage-users-api:
+        condition: service_healthy
+      hmpps-auth:
+        condition: service_healthy
+      prisoner-property-api:
+        condition: service_healthy
     profiles:
       - include-frontend
     ports:
