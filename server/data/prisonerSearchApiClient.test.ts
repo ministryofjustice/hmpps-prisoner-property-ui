@@ -45,4 +45,27 @@ describe('PrisonerSearchApiClient', () => {
       expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
     })
   })
+
+  describe('searchPrisoners', () => {
+    it('POSTs a keyword search scoped to the prison, with the term in andWords and pagination in the body', async () => {
+      let capturedBody: Record<string, unknown> = {}
+      nock(config.apis.prisonerSearchApi.url)
+        .post('/keyword', body => {
+          capturedBody = body
+          return true
+        })
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20 })
+
+      await prisonerSearchApiClient.searchPrisoners('Sonom', 'MDI', 2, 20, 'AUSER_GEN')
+
+      expect(capturedBody).toEqual({
+        andWords: 'Sonom',
+        fuzzyMatch: true,
+        prisonIds: ['MDI'],
+        pagination: { page: 2, size: 20 },
+      })
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+  })
 })

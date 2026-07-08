@@ -32,11 +32,12 @@ export default class PrisonerSearchApiClient extends RestClient {
     size: number,
     username: string,
   ): Promise<RestPage<Prisoner>> {
+    // The /keyword endpoint takes the term in `andWords` (every word must match, so results narrow to the
+    // closest match) and reads pagination from the body, not query params.
     return this.post<RestPage<Prisoner>>(
       {
         path: `/keyword`,
-        query: { page, size },
-        data: { orWords: term, fuzzyMatch: true, prisonIds: [prisonId] },
+        data: { andWords: term, fuzzyMatch: true, prisonIds: [prisonId], pagination: { page, size } },
       },
       asSystem(username),
     )
