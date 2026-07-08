@@ -10,6 +10,7 @@ export interface TimelineDetails {
   containerType: string
   sealNumber: string | null
   status: TimelineTag | null
+  locationLabel: string
   location: string | null
   historyUrl: string
 }
@@ -57,27 +58,32 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     case 'CREATED_SEALED':
       return `${container} added to storage at ${establishment}`
     case 'SEAL_CHANGED':
+      // The container is identified by its (new) seal, so avoid repeating it as a prefix.
       return item.sealNumber
-        ? `Property container seal changed to ${item.sealNumber}`
-        : 'Property container seal changed'
+        ? `Property container details changed — seal number now ${item.sealNumber}`
+        : 'Property container details changed — seal number'
     case 'CONTAINER_TYPE_CHANGE':
-      return `${container} property type changed`
+      return `${container} details changed — property type`
     case 'MOVED':
       return item.toStorageLocationType === 'BRANSTON'
         ? `${container} moved to Branston (offsite)`
-        : `${container} moved to a new storage location`
+        : `${container} storage location changed`
     case 'PRISONER_RECEIVED':
       return `${container} due for transfer out to ${toPrison}`
+    case 'PRISONER_RELEASED':
+      return `${container} due for return`
     case 'TRANSFERRED':
-      return `${container} transferred to ${toPrison}`
+      return `${container} transferred out to ${toPrison}`
     case 'RETURNED':
-      return `${container} returned to the prisoner`
+      return `${container} returned to the person`
     case 'DISPOSAL_REQUIRED':
-      return `${container} due for disposal at ${establishment}`
+      return `${container} due for disposal`
     case 'DISPOSED':
       return `${container} disposed of`
     case 'COMBINED':
       return `${container} combined into another container`
+    case 'CREATED_IN_ERROR':
+      return `${container} removed — created in error`
     default:
       return `${container} updated`
   }
@@ -95,13 +101,28 @@ const timelineByline = (item: PrisonerTimelineItem, nameByUsername: Map<string, 
   return item.actingEstablishmentName ? `${who}, ${item.actingEstablishmentName}` : who
 }
 
+// Events that remove the container — a removed container reports no live storage location.
+const REMOVAL_EVENTS = ['RETURNED', 'DISPOSED', 'CREATED_IN_ERROR']
+
+// The details block's location row is worded by event: a transfer names the destination establishment,
+// a removal reads "Removed", otherwise the current storage location.
+const detailsLocation = (item: PrisonerTimelineItem): { locationLabel: string; location: string | null } => {
+  if (item.eventType === 'TRANSFERRED') {
+    return { locationLabel: 'Transferred to', location: item.toPrisonName ?? 'another establishment' }
+  }
+  if (item.eventType && REMOVAL_EVENTS.includes(item.eventType)) {
+    return { locationLabel: 'Storage location', location: 'Removed' }
+  }
+  return { locationLabel: 'Storage location', location: item.containerLocationDescription }
+}
+
 const timelineDetails = (item: PrisonerTimelineItem, prisonerNumber: string): TimelineDetails | null => {
   if (item.itemType !== 'CONTAINER_EVENT' || !item.containerId) return null
   return {
     containerType: item.containerType ? containerTypeLabel(item.containerType) : '-',
     sealNumber: item.containerSealNumber,
     status: item.containerStatus ? timelineTag(item.containerStatus) : null,
-    location: item.containerLocationDescription,
+    ...detailsLocation(item),
     historyUrl: `/prisoner/${prisonerNumber}/container/${item.containerId}`,
   }
 }

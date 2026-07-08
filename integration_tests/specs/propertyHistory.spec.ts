@@ -103,7 +103,9 @@ test.describe('Property history timeline', () => {
     const historyPage = await PropertyHistoryPage.verifyOnPage(page)
 
     // interleaved, newest first: a container transfer, the prisoner movement, then the creation
-    await expect(historyPage.timeline).toContainText('Property container SN880032 transferred to Isle of Wight (HMP)')
+    await expect(historyPage.timeline).toContainText(
+      'Property container SN880032 transferred out to Isle of Wight (HMP)',
+    )
     await expect(historyPage.timeline).toContainText('Transferred out')
     // the acting user is resolved to their name, and the system movement shows "System generated"
     await expect(historyPage.timeline).toContainText('by John Doe, Leeds (HMP)')

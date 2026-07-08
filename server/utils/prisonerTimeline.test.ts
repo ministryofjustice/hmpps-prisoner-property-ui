@@ -49,22 +49,24 @@ const titleFor = (eventType: PropertyEventType, overrides: Partial<PrisonerTimel
 describe('buildPrisonerTimeline', () => {
   it('builds a title sentence per event type using the resolved names and seal', () => {
     expect(titleFor('CREATED_SEALED')).toBe('Property container SN880032 added to storage at Leeds (HMP)')
-    expect(titleFor('SEAL_CHANGED')).toBe('Property container seal changed to SN880032')
-    expect(titleFor('CONTAINER_TYPE_CHANGE')).toBe('Property container SN880032 property type changed')
-    expect(titleFor('MOVED')).toBe('Property container SN880032 moved to a new storage location')
+    expect(titleFor('SEAL_CHANGED')).toBe('Property container details changed — seal number now SN880032')
+    expect(titleFor('CONTAINER_TYPE_CHANGE')).toBe('Property container SN880032 details changed — property type')
+    expect(titleFor('MOVED')).toBe('Property container SN880032 storage location changed')
     expect(titleFor('MOVED', { toStorageLocationType: 'BRANSTON' })).toBe(
       'Property container SN880032 moved to Branston (offsite)',
     )
     expect(titleFor('PRISONER_RECEIVED', { toPrisonName: 'Moorland (HMP & YOI)' })).toBe(
       'Property container SN880032 due for transfer out to Moorland (HMP & YOI)',
     )
+    expect(titleFor('PRISONER_RELEASED')).toBe('Property container SN880032 due for return')
     expect(titleFor('TRANSFERRED', { toPrisonName: 'Isle of Wight (HMP)' })).toBe(
-      'Property container SN880032 transferred to Isle of Wight (HMP)',
+      'Property container SN880032 transferred out to Isle of Wight (HMP)',
     )
-    expect(titleFor('RETURNED')).toBe('Property container SN880032 returned to the prisoner')
-    expect(titleFor('DISPOSAL_REQUIRED')).toBe('Property container SN880032 due for disposal at Leeds (HMP)')
+    expect(titleFor('RETURNED')).toBe('Property container SN880032 returned to the person')
+    expect(titleFor('DISPOSAL_REQUIRED')).toBe('Property container SN880032 due for disposal')
     expect(titleFor('DISPOSED')).toBe('Property container SN880032 disposed of')
     expect(titleFor('COMBINED')).toBe('Property container SN880032 combined into another container')
+    expect(titleFor('CREATED_IN_ERROR')).toBe('Property container SN880032 removed — created in error')
   })
 
   it('omits the seal from the title when it is not known', () => {
@@ -107,8 +109,20 @@ describe('buildPrisonerTimeline', () => {
       containerType: 'Valuables',
       sealNumber: 'SN880032',
       status: { text: 'Stored', classes: 'govuk-tag--green' },
+      locationLabel: 'Storage location',
       location: 'Reception A1',
       historyUrl: '/prisoner/A1234BC/container/c1',
     })
+  })
+
+  it('words the details location row by event: transfer names the destination, a removal reads "Removed"', () => {
+    const [transfer] = buildPrisonerTimeline(
+      [containerEvent({ eventType: 'TRANSFERRED', toPrisonName: 'Isle of Wight (HMP)' })],
+      'A1234BC',
+    )
+    expect(transfer.details).toMatchObject({ locationLabel: 'Transferred to', location: 'Isle of Wight (HMP)' })
+
+    const [returned] = buildPrisonerTimeline([containerEvent({ eventType: 'RETURNED' })], 'A1234BC')
+    expect(returned.details).toMatchObject({ locationLabel: 'Storage location', location: 'Removed' })
   })
 })
