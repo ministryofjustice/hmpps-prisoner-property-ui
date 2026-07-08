@@ -102,10 +102,7 @@
             name: "personLocation",
             classes: "govuk-checkboxes--small app-checkboxes--inline",
             fieldset: { legend: { text: "By person location", classes: "govuk-fieldset__legend--s" } },
-            items: [
-              { value: "IN_ESTABLISHMENT", text: "Property for people in this establishment", disabled: true },
-              { value: "LEFT_ESTABLISHMENT", text: "Property for people no longer in this establishment", disabled: true }
-            ]
+            items: personLocationItems
           }) }}
 
           {{ govukCheckboxes({

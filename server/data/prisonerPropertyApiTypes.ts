@@ -187,6 +187,8 @@ export interface CombineContainersRequest {
 // Filters + paging for the establishment-wide list (GET /property-containers/prison/{prisonId}).
 // `query` is a free-text OR match over prisoner number, seal number and storage location; the other
 // filters are exact-match. Omit a field to leave it unfiltered.
+export type PersonLocation = 'IN_ESTABLISHMENT' | 'LEFT_ESTABLISHMENT'
+
 export interface PrisonPropertyListQuery {
   query?: string
   prisonerNumber?: string
@@ -195,6 +197,9 @@ export interface PrisonPropertyListQuery {
   status?: ContainerStatus[]
   storageLocation?: string
   includeRemoved?: boolean
+  // Where the property's owner currently is, from prisoner-search. Set only when exactly one of the two
+  // person-location checkboxes is ticked (both/neither means "everyone", so it's omitted).
+  personLocation?: PersonLocation
   page?: number
   size?: number
 }

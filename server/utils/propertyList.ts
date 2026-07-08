@@ -2,6 +2,7 @@ import type { ParsedQs } from 'qs'
 import type {
   ContainerStatus,
   ContainerType,
+  PersonLocation,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PrisonPropertyListQuery,
@@ -31,6 +32,7 @@ const CONTAINER_TYPE_LABELS: Record<ContainerType, string> = {
 
 export const ALL_STATUSES = Object.keys(STATUS_TAGS) as ContainerStatus[]
 export const ALL_CONTAINER_TYPES = Object.keys(CONTAINER_TYPE_LABELS) as ContainerType[]
+const ALL_PERSON_LOCATIONS: PersonLocation[] = ['IN_ESTABLISHMENT', 'LEFT_ESTABLISHMENT']
 
 export const isPrisonerNumber = (value: string): boolean => PRISON_NUMBER_PATTERN.test(value)
 
@@ -68,6 +70,7 @@ export interface ParsedPropertyListQuery {
   containerTypes: ContainerType[]
   statuses: ContainerStatus[]
   includeRemoved: boolean
+  personLocations: PersonLocation[]
   page: number
   apiQuery: PrisonPropertyListQuery
 }
@@ -81,6 +84,9 @@ export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_S
   const statuses = toArray(reqQuery.status).filter((status): status is ContainerStatus =>
     ALL_STATUSES.includes(status as ContainerStatus),
   )
+  const personLocations = toArray(reqQuery.personLocation).filter((value): value is PersonLocation =>
+    ALL_PERSON_LOCATIONS.includes(value as PersonLocation),
+  )
   const includeRemoved = firstValue(reqQuery.includeRemoved) === 'true'
   const parsedPage = Number.parseInt(firstValue(reqQuery.page) ?? '1', 10)
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
@@ -91,11 +97,14 @@ export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_S
     containerType: containerTypes.length ? containerTypes : undefined,
     status: statuses.length ? statuses : undefined,
     includeRemoved: includeRemoved || undefined,
+    // In vs no-longer-in are complementary, so only a single ticked box narrows the list; both/neither is
+    // "everyone" and sends nothing.
+    personLocation: personLocations.length === 1 ? personLocations[0] : undefined,
     page: page - 1, // API pages are zero-based
     size,
   }
 
-  return { search, containerTypes, statuses, includeRemoved, page, apiQuery }
+  return { search, containerTypes, statuses, includeRemoved, personLocations, page, apiQuery }
 }
 
 export interface PaginationItem {

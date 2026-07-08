@@ -56,10 +56,8 @@ export default function routes({
       return res.render('pages/noCaseload')
     }
 
-    const { search, containerTypes, statuses, includeRemoved, page, apiQuery } = parsePropertyListQuery(
-      req.query,
-      DEFAULT_PAGE_SIZE,
-    )
+    const { search, containerTypes, statuses, includeRemoved, personLocations, page, apiQuery } =
+      parsePropertyListQuery(req.query, DEFAULT_PAGE_SIZE)
 
     // The summary counts come from a separate endpoint. Fetch it alongside the list, but degrade
     // gracefully: if it fails (e.g. the endpoint isn't deployed yet) render the list without the bar.
@@ -78,6 +76,7 @@ export default function routes({
     if (search) baseQueryParams.set('q', search)
     containerTypes.forEach(type => baseQueryParams.append('containerType', type))
     statuses.forEach(status => baseQueryParams.append('status', status))
+    personLocations.forEach(location => baseQueryParams.append('personLocation', location))
     if (includeRemoved) baseQueryParams.set('includeRemoved', 'true')
 
     return res.render('pages/propertyList', {
@@ -118,6 +117,18 @@ export default function routes({
           checked: statuses.includes('DUE_FOR_TRANSFER_OUT'),
         },
         { value: 'TRANSFER_IN_PLACEHOLDER', text: 'Due for transfer in', disabled: true },
+      ],
+      personLocationItems: [
+        {
+          value: 'IN_ESTABLISHMENT',
+          text: 'Property for people in this establishment',
+          checked: personLocations.includes('IN_ESTABLISHMENT'),
+        },
+        {
+          value: 'LEFT_ESTABLISHMENT',
+          text: 'Property for people no longer in this establishment',
+          checked: personLocations.includes('LEFT_ESTABLISHMENT'),
+        },
       ],
     })
   })

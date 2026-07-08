@@ -187,11 +187,30 @@ test.describe('Establishment property list', () => {
     await expect(
       listPage.filters.getByRole('checkbox', { name: 'Show property that has been returned or disposed of' }),
     ).toBeEnabled()
-    // The remaining groups are placeholders until the API supports them.
-    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeDisabled()
+    // Person-location filters are now enabled.
     await expect(
       listPage.filters.getByRole('checkbox', { name: 'Property for people in this establishment' }),
-    ).toBeDisabled()
+    ).toBeEnabled()
+    await expect(
+      listPage.filters.getByRole('checkbox', { name: 'Property for people no longer in this establishment' }),
+    ).toBeEnabled()
+    // The remaining group is a placeholder until the API supports it.
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeDisabled()
+  })
+
+  test('keeps the person-location filter ticked when applied', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/?personLocation=IN_ESTABLISHMENT')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await listPage.filters.locator('summary').click() // expand the collapsed filters
+    await expect(
+      listPage.filters.getByRole('checkbox', { name: 'Property for people in this establishment' }),
+    ).toBeChecked()
+    await expect(
+      listPage.filters.getByRole('checkbox', { name: 'Property for people no longer in this establishment' }),
+    ).not.toBeChecked()
   })
 
   test('shows the Add button and per-row actions for a user with the manage role', async ({ page }) => {
