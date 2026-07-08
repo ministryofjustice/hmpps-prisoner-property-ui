@@ -40,52 +40,77 @@
   <form method="post" novalidate>
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
-    {{ govukInput({
-      label: { text: "Enter the property container’s current seal number", classes: "govuk-label--m" },
-      hint: { text: "The seal number fitted to the container now." },
-      id: "sealNumber",
-      name: "sealNumber",
-      value: data.sealNumber,
-      classes: "govuk-input--width-20",
-      errorMessage: { text: errors.sealNumber.text } if errors.sealNumber else undefined
+    {% for container in containers %}
+      {% set i = loop.index0 %}
+      {% set prefix = "containers[" + i + "]" %}
+      {% set idPrefix = "containers-" + i %}
+
+      {% if i > 0 %}
+        <h2 class="govuk-heading-m govuk-!-margin-top-6" data-qa="another-heading">Add another property container</h2>
+      {% endif %}
+
+      {{ govukInput({
+        label: { text: "Enter the property container’s current seal number", classes: "govuk-label--m" },
+        hint: { text: "The seal number fitted to the container now." },
+        id: idPrefix + "-sealNumber",
+        name: prefix + "[sealNumber]",
+        value: container.sealNumber,
+        classes: "govuk-input--width-20",
+        errorMessage: { text: fieldErrors[idPrefix + "-sealNumber"] } if fieldErrors[idPrefix + "-sealNumber"] else undefined
+      }) }}
+
+      {{ govukInput({
+        label: { text: "Previous or different seal number (optional)", classes: "govuk-label--m" },
+        hint: { text: "Leave this blank if the container is new, or if you do not know another seal number." },
+        id: idPrefix + "-previousSealNumber",
+        name: prefix + "[previousSealNumber]",
+        value: container.previousSealNumber,
+        classes: "govuk-input--width-20"
+      }) }}
+
+      {{ govukDetails({
+        summaryText: "Why do we ask for this",
+        text: "Recording a previous seal number lets us link a container to its record at another establishment, so property can be tracked when a person transfers."
+      }) }}
+
+      {% set typeItems = [] %}
+      {% for type in containerTypes %}
+        {% set typeItems = (typeItems.push({ value: type.value, text: type.text, checked: type.value == container.containerType }), typeItems) %}
+      {% endfor %}
+      {{ govukRadios({
+        idPrefix: idPrefix + "-containerType",
+        name: prefix + "[containerType]",
+        fieldset: { legend: { text: "What is the type of property?", classes: "govuk-fieldset__legend--m" } },
+        items: typeItems,
+        errorMessage: { text: fieldErrors[idPrefix + "-containerType"] } if fieldErrors[idPrefix + "-containerType"] else undefined
+      }) }}
+
+      {{ govukDateInput({
+        id: idPrefix + "-disposalDate",
+        fieldset: { legend: { text: "Enter or select a date the property must be destroyed or disposed of (optional)", classes: "govuk-fieldset__legend--m" } },
+        hint: { text: "For example, 17 1 2026." },
+        errorMessage: { text: fieldErrors[idPrefix + "-disposalDate"] } if fieldErrors[idPrefix + "-disposalDate"] else undefined,
+        items: [
+          { name: prefix + "[disposalDate][day]", classes: "govuk-input--width-2", value: container.disposalDate.day },
+          { name: prefix + "[disposalDate][month]", classes: "govuk-input--width-2", value: container.disposalDate.month },
+          { name: prefix + "[disposalDate][year]", classes: "govuk-input--width-4", value: container.disposalDate.year }
+        ]
+      }) }}
+
+      {% if not loop.last %}<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">{% endif %}
+    {% endfor %}
+
+    {{ govukButton({
+      text: "Add another property container for this person",
+      classes: "govuk-button--secondary",
+      name: "action",
+      value: "addAnother",
+      attributes: { "data-qa": "add-another" }
     }) }}
 
-    {{ govukInput({
-      label: { text: "Previous or different seal number (optional)", classes: "govuk-label--m" },
-      hint: { text: "Leave this blank if the container is new, or if you do not know another seal number." },
-      id: "previousSealNumber",
-      name: "previousSealNumber",
-      value: data.previousSealNumber,
-      classes: "govuk-input--width-20"
-    }) }}
-
-    {{ govukDetails({
-      summaryText: "Why do we ask for this",
-      text: "Recording a previous seal number lets us link a container to its record at another establishment, so property can be tracked when a person transfers."
-    }) }}
-
-    {{ govukRadios({
-      idPrefix: "containerType",
-      name: "containerType",
-      fieldset: { legend: { text: "What is the type of property?", classes: "govuk-fieldset__legend--m" } },
-      items: containerTypes,
-      errorMessage: { text: errors.containerType.text } if errors.containerType else undefined
-    }) }}
-
-    {{ govukDateInput({
-      id: "disposalDate",
-      namePrefix: "disposalDate",
-      fieldset: { legend: { text: "Enter or select a date the property must be destroyed or disposed of (optional)", classes: "govuk-fieldset__legend--m" } },
-      hint: { text: "For example, 17 1 2026." },
-      errorMessage: { text: errors.disposalDate.text } if errors.disposalDate else undefined,
-      items: [
-        { name: "day", classes: "govuk-input--width-2", value: data.day },
-        { name: "month", classes: "govuk-input--width-2", value: data.month },
-        { name: "year", classes: "govuk-input--width-4", value: data.year }
-      ]
-    }) }}
-
-    {{ govukButton({ text: "Save and continue" }) }}
+    <div class="govuk-button-group govuk-!-margin-top-4">
+      {{ govukButton({ text: "Save and continue", attributes: { "data-qa": "save-and-continue" } }) }}
+    </div>
   </form>
 
   <p class="govuk-body"><a class="govuk-link" href="{{ backUrl }}" data-qa="cancel">Cancel</a></p>

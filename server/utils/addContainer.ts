@@ -22,6 +22,15 @@ export interface FieldError {
   href: string
 }
 
+// The raw shape of one container block posted from the multi-add details form
+// (containers[i][sealNumber], containers[i][disposalDate][day], ...).
+export interface ContainerBlock {
+  sealNumber?: string
+  previousSealNumber?: string
+  containerType?: string
+  disposalDate?: { day?: string; month?: string; year?: string }
+}
+
 const trim = (value?: string): string => (value ?? '').trim()
 
 /**
@@ -88,4 +97,47 @@ export const validateDetails = (form: DetailsForm): { values?: ParsedDetails; er
     },
     errors: {},
   }
+}
+
+/**
+ * Normalise the posted `containers` value into an ordered array of blocks. `qs` parses `containers[0][x]`
+ * into an array, but a single or sparse set can arrive as an object keyed by index - coerce either to an
+ * array. Always returns at least one (empty) block.
+ */
+export const toContainerBlocks = (raw: unknown): ContainerBlock[] => {
+  if (Array.isArray(raw)) return raw.length ? (raw as ContainerBlock[]) : [{}]
+  if (raw && typeof raw === 'object') {
+    const values = Object.values(raw as Record<string, ContainerBlock>)
+    return values.length ? values : [{}]
+  }
+  return [{}]
+}
+
+/**
+ * Validate every container block from the multi-add details form. Returns the parsed values when all are
+ * valid, or a flat list of GOV.UK error-summary entries whose hrefs anchor to `#containers-{index}-{field}`
+ * (prefixed with "Container N:" when there is more than one).
+ */
+export const validateContainers = (blocks: ContainerBlock[]): { values?: ParsedDetails[]; errors: FieldError[] } => {
+  const errors: FieldError[] = []
+  const values: ParsedDetails[] = []
+  const many = blocks.length > 1
+  blocks.forEach((block, index) => {
+    const { values: parsed, errors: blockErrors } = validateDetails({
+      sealNumber: block.sealNumber,
+      previousSealNumber: block.previousSealNumber,
+      containerType: block.containerType,
+      'disposalDate-day': block.disposalDate?.day,
+      'disposalDate-month': block.disposalDate?.month,
+      'disposalDate-year': block.disposalDate?.year,
+    })
+    if (parsed) values.push(parsed)
+    Object.entries(blockErrors).forEach(([field, err]) => {
+      errors.push({
+        text: many ? `Container ${index + 1}: ${err.text}` : err.text,
+        href: `#containers-${index}-${field}`,
+      })
+    })
+  })
+  return errors.length ? { errors } : { values, errors: [] }
 }

@@ -871,12 +871,75 @@ describe('Add container journey - access control', () => {
   })
 })
 
+describe('Add container journey - search entry', () => {
+  it('renders the search page from the establishment list', async () => {
+    withActiveCaseload()
+
+    return request(manageApp())
+      .get('/add-container')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Who is the property container for?')
+        expect(res.text).toContain('You can search by name or prison number')
+      })
+  })
+
+  it('errors on an empty search term', async () => {
+    withActiveCaseload()
+
+    return request(manageApp())
+      .get('/add-container?q=')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+        expect(res.text).toContain('Enter a name or prison number')
+      })
+  })
+
+  it('lists matching prisoners scoped to the caseload with add and view actions', async () => {
+    withActiveCaseload()
+    prisonerService.searchPrisoners.mockResolvedValue({
+      ...emptyPage,
+      totalElements: 1,
+      totalPages: 1,
+      numberOfElements: 1,
+      content: [
+        prisoner({ prisonerNumber: 'A0038EA', firstName: 'Matthew', lastName: 'Sonom', cellLocation: 'F-7-003' }),
+      ],
+    } as never)
+
+    await request(manageApp())
+      .get('/add-container?q=Sonom')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('A0038EA')
+        expect(res.text).toContain('F-7-003')
+        expect(res.text).toContain('/prisoner/A0038EA/add-container?from=list')
+        expect(res.text).toContain('/prisoner/A0038EA/image')
+      })
+
+    expect(prisonerService.searchPrisoners).toHaveBeenCalledWith('Sonom', 'MDI', 0, 50, user.username)
+  })
+
+  it('forbids the search page for a user without the manage role', async () => {
+    withActiveCaseload()
+
+    return request(app).get('/add-container').expect(403)
+  })
+})
+
 describe('Add container journey - steps', () => {
+  const startJourney = async (agent: ReturnType<typeof request.agent>, from = 'person') => {
+    await agent.get(`/prisoner/A1234BC/add-container?from=${from}`).expect(302)
+  }
+
   it('renders the details form', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
 
-    return request(manageApp())
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    return agent
       .get('/prisoner/A1234BC/add-container/details')
       .expect(200)
       .expect(res => {
@@ -890,10 +953,12 @@ describe('Add container journey - steps', () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
 
-    return request(manageApp())
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    return agent
       .post('/prisoner/A1234BC/add-container/details')
       .type('form')
-      .send({ containerType: 'STANDARD' })
+      .send({ 'containers[0][containerType]': 'STANDARD' })
       .expect(200)
       .expect(res => {
         expect(res.text).toContain('There is a problem')
@@ -901,23 +966,24 @@ describe('Add container journey - steps', () => {
       })
   })
 
-  it('walks details -> location -> check -> confirm and creates the container', async () => {
+  it('walks details -> location -> check -> confirm and adds the container, returning to the list', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
     prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
     prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'newC' }))
 
     const agent = request.agent(manageApp())
+    await startJourney(agent, 'list')
 
     await agent
       .post('/prisoner/A1234BC/add-container/details')
       .type('form')
-      .send({ sealNumber: 'SN9', containerType: 'VALUABLES' })
+      .send({ 'containers[0][sealNumber]': 'SN9', 'containers[0][containerType]': 'VALUABLES' })
       .expect(302)
-      .expect('location', '/prisoner/A1234BC/add-container/location')
+      .expect('location', '/prisoner/A1234BC/add-container/location/0')
 
     await agent
-      .get('/prisoner/A1234BC/add-container/location')
+      .get('/prisoner/A1234BC/add-container/location/0')
       .expect(200)
       .expect(res => {
         expect(res.text).toContain('Select a storage location for container SN9')
@@ -925,7 +991,7 @@ describe('Add container journey - steps', () => {
       })
 
     await agent
-      .post('/prisoner/A1234BC/add-container/location')
+      .post('/prisoner/A1234BC/add-container/location/0')
       .type('form')
       .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
       .expect(302)
@@ -946,7 +1012,7 @@ describe('Add container journey - steps', () => {
       .type('form')
       .send({})
       .expect(302)
-      .expect('location', '/prisoner/A1234BC')
+      .expect('location', '/')
 
     expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -958,26 +1024,90 @@ describe('Add container journey - steps', () => {
       }),
       user.username,
     )
-    expect(flashProvider).toHaveBeenCalledWith('success', 'Property container added')
+    expect(flashProvider).toHaveBeenCalledWith('success', 'Property container(s) added')
     expect(auditService.logPageView).toHaveBeenCalledWith(
       Page.ADD_PROPERTY_CONTAINER,
-      expect.objectContaining({ subjectId: 'A1234BC', details: { containerId: 'newC' } }),
+      expect.objectContaining({ subjectId: 'A1234BC', details: { count: 1 } }),
     )
   })
 
-  it('redirects back to details with an error when the seal number is already in use (409)', async () => {
+  it('adds multiple containers in one journey, skipping the location step for excess', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
+    prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'newC' }))
+
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+
+    // Two containers: a Standard (needs a location) and an Excess (off-site Branston, no location step).
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({
+        'containers[0][sealNumber]': 'SN1',
+        'containers[0][containerType]': 'STANDARD',
+        'containers[1][sealNumber]': 'SN2',
+        'containers[1][containerType]': 'EXCESS',
+      })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/add-container/location/0')
+
+    // Only container 0 needs a location; selecting it goes straight to check (container 1 is Excess).
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/0')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/add-container/check')
+
+    await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+
+    expect(prisonerPropertyService.createContainer).toHaveBeenCalledTimes(2)
+    expect(prisonerPropertyService.createContainer).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ sealNumber: 'SN1', containerType: 'STANDARD', internalLocationId: 'box1' }),
+      user.username,
+    )
+    expect(prisonerPropertyService.createContainer).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ sealNumber: 'SN2', containerType: 'EXCESS', internalLocationId: undefined }),
+      user.username,
+    )
+  })
+
+  it('appends an empty block on "Add another" without validating', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    return agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({ 'containers[0][sealNumber]': 'SN1', 'containers[0][containerType]': 'STANDARD', action: 'addAnother' })
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Add another property container')
+        expect(res.text).not.toContain('There is a problem')
+        expect(res.text).toContain('value="SN1"')
+      })
+  })
+
+  it('redirects back to details with an error when a seal number is already in use (409)', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
     prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({})]))
     prisonerPropertyService.createContainer.mockRejectedValue({ responseStatus: 409 })
 
     const agent = request.agent(manageApp())
+    await startJourney(agent)
     await agent
       .post('/prisoner/A1234BC/add-container/details')
       .type('form')
-      .send({ sealNumber: 'SN9', containerType: 'STANDARD' })
+      .send({ 'containers[0][sealNumber]': 'SN9', 'containers[0][containerType]': 'STANDARD' })
     await agent
-      .post('/prisoner/A1234BC/add-container/location')
+      .post('/prisoner/A1234BC/add-container/location/0')
       .type('form')
       .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
 
@@ -994,13 +1124,13 @@ describe('Add container journey - steps', () => {
   it('shows the success banner on the person view from a flash message', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
-    flashProvider.mockReturnValueOnce(['Property container added'])
+    flashProvider.mockReturnValueOnce(['Property container(s) added'])
 
     return request(manageApp())
       .get('/prisoner/A1234BC')
       .expect(200)
       .expect(res => {
-        expect(res.text).toContain('Property container added')
+        expect(res.text).toContain('Property container(s) added')
       })
   })
 })

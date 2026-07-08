@@ -10,7 +10,6 @@
 {% set mainClasses = "govuk-body" %}
 
 {% set detailsUrl = "/prisoner/" + prisonerNumber + "/add-container/details" %}
-{% set locationUrl = "/prisoner/" + prisonerNumber + "/add-container/location" %}
 
 {% block beforeContent %}
   {{ govukBackLink({ text: "Back", href: backUrl }) }}
@@ -28,42 +27,25 @@
     ]
   }) }}
 
-  <h2 class="govuk-heading-m govuk-!-margin-top-6">Property container {{ journey.sealNumber }}</h2>
+  {% for container in containers %}
+    <h2 class="govuk-heading-m govuk-!-margin-top-6">
+      Property container {{ container.sealNumber }}
+      <span class="govuk-!-font-weight-regular govuk-!-font-size-19 govuk-!-margin-left-3">
+        <a class="govuk-link" href="{{ detailsUrl }}#containers-{{ container.index }}-sealNumber" data-qa="change-{{ container.index }}">Change<span class="govuk-visually-hidden"> property container {{ container.sealNumber }}</span></a>
+      </span>
+    </h2>
 
-  {{ govukSummaryList({
-    attributes: { "data-qa": "container-summary" },
-    rows: [
-      {
-        key: { text: "Seal number" },
-        value: { text: journey.sealNumber },
-        actions: { items: [{ href: detailsUrl, text: "Change", visuallyHiddenText: "seal number" }] }
-      },
-      {
-        key: { text: "Previous seal number" },
-        value: { text: journey.previousSealNumber or "None" },
-        actions: { items: [{ href: detailsUrl, text: "Change", visuallyHiddenText: "previous seal number" }] }
-      },
-      {
-        key: { text: "Property type" },
-        value: { text: journey.containerType | containerTypeLabel },
-        actions: { items: [{ href: detailsUrl, text: "Change", visuallyHiddenText: "property type" }] }
-      },
-      {
-        key: { text: "Disposal date" },
-        value: { text: (journey.proposedDisposalDate | formatDate) if journey.proposedDisposalDate else "No date set" },
-        actions: { items: [{ href: detailsUrl, text: "Change", visuallyHiddenText: "disposal date" }] }
-      },
-      {
-        key: { text: "Storage location" },
-        value: { text: journey.locationName },
-        actions: { items: [{ href: locationUrl, text: "Change", visuallyHiddenText: "storage location" }] }
-      },
-      {
-        key: { text: "Property status" },
-        value: { html: govukTag({ text: "Stored", classes: "govuk-tag--blue" }) }
-      }
-    ]
-  }) }}
+    {{ govukSummaryList({
+      attributes: { "data-qa": "container-summary" },
+      rows: [
+        { key: { text: "Seal number" }, value: { text: container.sealNumber } },
+        { key: { text: "Property type" }, value: { text: container.containerType | containerTypeLabel } },
+        { key: { text: "Disposal date" }, value: { text: (container.proposedDisposalDate | formatDate) if container.proposedDisposalDate else "No date set" } },
+        { key: { text: "Storage location" }, value: { text: container.storageLocation or "Not set" } },
+        { key: { text: "Property status" }, value: { html: govukTag({ text: "Stored", classes: "govuk-tag--green" }) } }
+      ]
+    }) }}
+  {% endfor %}
 
   {{ govukInsetText({
     html: "<strong>You may also need to update paper property cards.</strong><br>If any details have changed, for example the seal number, make sure these are updated on any paper records."

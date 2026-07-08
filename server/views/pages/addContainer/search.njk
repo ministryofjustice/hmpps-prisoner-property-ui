@@ -1,0 +1,74 @@
+{% extends "../../partials/layout.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+{% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
+{% from "moj/components/pagination/macro.njk" import mojPagination %}
+
+{% set pageTitle = applicationName + " - Add a property container" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back", href: backUrl }) }}
+{% endblock %}
+
+{% block content %}
+  {% if errorMessage %}
+    {{ govukErrorSummary({ titleText: "There is a problem", errorList: [{ text: errorMessage, href: "#q" }] }) }}
+  {% endif %}
+
+  <h1 class="govuk-heading-xl" data-qa="add-container-heading">Add a property container</h1>
+
+  <form method="get" action="/add-container" novalidate data-qa="person-search">
+    {{ govukInput({
+      label: { text: "Who is the property container for?", classes: "govuk-label--m" },
+      hint: { text: "You can search by name or prison number" },
+      id: "q",
+      name: "q",
+      value: term,
+      classes: "govuk-input--width-20",
+      errorMessage: { text: errorMessage } if errorMessage else undefined
+    }) }}
+    {{ govukButton({ text: "Search" }) }}
+  </form>
+
+  {% if results %}
+    {% if results.prisoners.length == 0 %}
+      <p class="govuk-body" data-qa="no-results">No people found matching “{{ term }}”.</p>
+    {% else %}
+      {{ mojPagination(results.pagination) }}
+
+      {% set rows = [] %}
+      {% for prisoner in results.prisoners %}
+        {% set nameHtml %}
+          <div class="app-search-result">
+            <img class="app-search-result__photo" src="/prisoner/{{ prisoner.prisonerNumber }}/image" alt="" width="60" height="80">
+            <a class="govuk-link" href="/prisoner/{{ prisoner.prisonerNumber }}">{{ [prisoner.lastName, prisoner.firstName] | join(", ") | convertToTitleCase }}</a>
+          </div>
+        {% endset %}
+        {% set actionsHtml %}<a class="govuk-link" href="/prisoner/{{ prisoner.prisonerNumber }}/add-container?from=list" data-qa="add-link">Add property container</a> <br><a class="govuk-link" href="/prisoner/{{ prisoner.prisonerNumber }}">View property containers</a>{% endset %}
+        {% set rows = (rows.push([
+          { html: nameHtml },
+          { text: prisoner.prisonerNumber },
+          { text: prisoner.cellLocation or "-" },
+          { html: actionsHtml }
+        ]), rows) %}
+      {% endfor %}
+
+      {{ govukTable({
+        attributes: { "data-qa": "search-results" },
+        head: [
+          { text: "Name" },
+          { text: "Prison number" },
+          { text: "Location" },
+          { text: "Actions" }
+        ],
+        rows: rows
+      }) }}
+
+      {{ mojPagination(results.pagination) }}
+    {% endif %}
+  {% endif %}
+{% endblock %}

@@ -18,7 +18,7 @@ import { buildPrisonerBanner, fallbackPrisonerBanner } from '../utils/prisonerBa
 import { buildPrisonerTimeline } from '../utils/prisonerTimeline'
 import type { Prisoner } from '../data/prisonerSearchApiTypes'
 import type { PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
-import { validateDetails } from '../utils/addContainer'
+import { toContainerBlocks, validateContainers, validateDetails } from '../utils/addContainer'
 import { disposalBanner } from '../utils/changeContainer'
 import {
   isRemoveReason,
@@ -297,7 +297,7 @@ export default function routes({
     })
   })
 
-  // ---- Add a property container journey (single container, gated on the manage role) ----
+  // ---- Add property container(s) journey: search for a person, then add one or more (manage role) ----
 
   interface JourneyContext {
     prisonerNumber: string
@@ -332,36 +332,97 @@ export default function routes({
     return { day: String(Number(day)), month: String(Number(month)), year: year ?? '' }
   }
 
-  const renderDetails = async (
+  type AddContainerJourney = NonNullable<import('express-session').SessionData['addContainerJourney']>
+  type AddContainerDraft = AddContainerJourney['containers'][number]
+
+  // The index of the next container that still needs a storage location (non-Excess, none picked yet),
+  // from `from` onwards; -1 when they all have one (or are Excess/offsite).
+  const nextLocationIndex = (containers: AddContainerDraft[], from: number): number =>
+    containers.findIndex((c, i) => i >= from && c.containerType !== 'EXCESS' && !c.internalLocationId)
+
+  // The prisoner's display name, from their property if any, else prisoner-search (zero-property people
+  // reached via the search entry have no property yet). Null if it can't be resolved.
+  const resolvePrisonerName = async (prisonerNumber: string, username: string): Promise<string | null> => {
+    const property = await prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username)
+    if (property[0]?.prisonerName) return property[0].prisonerName
+    try {
+      const prisoner = await prisonerService.getPrisonerDetails(prisonerNumber, username)
+      return [prisoner.firstName, prisoner.lastName].filter(Boolean).join(' ') || null
+    } catch {
+      return null
+    }
+  }
+
+  // The raw view model for a stored draft (disposal date split into date-input parts).
+  const draftToView = (c: AddContainerDraft) => ({
+    sealNumber: c.sealNumber ?? '',
+    previousSealNumber: c.previousSealNumber ?? '',
+    containerType: c.containerType,
+    disposalDate: isoToParts(c.proposedDisposalDate),
+  })
+
+  const renderAddDetails = async (
     req: import('express').Request,
     res: import('express').Response,
     ctx: JourneyContext,
-    data: Record<string, unknown>,
-    errors: Record<string, { text: string; href: string }> = {},
+    origin: 'list' | 'person',
+    containers: unknown[],
+    errorList: { text: string; href: string }[] = [],
   ) => {
     const { username } = res.locals.user
-    const containers = await prisonerPropertyService.getPropertyForPrisoner(ctx.prisonerNumber, username)
     return res.render('pages/addContainer/details', {
       prisonerNumber: ctx.prisonerNumber,
-      prisonerName: containers[0]?.prisonerName ?? null,
+      prisonerName: await resolvePrisonerName(ctx.prisonerNumber, username),
       establishmentName: ctx.activeCaseloadName,
-      data,
-      containerTypes: ALL_CONTAINER_TYPES.map(type => ({
-        value: type,
-        text: containerTypeLabel(type),
-        checked: type === data.containerType,
-      })),
-      errors,
-      errorList: Object.values(errors),
+      containers,
+      containerTypes: ALL_CONTAINER_TYPES.map(type => ({ value: type, text: containerTypeLabel(type) })),
+      errorList,
+      // Per-field messages keyed by input id (e.g. containers-0-sealNumber), for inline display.
+      fieldErrors: Object.fromEntries(errorList.map(e => [e.href.slice(1), e.text])),
       errorBanner: req.flash('error')[0],
-      backUrl: `/prisoner/${ctx.prisonerNumber}`,
+      backUrl: origin === 'list' ? '/add-container' : `/prisoner/${ctx.prisonerNumber}`,
     })
   }
+
+  // Entry point 1 (establishment list): search for the person to add property for.
+  router.get('/add-container', requireManageRole, async (req, res) => {
+    const { token, username } = res.locals.user
+    const { activeCaseloadId, activeCaseloadName } = await userService.getActiveCaseload(token)
+    if (!activeCaseloadId) return res.render('pages/noCaseload')
+
+    const term = String(req.query.q ?? '').trim()
+    const searched = req.query.q !== undefined
+    const parsedPage = Number.parseInt((req.query.page as string) ?? '1', 10)
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
+
+    let results = null
+    let errorMessage
+    if (searched && !term) {
+      errorMessage = 'Enter a name or prison number'
+    } else if (searched) {
+      // Scoped to the user's own caseload - never a global search.
+      const found = await prisonerService.searchPrisoners(term, activeCaseloadId, page - 1, DEFAULT_PAGE_SIZE, username)
+      const baseQuery = new URLSearchParams({ q: term })
+      results = {
+        prisoners: found.content,
+        pagination: buildPagination(page, found.totalPages, found.totalElements, found.size, baseQuery.toString()),
+      }
+    }
+
+    return res.render('pages/addContainer/search', {
+      establishmentName: activeCaseloadName,
+      term,
+      results,
+      errorMessage,
+      backUrl: '/',
+    })
+  })
 
   router.get('/prisoner/:prisonerNumber/add-container', requireManageRole, async (req, res, next) => {
     const ctx = await resolveContext(req, res, next)
     if (!ctx) return undefined
-    req.session.addContainerJourney = { prisonerNumber: ctx.prisonerNumber }
+    const origin = req.query.from === 'list' ? 'list' : 'person'
+    req.session.addContainerJourney = { prisonerNumber: ctx.prisonerNumber, origin, containers: [{}] }
     return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
   })
 
@@ -369,61 +430,70 @@ export default function routes({
     const ctx = await resolveContext(req, res, next)
     if (!ctx) return undefined
     const journey = req.session.addContainerJourney
-    return renderDetails(req, res, ctx, {
-      sealNumber: journey?.sealNumber,
-      previousSealNumber: journey?.previousSealNumber,
-      containerType: journey?.containerType,
-      ...isoToParts(journey?.proposedDisposalDate),
-    })
+    if (journey?.prisonerNumber !== ctx.prisonerNumber) {
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container`)
+    }
+    return renderAddDetails(req, res, ctx, journey.origin, journey.containers.map(draftToView))
   })
 
   router.post('/prisoner/:prisonerNumber/add-container/details', requireManageRole, async (req, res, next) => {
     const ctx = await resolveContext(req, res, next)
     if (!ctx) return undefined
+    const journey = req.session.addContainerJourney
+    if (journey?.prisonerNumber !== ctx.prisonerNumber) {
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container`)
+    }
 
-    const { values, errors } = validateDetails(req.body)
+    const blocks = toContainerBlocks(req.body.containers)
+
+    // "Add another": keep what's entered and append an empty block; no validation yet.
+    if (req.body.action === 'addAnother') {
+      return renderAddDetails(req, res, ctx, journey.origin, [...blocks, {}])
+    }
+
+    const { values, errors } = validateContainers(blocks)
     if (!values) {
-      return renderDetails(
-        req,
-        res,
-        ctx,
-        {
-          sealNumber: req.body.sealNumber,
-          previousSealNumber: req.body.previousSealNumber,
-          containerType: req.body.containerType,
-          day: req.body['disposalDate-day'],
-          month: req.body['disposalDate-month'],
-          year: req.body['disposalDate-year'],
-        },
-        errors,
-      )
+      return renderAddDetails(req, res, ctx, journey.origin, blocks, errors)
     }
 
-    req.session.addContainerJourney = {
-      ...req.session.addContainerJourney,
-      prisonerNumber: ctx.prisonerNumber,
-      sealNumber: values.sealNumber,
-      previousSealNumber: values.previousSealNumber,
-      containerType: values.containerType,
-      proposedDisposalDate: values.proposedDisposalDate,
-    }
+    // Keep any location already chosen for a container at the same index (editing from Check your
+    // answers), unless it is now Excess (off-site Branston, never gets an internal location).
+    const containers: AddContainerDraft[] = values.map((v, i) => {
+      const previous = journey.containers[i]
+      const keepLocation = v.containerType !== 'EXCESS' && previous?.internalLocationId
+      return {
+        sealNumber: v.sealNumber,
+        previousSealNumber: v.previousSealNumber,
+        containerType: v.containerType,
+        proposedDisposalDate: v.proposedDisposalDate,
+        internalLocationId: keepLocation ? previous.internalLocationId : undefined,
+        locationName: keepLocation ? previous.locationName : undefined,
+      }
+    })
+    req.session.addContainerJourney = { ...journey, containers }
 
-    // If a location was already chosen (editing details from Check your answers), return to CYA;
-    // otherwise carry on to the location step.
-    const next2 = req.session.addContainerJourney.internalLocationId ? 'check' : 'location'
-    return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/${next2}`)
+    const index = nextLocationIndex(containers, 0)
+    return res.redirect(
+      index === -1
+        ? `/prisoner/${ctx.prisonerNumber}/add-container/check`
+        : `/prisoner/${ctx.prisonerNumber}/add-container/location/${index}`,
+    )
   })
 
-  router.get('/prisoner/:prisonerNumber/add-container/location', requireManageRole, async (req, res, next) => {
+  router.get('/prisoner/:prisonerNumber/add-container/location/:index', requireManageRole, async (req, res, next) => {
     const ctx = await resolveContext(req, res, next)
     if (!ctx) return undefined
     const journey = req.session.addContainerJourney
-    if (!journey?.sealNumber || !journey?.containerType) {
+    const index = Number.parseInt(String(req.params.index), 10)
+    const draft = journey?.containers?.[index]
+    if (journey?.prisonerNumber !== ctx.prisonerNumber || !draft?.sealNumber || !draft?.containerType) {
       return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
     }
 
     const { username } = res.locals.user
-    const query = (req.query.query as string)?.trim() || undefined
+    const rawQuery = req.query.query
+    const query = String(rawQuery ?? '').trim() || undefined
+    const searchError = rawQuery !== undefined && !query // Search clicked with an empty box
     const parsedPage = Number.parseInt((req.query.page as string) ?? '1', 10)
     const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
 
@@ -438,51 +508,68 @@ export default function routes({
 
     return res.render('pages/addContainer/location', {
       prisonerNumber: ctx.prisonerNumber,
-      sealNumber: journey.sealNumber,
+      sealNumber: draft.sealNumber,
       query: query ?? '',
       locations: result.content,
       pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
+      searchError,
       errorBanner: req.flash('error')[0],
       backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
     })
   })
 
-  router.post('/prisoner/:prisonerNumber/add-container/location', requireManageRole, async (req, res, next) => {
+  router.post('/prisoner/:prisonerNumber/add-container/location/:index', requireManageRole, async (req, res, next) => {
     const ctx = await resolveContext(req, res, next)
     if (!ctx) return undefined
     const journey = req.session.addContainerJourney
-    if (!journey?.sealNumber || !journey?.containerType) {
+    const index = Number.parseInt(String(req.params.index), 10)
+    if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers[index]) {
       return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
     }
 
-    req.session.addContainerJourney = {
-      ...journey,
+    journey.containers[index] = {
+      ...journey.containers[index],
       internalLocationId: req.body.internalLocationId,
       locationName: req.body.locationName,
     }
-    return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/check`)
+    req.session.addContainerJourney = journey
+
+    const nextIndex = nextLocationIndex(journey.containers, index + 1)
+    return res.redirect(
+      nextIndex === -1
+        ? `/prisoner/${ctx.prisonerNumber}/add-container/check`
+        : `/prisoner/${ctx.prisonerNumber}/add-container/location/${nextIndex}`,
+    )
   })
 
   router.get('/prisoner/:prisonerNumber/add-container/check', requireManageRole, async (req, res, next) => {
     const ctx = await resolveContext(req, res, next)
     if (!ctx) return undefined
     const journey = req.session.addContainerJourney
-    if (!journey?.sealNumber || !journey?.containerType) {
+    if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers.length) {
       return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
     }
-    if (!journey.internalLocationId) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/location`)
+    if (journey.containers.some(c => !c.sealNumber || !c.containerType)) {
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+    }
+    const missing = nextLocationIndex(journey.containers, 0)
+    if (missing !== -1) {
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/location/${missing}`)
     }
 
     const { username } = res.locals.user
-    const containers = await prisonerPropertyService.getPropertyForPrisoner(ctx.prisonerNumber, username)
-
     return res.render('pages/addContainer/checkAnswers', {
       prisonerNumber: ctx.prisonerNumber,
-      prisonerName: containers[0]?.prisonerName ?? null,
+      prisonerName: await resolvePrisonerName(ctx.prisonerNumber, username),
       establishmentName: ctx.activeCaseloadName,
-      journey,
-      backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/location`,
+      containers: journey.containers.map((c, index) => ({
+        index,
+        sealNumber: c.sealNumber,
+        containerType: c.containerType,
+        proposedDisposalDate: c.proposedDisposalDate,
+        storageLocation: c.containerType === 'EXCESS' ? 'Branston (offsite)' : c.locationName,
+      })),
+      backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
     })
   })
 
@@ -490,36 +577,28 @@ export default function routes({
     const ctx = await resolveContext(req, res, next)
     if (!ctx) return undefined
     const journey = req.session.addContainerJourney
-    if (!journey?.sealNumber || !journey?.containerType || !journey.internalLocationId) {
+    if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers.length) {
       return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
     }
 
     const { username } = res.locals.user
     try {
-      const created = await prisonerPropertyService.createContainer(
-        {
-          prisonerNumber: ctx.prisonerNumber,
-          prisonId: ctx.activeCaseloadId,
-          containerType: journey.containerType,
-          sealNumber: journey.sealNumber,
-          previousSealNumber: journey.previousSealNumber,
-          internalLocationId: journey.internalLocationId,
-          proposedDisposalDate: journey.proposedDisposalDate,
-        },
-        username,
-      )
-
-      await auditService.logPageView(Page.ADD_PROPERTY_CONTAINER, {
-        who: username,
-        subjectId: ctx.prisonerNumber,
-        subjectType: 'PRISONER_NUMBER',
-        correlationId: req.id,
-        details: { containerId: created.id },
-      })
-
-      req.session.addContainerJourney = undefined
-      req.flash('success', 'Property container added')
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}`)
+      // Sequential so seal-uniqueness is enforced deterministically and the first failure is surfaced.
+      for (const c of journey.containers) {
+        // eslint-disable-next-line no-await-in-loop
+        await prisonerPropertyService.createContainer(
+          {
+            prisonerNumber: ctx.prisonerNumber,
+            prisonId: ctx.activeCaseloadId,
+            containerType: c.containerType!,
+            sealNumber: c.sealNumber!,
+            previousSealNumber: c.previousSealNumber,
+            internalLocationId: c.containerType === 'EXCESS' ? undefined : c.internalLocationId,
+            proposedDisposalDate: c.proposedDisposalDate,
+          },
+          username,
+        )
+      }
     } catch (error) {
       const status = (error as { responseStatus?: number }).responseStatus
       if (status === 409) {
@@ -527,11 +606,24 @@ export default function routes({
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
       }
       if (status === 400) {
-        req.flash('error', 'That storage location could not be used. Select a different location.')
-        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/location`)
+        req.flash('error', 'A storage location could not be used. Check the containers and try again.')
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
       }
       return next(error)
     }
+
+    await auditService.logPageView(Page.ADD_PROPERTY_CONTAINER, {
+      who: username,
+      subjectId: ctx.prisonerNumber,
+      subjectType: 'PRISONER_NUMBER',
+      correlationId: req.id,
+      details: { count: journey.containers.length },
+    })
+
+    const { origin } = journey
+    req.session.addContainerJourney = undefined
+    req.flash('success', 'Property container(s) added')
+    return res.redirect(origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`)
   })
 
   // ---- Remove a property container journey (gated on the manage role) ----

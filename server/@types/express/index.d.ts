@@ -1,15 +1,24 @@
 import { HmppsUser } from '../../interfaces/hmppsUser'
 import { ContainerType, RemovalOutcome } from '../../data/prisonerPropertyApiTypes'
 
-// Working state for the multi-step "add a property container" journey. Cleared on confirm/cancel.
-export interface AddContainerJourney {
-  prisonerNumber: string
+// One container being added within the multi-add journey. Excess property is stored off-site at Branston,
+// so it never gets an internalLocationId.
+export interface AddContainerDraft {
   sealNumber?: string
   previousSealNumber?: string
   containerType?: ContainerType
   proposedDisposalDate?: string // ISO yyyy-mm-dd
   internalLocationId?: string
   locationName?: string
+}
+
+// Working state for the multi-step "add a property container" journey (one or more containers for one
+// person). `origin` records where the user started so we return them there afterwards. Cleared on
+// confirm/cancel.
+export interface AddContainerJourney {
+  prisonerNumber: string
+  origin: 'list' | 'person'
+  containers: AddContainerDraft[]
 }
 
 // Working state for the multi-step "remove a property container" journey. Cleared on confirm/cancel.

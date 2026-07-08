@@ -10,7 +10,7 @@
 {% if canManage %}
   {{ govukButton({
     text: "Add property",
-    href: "/prisoner/" + prisonerNumber + "/add-container",
+    href: "/prisoner/" + prisonerNumber + "/add-container?from=person",
     attributes: { "data-qa": "add-property" }
   }) }}
 {% endif %}

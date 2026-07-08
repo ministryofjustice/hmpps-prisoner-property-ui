@@ -2,6 +2,7 @@ import { RestClient, asSystem } from '@ministryofjustice/hmpps-rest-client'
 import type { AuthenticationClient } from '@ministryofjustice/hmpps-auth-clients'
 import config from '../config'
 import logger from '../../logger'
+import type { RestPage } from './prisonerPropertyApiTypes'
 import type { Prisoner } from './prisonerSearchApiTypes'
 
 export default class PrisonerSearchApiClient extends RestClient {
@@ -17,5 +18,27 @@ export default class PrisonerSearchApiClient extends RestClient {
    */
   getPrisoner(prisonerNumber: string, username: string): Promise<Prisoner> {
     return this.get<Prisoner>({ path: `/prisoner/${prisonerNumber}` }, asSystem(username))
+  }
+
+  /**
+   * Keyword-search prisoners by name or prison number, scoped to a single prison (never global). Results
+   * are relevance-ranked (closest match first) and paged. Called with a system token tied to the signed-in
+   * user (`asSystem(username)`).
+   */
+  searchPrisoners(
+    term: string,
+    prisonId: string,
+    page: number,
+    size: number,
+    username: string,
+  ): Promise<RestPage<Prisoner>> {
+    return this.post<RestPage<Prisoner>>(
+      {
+        path: `/keyword`,
+        query: { page, size },
+        data: { orWords: term, fuzzyMatch: true, prisonIds: [prisonId] },
+      },
+      asSystem(username),
+    )
   }
 }
