@@ -1,0 +1,32 @@
+// Disposal banners on the change-container screen. A bordered box with a coloured left edge and an
+// icon: blue "info" when a disposal date is set for today/the future, orange "warning" when it is
+// overdue. Mirrors the alpha designs (a lighter-weight alternative to the filled GOV.UK notification
+// banner).
+.app-disposal-banner {
+  @include govuk-responsive-margin(4, 'bottom');
+  @include govuk-responsive-padding(3);
+  display: flex;
+  gap: govuk-spacing(3);
+  border: 1px solid $govuk-border-colour;
+  border-left: govuk-spacing(2) solid govuk-colour('blue');
+
+  &--overdue {
+    border-left-color: govuk-colour('orange');
+  }
+
+  &__icon {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+  }
+
+  &__title {
+    @include govuk-font($size: 19, $weight: 'bold');
+    margin: 0 0 govuk-spacing(1);
+  }
+
+  &__body {
+    @include govuk-font($size: 19);
+    margin: 0;
+  }
+}

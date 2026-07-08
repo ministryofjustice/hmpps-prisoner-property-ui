@@ -11,6 +11,7 @@ import type {
   PropertyEvent,
   RemoveContainerRequest,
   RestPage,
+  UpdateContainerRequest,
 } from '../data/prisonerPropertyApiTypes'
 
 export default class PrisonerPropertyService {
@@ -58,5 +59,9 @@ export default class PrisonerPropertyService {
 
   combineContainers(body: CombineContainersRequest, username: string): Promise<PrisonerPropertyContainer> {
     return this.prisonerPropertyApiClient.combineContainers(body, username)
+  }
+
+  updateContainer(id: string, body: UpdateContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
+    return this.prisonerPropertyApiClient.updateContainer(id, body, username)
   }
 }

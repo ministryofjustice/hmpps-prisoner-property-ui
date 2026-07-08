@@ -23,6 +23,21 @@ export interface RemoveContainerJourney {
   toPrisonId?: string
 }
 
+// Working state for the multi-step "change a property container" journey. Cleared on confirm/cancel.
+// `origin` records where the user started (list or person view). `locationChoice` is 'current' (keep the
+// existing storage location) or 'new' (pick one via the box picker).
+export interface ChangeContainerJourney {
+  prisonerNumber: string
+  containerId: string
+  origin: 'list' | 'person'
+  sealNumber?: string
+  containerType?: ContainerType
+  proposedDisposalDate?: string // ISO yyyy-mm-dd
+  locationChoice?: 'current' | 'new'
+  internalLocationId?: string
+  locationName?: string
+}
+
 // Working state for the multi-step "combine property containers" journey. Cleared on confirm/cancel.
 // The sources are the ticked containers from the person view; the rest describe the new combined
 // container. `locationType` is BRANSTON (off-site) for excess property, otherwise INTERNAL.
@@ -44,6 +59,7 @@ export declare module 'express-session' {
     addContainerJourney?: AddContainerJourney
     removeContainerJourney?: RemoveContainerJourney
     combineJourney?: CombineJourney
+    changeContainerJourney?: ChangeContainerJourney
   }
 }
 

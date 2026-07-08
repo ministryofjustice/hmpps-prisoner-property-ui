@@ -150,6 +150,16 @@ export interface CreateContainerRequest {
   proposedDisposalDate?: string
 }
 
+// Payload to change a container's editable details (PUT /property-containers/{id}). See
+// UpdatePropertyContainerRequest in the API. A full replace of the mutable fields; omit or null
+// `internalLocationId` to leave the storage location unchanged.
+export interface UpdateContainerRequest {
+  containerType: ContainerType
+  sealNumber: string
+  internalLocationId?: string
+  proposedDisposalDate?: string
+}
+
 // Payload to remove a container from active storage (POST /property-containers/{id}/remove). See
 // RemoveContainerRequest in the API. `outcome` is one of RETURNED/DISPOSED/CREATED_IN_ERROR (terminal)
 // or TRANSFERRED (reassigns the container to `toPrisonId`, which is then required). `date` defaults to

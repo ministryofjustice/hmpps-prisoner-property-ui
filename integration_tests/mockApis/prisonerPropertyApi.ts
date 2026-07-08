@@ -204,4 +204,25 @@ export default {
         jsonBody: container ?? {},
       },
     }),
+
+  stubUpdateContainer: (
+    {
+      id = 'c1',
+      container = undefined as PrisonerPropertyContainer | undefined,
+      priority = undefined as number | undefined,
+    } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'PUT',
+        urlPath: `/prisoner-property-api/property-containers/${id}`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: container ?? {},
+      },
+    }),
 }
