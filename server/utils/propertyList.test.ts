@@ -123,6 +123,30 @@ describe('propertyList utils', () => {
       expect(result.apiQuery.status).toEqual(['DUE_FOR_RETURN'])
     })
 
+    it('passes a single person-location filter to the API', () => {
+      const result = parsePropertyListQuery({ personLocation: 'IN_ESTABLISHMENT' } as unknown as ParsedQs, 20)
+
+      expect(result.personLocations).toEqual(['IN_ESTABLISHMENT'])
+      expect(result.apiQuery.personLocation).toBe('IN_ESTABLISHMENT')
+    })
+
+    it('omits the person-location filter when both boxes are ticked (that means everyone)', () => {
+      const result = parsePropertyListQuery(
+        { personLocation: ['IN_ESTABLISHMENT', 'LEFT_ESTABLISHMENT'] } as unknown as ParsedQs,
+        20,
+      )
+
+      expect(result.personLocations).toEqual(['IN_ESTABLISHMENT', 'LEFT_ESTABLISHMENT'])
+      expect(result.apiQuery.personLocation).toBeUndefined()
+    })
+
+    it('drops an invalid person-location value', () => {
+      const result = parsePropertyListQuery({ personLocation: 'NOWHERE' } as unknown as ParsedQs, 20)
+
+      expect(result.personLocations).toEqual([])
+      expect(result.apiQuery.personLocation).toBeUndefined()
+    })
+
     it('defaults page to 1 and drops invalid container types / empty status / unticked includeRemoved', () => {
       const result = parsePropertyListQuery({ containerType: 'NOPE', page: '0' } as unknown as ParsedQs, 20)
 
