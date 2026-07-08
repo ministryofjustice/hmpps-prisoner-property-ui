@@ -2,13 +2,20 @@
 // See PrisonerPropertyContainerDto / PrisonerPropertyGroupDto in the API for the source of truth.
 
 export type ContainerStatus =
-  'STORED' | 'DUE_FOR_TRANSFER_OUT' | 'DISPOSAL_REQUIRED' | 'DISPOSED' | 'RETURNED' | 'TRANSFER' | 'COMBINED'
+  | 'STORED'
+  | 'DUE_FOR_TRANSFER_OUT'
+  | 'DISPOSAL_REQUIRED'
+  | 'DISPOSED'
+  | 'RETURNED'
+  | 'TRANSFER'
+  | 'COMBINED'
+  | 'CREATED_IN_ERROR'
 
 export type ContainerType = 'STANDARD' | 'EXCESS' | 'VALUABLES' | 'CONFISCATED'
 
 export type StorageLocationType = 'INTERNAL' | 'BRANSTON'
 
-export type RemovalOutcome = 'DISPOSED' | 'RETURNED' | 'TRANSFERRED' | 'COMBINED'
+export type RemovalOutcome = 'DISPOSED' | 'RETURNED' | 'TRANSFERRED' | 'COMBINED' | 'CREATED_IN_ERROR'
 
 // Where the prisoner is, from prisoner-search: held in an establishment, in transit between prisons, or released.
 export type PrisonerMovementStatus = 'IN_ESTABLISHMENT' | 'IN_TRANSIT' | 'RELEASED'
@@ -69,6 +76,7 @@ export type PropertyEventType =
   | 'DISPOSAL_REQUIRED'
   | 'DISPOSED'
   | 'COMBINED'
+  | 'CREATED_IN_ERROR'
 
 // A single event in a container's history (GET /property-containers/{id}/events), newest first.
 // See PropertyEventDto in the API for the source of truth. Each event carries only the fields
@@ -140,6 +148,16 @@ export interface CreateContainerRequest {
   previousSealNumber?: string
   internalLocationId?: string
   proposedDisposalDate?: string
+}
+
+// Payload to remove a container from active storage (POST /property-containers/{id}/remove). See
+// RemoveContainerRequest in the API. `outcome` is one of RETURNED/DISPOSED/CREATED_IN_ERROR (terminal)
+// or TRANSFERRED (reassigns the container to `toPrisonId`, which is then required). `date` defaults to
+// today on the API when omitted.
+export interface RemoveContainerRequest {
+  outcome: RemovalOutcome
+  date?: string
+  toPrisonId?: string
 }
 
 // Filters + paging for the establishment-wide list (GET /property-containers/prison/{prisonId}).

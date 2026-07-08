@@ -166,4 +166,25 @@ export default {
         jsonBody: container ?? {},
       },
     }),
+
+  stubRemoveContainer: (
+    {
+      id = 'c1',
+      container = undefined as PrisonerPropertyContainer | undefined,
+      priority = undefined as number | undefined,
+    } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'POST',
+        urlPath: `/prisoner-property-api/property-containers/${id}/remove`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: container ?? {},
+      },
+    }),
 }

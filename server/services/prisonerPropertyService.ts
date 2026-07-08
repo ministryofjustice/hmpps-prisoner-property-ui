@@ -8,6 +8,7 @@ import type {
   PrisonPropertyListQuery,
   PrisonPropertySummary,
   PropertyEvent,
+  RemoveContainerRequest,
   RestPage,
 } from '../data/prisonerPropertyApiTypes'
 
@@ -48,5 +49,9 @@ export default class PrisonerPropertyService {
 
   createContainer(body: CreateContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
     return this.prisonerPropertyApiClient.createContainer(body, username)
+  }
+
+  removeContainer(id: string, body: RemoveContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
+    return this.prisonerPropertyApiClient.removeContainer(id, body, username)
   }
 }

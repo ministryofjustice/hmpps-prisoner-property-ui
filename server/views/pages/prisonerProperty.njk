@@ -82,7 +82,8 @@
           { html: govukTag({ text: row.status.text, classes: row.status.classes }), attributes: { "data-sort-value": row.status.text } }
         ), cells) %}
         {% if canManage %}
-          {% set cells = (cells.push({ html: '<a class="govuk-link" href="#">Change</a> | <a class="govuk-link" href="#">Remove</a>' }), cells) %}
+          {% set actionsHtml %}<a class="govuk-link" href="#">Change</a> | <a class="govuk-link" href="/prisoner/{{ prisonerNumber }}/remove-container/{{ row.container.id }}?from=person" data-qa="remove-link">Remove<span class="govuk-visually-hidden"> {{ row.container.currentSealNumber }}</span></a>{% endset %}
+          {% set cells = (cells.push({ html: actionsHtml }), cells) %}
         {% endif %}
         {% set inEstablishmentRows = (inEstablishmentRows.push(cells), inEstablishmentRows) %}
       {% endfor %}

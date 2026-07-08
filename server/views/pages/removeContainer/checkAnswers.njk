@@ -1,0 +1,58 @@
+{% extends "../../partials/layout.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+
+{% set pageTitle = applicationName + " - Check your answers" %}
+{% set mainClasses = "govuk-body" %}
+
+{% set reasonUrl = "/prisoner/" + prisonerNumber + "/remove-container/" + container.id %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back", href: backUrl }) }}
+{% endblock %}
+
+{% block content %}
+  <h1 class="govuk-heading-xl" data-qa="check-answers-heading">Check your answers</h1>
+
+  {{ govukSummaryList({
+    attributes: { "data-qa": "prisoner-summary" },
+    rows: [
+      { key: { text: "Name" }, value: { text: (prisonerName | convertToTitleCase) or "Unknown" } },
+      { key: { text: "Prison number" }, value: { text: prisonerNumber } },
+      { key: { text: "Prisoner establishment" }, value: { text: prisonerEstablishment or "Not known" } }
+    ]
+  }) }}
+
+  <h2 class="govuk-heading-m govuk-!-margin-top-6">
+    Remove property container {{ container.currentSealNumber }}
+    <span class="govuk-!-font-weight-regular govuk-!-font-size-19 govuk-!-margin-left-3">
+      <a class="govuk-link" href="{{ reasonUrl }}" data-qa="change-reason">Change<span class="govuk-visually-hidden"> the reason for removing this container</span></a>
+    </span>
+  </h2>
+
+  {{ govukSummaryList({
+    attributes: { "data-qa": "container-summary" },
+    rows: [
+      { key: { text: "Seal number" }, value: { text: container.currentSealNumber or "-" } },
+      { key: { text: "Property type" }, value: { text: container.containerType | containerTypeLabel } },
+      { key: { text: "Disposal date" }, value: { text: (container.proposedDisposalDate | formatDate) if container.proposedDisposalDate else "No date set" } },
+      { key: { text: removalDateLabel }, value: { text: removalDate | formatDate } },
+      { key: { text: "Property status" }, value: { html: govukTag({ text: resultStatus.text, classes: resultStatus.classes }) } }
+    ]
+  }) }}
+
+  {{ govukInsetText({
+    html: "<strong>You may also need to update paper property cards.</strong><br>Make sure this change is also recorded on any paper records used in this establishment."
+  }) }}
+
+  <form method="post" action="/prisoner/{{ prisonerNumber }}/remove-container/{{ container.id }}/confirm">
+    <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+    {{ govukButton({ text: "Confirm", attributes: { "data-qa": "confirm" } }) }}
+  </form>
+
+  <p class="govuk-body"><a class="govuk-link" href="{{ backUrl }}" data-qa="cancel">Cancel</a></p>
+{% endblock %}

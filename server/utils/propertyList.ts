@@ -18,6 +18,7 @@ const STATUS_TAGS: Record<ContainerStatus, { text: string; classes: string }> = 
   RETURNED: { text: 'Returned', classes: 'govuk-tag--green' },
   TRANSFER: { text: 'Transferred', classes: 'govuk-tag--grey' },
   COMBINED: { text: 'Combined', classes: 'govuk-tag--grey' },
+  CREATED_IN_ERROR: { text: 'Created in error', classes: 'govuk-tag--grey' },
 }
 
 const CONTAINER_TYPE_LABELS: Record<ContainerType, string> = {

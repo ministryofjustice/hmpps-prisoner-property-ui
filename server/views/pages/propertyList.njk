@@ -7,6 +7,7 @@
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 {% from "moj/components/pagination/macro.njk" import mojPagination %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 
 {% set pageTitle = applicationName + " - Property" %}
 {% set mainClasses = "govuk-body" %}
@@ -19,6 +20,14 @@
 {% endblock %}
 
 {% block content %}
+  {% if successMessage %}
+    {{ govukNotificationBanner({
+      type: "success",
+      text: successMessage,
+      attributes: { "data-qa": "success-banner" }
+    }) }}
+  {% endif %}
+
   <h1 class="govuk-heading-xl govuk-!-margin-bottom-4">
     Prisoner property{% if establishmentName %} <span class="govuk-!-font-weight-regular">— {{ establishmentName }}</span>{% endif %}
   </h1>
@@ -155,7 +164,8 @@
           { html: govukTag({ text: statusData.text, classes: statusData.classes }) }
         ), cells) %}
         {% if canManage %}
-          {% set cells = (cells.push({ html: '<a class="govuk-link" href="#">Change</a> | <a class="govuk-link" href="#">Remove</a>' }), cells) %}
+          {% set actionsHtml %}<a class="govuk-link" href="#">Change</a> | <a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}/remove-container/{{ container.id }}?from=list" data-qa="remove-link">Remove<span class="govuk-visually-hidden"> {{ container.currentSealNumber }}</span></a>{% endset %}
+          {% set cells = (cells.push({ html: actionsHtml }), cells) %}
         {% endif %}
         {% set rows = (rows.push(cells), rows) %}
       {% endfor %}
