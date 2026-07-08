@@ -73,7 +73,6 @@ export default function routes({
     return res.render('pages/propertyList', {
       establishmentName: activeCaseloadName,
       canManage: canManageProperty(res.locals.user.userRoles),
-      dpsUrl: config.serviceUrls.digitalPrison,
       includeRemoved,
       summary,
       groups: result.content,
