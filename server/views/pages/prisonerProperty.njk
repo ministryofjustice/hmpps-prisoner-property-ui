@@ -1,16 +1,20 @@
 {% extends "../partials/layout.njk" %}
 
-{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/table/macro.njk" import govukTable %}
 {% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 
 {% set pageTitle = applicationName + " - Person property" %}
-{% set mainClasses = "govuk-body" %}
+{% set mainClasses = "govuk-body app-property-page" %}
 
 {% block beforeContent %}
-  {{ govukBackLink({ text: "Back to property list", href: backUrl }) }}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: "Prisoner property", href: "/" }
+  ] }) }}
 {% endblock %}
 
 {% block content %}
@@ -35,70 +39,94 @@
   {% if inEstablishment.length == 0 and dueToTransferIn.length == 0 %}
     <p class="govuk-body" data-qa="no-results">No property found for this person.</p>
   {% else %}
-    <h2 class="govuk-heading-l govuk-!-margin-top-6">Property in this establishment</h2>
+    <h2 class="govuk-heading-m govuk-!-margin-top-6">Property in this establishment</h2>
     {% if inEstablishment.length == 0 %}
       <p class="govuk-body" data-qa="no-in-establishment">No property is being held in this establishment for this person.</p>
     {% else %}
-      {% set inEstablishmentHead = [{ text: "Seal number" }] %}
+      {% set inEstablishmentHead = [] %}
+      {% if canManage %}
+        {% set inEstablishmentHead = (inEstablishmentHead.push({ html: "", attributes: { id: "select-all" } }), inEstablishmentHead) %}
+      {% endif %}
+      {% set inEstablishmentHead = (inEstablishmentHead.push({ text: "Seal number" }), inEstablishmentHead) %}
       {% if hasLeft %}
         {% set inEstablishmentHead = (inEstablishmentHead.push({ text: "Prisoner establishment" }), inEstablishmentHead) %}
       {% endif %}
       {% set inEstablishmentHead = (inEstablishmentHead.push(
-        { text: "Property type" },
+        { text: "Property type", attributes: { "aria-sort": "none" } },
         { text: "Storage location" },
-        { text: "Disposal date" },
-        { text: "Last updated" },
-        { text: "Property status" },
-        { text: "Actions" }
+        { text: "Disposal date", attributes: { "aria-sort": "none" } },
+        { text: "Last updated", attributes: { "aria-sort": "none" } },
+        { text: "Property status", attributes: { "aria-sort": "none" } }
       ), inEstablishmentHead) %}
+      {% if canManage %}
+        {% set inEstablishmentHead = (inEstablishmentHead.push({ text: "Actions" }), inEstablishmentHead) %}
+      {% endif %}
 
       {% set inEstablishmentRows = [] %}
       {% for row in inEstablishment %}
-        {% set cells = [{ text: row.container.currentSealNumber or "-" }] %}
+        {% set cells = [] %}
+        {% if canManage %}
+          {% set checkboxId = "select-" + row.container.id %}
+          {% set checkboxHtml %}<div class="govuk-checkboxes govuk-checkboxes--small"><div class="govuk-checkboxes__item"><input type="checkbox" class="govuk-checkboxes__input" id="{{ checkboxId }}" name="containerIds" value="{{ row.container.id }}"><label class="govuk-label govuk-checkboxes__label" for="{{ checkboxId }}"><span class="govuk-visually-hidden">Select {{ row.container.currentSealNumber or "container" }}</span></label></div></div>{% endset %}
+          {% set cells = (cells.push({ html: checkboxHtml }), cells) %}
+        {% endif %}
+        {% set cells = (cells.push({ text: row.container.currentSealNumber or "-" }), cells) %}
         {% if hasLeft %}
           {% set cells = (cells.push({ text: prisonerCurrentPrisonName or "Not known" }), cells) %}
         {% endif %}
         {% set cells = (cells.push(
           { text: row.container.containerType | containerTypeLabel },
           { text: row.container | containerLocation },
-          { text: (row.container.proposedDisposalDate | formatShortDate) or "No date set" },
-          { text: row.container.createDateTime | formatShortDate },
-          { html: govukTag({ text: row.status.text, classes: row.status.classes }) },
-          { html: '<a class="govuk-link" href="/prisoner/' + prisonerNumber + '/container/' + row.container.id + '">View history</a>' }
+          { text: (row.container.proposedDisposalDate | formatShortDate) or "No date set", attributes: { "data-sort-value": row.container.proposedDisposalDate or "" } },
+          { text: row.container.createDateTime | formatShortDate, attributes: { "data-sort-value": row.container.createDateTime } },
+          { html: govukTag({ text: row.status.text, classes: row.status.classes }), attributes: { "data-sort-value": row.status.text } }
         ), cells) %}
+        {% if canManage %}
+          {% set cells = (cells.push({ html: '<a class="govuk-link" href="#">Change</a> | <a class="govuk-link" href="#">Remove</a>' }), cells) %}
+        {% endif %}
         {% set inEstablishmentRows = (inEstablishmentRows.push(cells), inEstablishmentRows) %}
       {% endfor %}
 
-      {{ govukTable({
-        attributes: { "data-qa": "in-establishment" },
-        head: inEstablishmentHead,
-        rows: inEstablishmentRows
-      }) }}
+      {% if canManage %}<div data-module="moj-multi-select">{% endif %}
+        {{ govukTable({
+          attributes: { "data-qa": "in-establishment", "data-module": "moj-sortable-table" },
+          head: inEstablishmentHead,
+          rows: inEstablishmentRows
+        }) }}
+      {% if canManage %}</div>{% endif %}
+
+      {% if canManage %}
+        {{ govukButton({
+          text: "Combine selected property containers",
+          classes: "govuk-button--secondary",
+          attributes: { "data-qa": "combine-selected" }
+        }) }}
+      {% endif %}
     {% endif %}
 
     {% if dueToTransferIn.length %}
-      <h2 class="govuk-heading-l govuk-!-margin-top-6">Property due to be transferred in</h2>
+      <h2 class="govuk-heading-m govuk-!-margin-top-6">Property due to be transferred in</h2>
       {% set transferInRows = [] %}
       {% for row in dueToTransferIn %}
         {% set transferInRows = (transferInRows.push([
           { text: row.container.currentSealNumber or "-" },
           { text: row.container.containerType | containerTypeLabel },
           { text: row.container.prisonName or "-" },
-          { text: (row.container.proposedDisposalDate | formatShortDate) or "No date set" },
-          { text: row.container.createDateTime | formatShortDate },
-          { html: govukTag({ text: row.status.text, classes: row.status.classes }) }
+          { text: (row.container.proposedDisposalDate | formatShortDate) or "No date set", attributes: { "data-sort-value": row.container.proposedDisposalDate or "" } },
+          { text: row.container.createDateTime | formatShortDate, attributes: { "data-sort-value": row.container.createDateTime } },
+          { html: govukTag({ text: row.status.text, classes: row.status.classes }), attributes: { "data-sort-value": row.status.text } }
         ]), transferInRows) %}
       {% endfor %}
 
       {{ govukTable({
-        attributes: { "data-qa": "due-transfer-in" },
+        attributes: { "data-qa": "due-transfer-in", "data-module": "moj-sortable-table" },
         head: [
           { text: "Seal number" },
-          { text: "Property type" },
+          { text: "Property type", attributes: { "aria-sort": "none" } },
           { text: "Establishment" },
-          { text: "Disposal date" },
-          { text: "Last updated" },
-          { text: "Property status" }
+          { text: "Disposal date", attributes: { "aria-sort": "none" } },
+          { text: "Last updated", attributes: { "aria-sort": "none" } },
+          { text: "Property status", attributes: { "aria-sort": "none" } }
         ],
         rows: transferInRows
       }) }}

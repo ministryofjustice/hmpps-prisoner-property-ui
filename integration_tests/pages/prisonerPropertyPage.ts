@@ -36,6 +36,12 @@ export default class PrisonerPropertyPage extends AbstractPage {
 
   readonly tabHistory: Locator
 
+  readonly breadcrumbs: Locator
+
+  readonly combineButton: Locator
+
+  readonly selectAllHeader: Locator
+
   private constructor(page: Page) {
     super(page)
     this.name = page.getByTestId('prisoner-name')
@@ -55,6 +61,9 @@ export default class PrisonerPropertyPage extends AbstractPage {
     this.successBanner = page.getByTestId('success-banner')
     this.tabProperty = page.getByTestId('tab-property')
     this.tabHistory = page.getByTestId('tab-history')
+    this.breadcrumbs = page.locator('.govuk-breadcrumbs')
+    this.combineButton = page.getByTestId('combine-selected')
+    this.selectAllHeader = page.locator('#select-all')
   }
 
   static async verifyOnPage(page: Page): Promise<PrisonerPropertyPage> {
