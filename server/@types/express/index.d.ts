@@ -1,5 +1,5 @@
 import { HmppsUser } from '../../interfaces/hmppsUser'
-import { ContainerType } from '../../data/prisonerPropertyApiTypes'
+import { ContainerType, RemovalOutcome } from '../../data/prisonerPropertyApiTypes'
 
 // Working state for the multi-step "add a property container" journey. Cleared on confirm/cancel.
 export interface AddContainerJourney {
@@ -12,11 +12,23 @@ export interface AddContainerJourney {
   locationName?: string
 }
 
+// Working state for the multi-step "remove a property container" journey. Cleared on confirm/cancel.
+// `origin` records where the user started (the establishment list or a person view) so we return them
+// there afterwards. `toPrisonId` is the resolved receiving prison for a TRANSFERRED outcome.
+export interface RemoveContainerJourney {
+  prisonerNumber: string
+  containerId: string
+  origin: 'list' | 'person'
+  outcome?: RemovalOutcome
+  toPrisonId?: string
+}
+
 export declare module 'express-session' {
   // Declare that the session will potentially contain these additional fields
   interface SessionData {
     returnTo: string
     addContainerJourney?: AddContainerJourney
+    removeContainerJourney?: RemoveContainerJourney
   }
 }
 

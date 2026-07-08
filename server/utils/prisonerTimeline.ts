@@ -34,6 +34,7 @@ const TIMELINE_STATUS_TAGS: Record<ContainerStatus, TimelineTag> = {
   RETURNED: { text: 'Returned', classes: 'govuk-tag--green' },
   TRANSFER: { text: 'Transferred out', classes: 'govuk-tag--grey' },
   COMBINED: { text: 'Combined', classes: 'govuk-tag--grey' },
+  CREATED_IN_ERROR: { text: 'Created in error', classes: 'govuk-tag--grey' },
 }
 
 const timelineTag = (status: ContainerStatus): TimelineTag =>

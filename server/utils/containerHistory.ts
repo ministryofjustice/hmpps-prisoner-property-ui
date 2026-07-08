@@ -12,6 +12,7 @@ const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
   DISPOSAL_REQUIRED: 'Marked for disposal',
   DISPOSED: 'Disposed',
   COMBINED: 'Combined',
+  CREATED_IN_ERROR: 'Removed – created in error',
 }
 
 export const eventTypeLabel = (type: PropertyEventType): string => EVENT_TYPE_LABELS[type] ?? type
@@ -47,6 +48,8 @@ export const eventDescription = (event: PropertyEvent): string => {
       return 'Disposed of.'
     case 'COMBINED':
       return 'Combined into another container.'
+    case 'CREATED_IN_ERROR':
+      return 'Removed because the record was created in error.'
     default:
       return ''
   }

@@ -1,0 +1,55 @@
+// Interruption panel shown before a transfer removal when the prisoner has not yet been recorded as
+// received into the receiving establishment. A blue full-width card with white text, a white-bordered
+// "continue" button and a plain "return" link.
+.app-interruption {
+  @include govuk-responsive-padding(6);
+  @include govuk-responsive-margin(6, 'bottom');
+  background-color: govuk-colour('blue');
+  color: govuk-colour('white');
+
+  &__title {
+    @include govuk-font($size: 36, $weight: 'bold');
+    color: govuk-colour('white');
+    @include govuk-responsive-margin(4, 'bottom');
+  }
+
+  &__body {
+    @include govuk-font($size: 19);
+    color: govuk-colour('white');
+    @include govuk-responsive-margin(6, 'bottom');
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: govuk-spacing(4);
+  }
+
+  &__continue {
+    @include govuk-font($size: 19, $weight: 'bold');
+    display: inline-block;
+    padding: govuk-spacing(2) govuk-spacing(3);
+    border: 2px solid govuk-colour('white');
+    color: govuk-colour('white');
+    text-decoration: none;
+
+    &:hover {
+      background-color: govuk-colour('white');
+      color: govuk-colour('blue');
+    }
+
+    &:focus {
+      @include govuk-focused-text;
+    }
+  }
+
+  &__return {
+    color: govuk-colour('white');
+
+    &:link,
+    &:visited {
+      color: govuk-colour('white');
+    }
+  }
+}

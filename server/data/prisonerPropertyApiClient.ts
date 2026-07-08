@@ -11,6 +11,7 @@ import type {
   PrisonPropertyListQuery,
   PrisonPropertySummary,
   PropertyEvent,
+  RemoveContainerRequest,
   RestPage,
 } from './prisonerPropertyApiTypes'
 
@@ -108,5 +109,17 @@ export default class PrisonerPropertyApiClient extends RestClient {
    */
   createContainer(body: CreateContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
     return this.post<PrisonerPropertyContainer>({ path: `/property-containers`, data: { ...body } }, asSystem(username))
+  }
+
+  /**
+   * Remove a container from active storage (returned / disposed / created in error), or transfer it to
+   * the prisoner's new establishment (which reassigns it there). Called with a system token tied to the
+   * signed-in user (`asSystem(username)`); the system client must hold the ROLE_PRISONER_PROPERTY__RW role.
+   */
+  removeContainer(id: string, body: RemoveContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
+    return this.post<PrisonerPropertyContainer>(
+      { path: `/property-containers/${id}/remove`, data: { ...body } },
+      asSystem(username),
+    )
   }
 }

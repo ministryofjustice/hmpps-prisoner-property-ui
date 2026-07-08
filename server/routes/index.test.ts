@@ -1004,3 +1004,197 @@ describe('Add container journey - steps', () => {
       })
   })
 })
+
+describe('Remove container journey - access control', () => {
+  it('renders a Remove link on the person view for a user with the manage role', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('/prisoner/A1234BC/remove-container/c1?from=person')
+      })
+  })
+
+  it('forbids the journey for a user without the manage role', async () => {
+    withActiveCaseload()
+
+    return request(app)
+      .get('/prisoner/A1234BC/remove-container/c1')
+      .expect(403)
+      .expect(() => {
+        expect(userService.getActiveCaseload).not.toHaveBeenCalled()
+      })
+  })
+})
+
+describe('Remove container journey - steps', () => {
+  it('renders the reason screen with the container details and reasons', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ currentSealNumber: 'SN0001', currentStatus: 'DISPOSAL_REQUIRED' }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC/remove-container/c1?from=list')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Remove property container SN0001')
+        expect(res.text).toContain('Why are you removing this property container record?')
+        expect(res.text).toContain('The property has been returned')
+        expect(res.text).toContain('This record was created in error')
+        expect(res.text).toContain('Due for disposal')
+      })
+  })
+
+  it('404s when the container is not found for the prisoner', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ id: 'other' })])
+
+    return request(manageApp()).get('/prisoner/A1234BC/remove-container/c1').expect(404)
+  })
+
+  it('404s when the container has already been removed', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ removalOutcome: 'RETURNED' })])
+
+    return request(manageApp()).get('/prisoner/A1234BC/remove-container/c1').expect(404)
+  })
+
+  it('re-renders the reason screen with an error when no reason is chosen', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/remove-container/c1')
+    return agent
+      .post('/prisoner/A1234BC/remove-container/c1')
+      .type('form')
+      .send({})
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+        expect(res.text).toContain('Select why you are removing')
+      })
+  })
+
+  it('walks reason -> check -> confirm for a return and returns to the person view', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ currentSealNumber: 'SN0001' })])
+    prisonerPropertyService.removeContainer.mockResolvedValue(container({}))
+
+    const agent = request.agent(manageApp())
+
+    await agent.get('/prisoner/A1234BC/remove-container/c1?from=person').expect(200)
+
+    await agent
+      .post('/prisoner/A1234BC/remove-container/c1')
+      .type('form')
+      .send({ outcome: 'RETURNED' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/remove-container/c1/check')
+
+    await agent
+      .get('/prisoner/A1234BC/remove-container/c1/check')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Check your answers')
+        expect(res.text).toContain('Returned')
+        expect(res.text).toContain('Date property returned')
+      })
+
+    await agent
+      .post('/prisoner/A1234BC/remove-container/c1/confirm')
+      .type('form')
+      .send({})
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC')
+
+    expect(prisonerPropertyService.removeContainer).toHaveBeenCalledWith(
+      'c1',
+      { outcome: 'RETURNED', toPrisonId: undefined },
+      user.username,
+    )
+    expect(flashProvider).toHaveBeenCalledWith('success', 'Property container removed')
+    expect(auditService.logPageView).toHaveBeenCalledWith(
+      Page.REMOVE_PROPERTY_CONTAINER,
+      expect.objectContaining({ subjectId: 'A1234BC', details: { containerId: 'c1', outcome: 'RETURNED' } }),
+    )
+  })
+
+  it('returns to the establishment list when the journey started there', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.removeContainer.mockResolvedValue(container({}))
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/remove-container/c1?from=list')
+    await agent.post('/prisoner/A1234BC/remove-container/c1').type('form').send({ outcome: 'DISPOSED' })
+    await agent
+      .post('/prisoner/A1234BC/remove-container/c1/confirm')
+      .type('form')
+      .send({})
+      .expect(302)
+      .expect('location', '/')
+  })
+
+  it('transfers straight to check when the prisoner has been received elsewhere', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({
+        prisonerCurrentPrisonId: 'LEI',
+        prisonerCurrentPrisonName: 'Leeds (HMP)',
+        prisonerMovementStatus: 'IN_ESTABLISHMENT',
+      }),
+    ])
+    prisonerPropertyService.removeContainer.mockResolvedValue(container({}))
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/remove-container/c1?from=person')
+    await agent
+      .post('/prisoner/A1234BC/remove-container/c1')
+      .type('form')
+      .send({ outcome: 'TRANSFERRED' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/remove-container/c1/check')
+
+    await agent.post('/prisoner/A1234BC/remove-container/c1/confirm').type('form').send({}).expect(302)
+
+    expect(prisonerPropertyService.removeContainer).toHaveBeenCalledWith(
+      'c1',
+      { outcome: 'TRANSFERRED', toPrisonId: 'LEI' },
+      user.username,
+    )
+  })
+
+  it('shows the interruption when the prisoner has not been received into the new establishment yet', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({
+        prisonerName: 'John Smith',
+        prisonerCurrentPrisonId: 'MDI',
+        prisonerMovementStatus: 'IN_ESTABLISHMENT',
+      }),
+    ])
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/remove-container/c1?from=person')
+    await agent
+      .post('/prisoner/A1234BC/remove-container/c1')
+      .type('form')
+      .send({ outcome: 'TRANSFERRED' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/remove-container/c1/interruption')
+
+    await agent
+      .get('/prisoner/A1234BC/remove-container/c1/interruption')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('has not been received into')
+        expect(res.text).toContain('Continue and remove property container')
+        expect(res.text).toContain('/prisoner/A1234BC/remove-container/c1/check')
+      })
+  })
+})

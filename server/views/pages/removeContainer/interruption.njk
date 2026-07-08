@@ -1,0 +1,30 @@
+{% extends "../../partials/layout.njk" %}
+
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
+
+{% set pageTitle = applicationName + " - Remove property container" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBackLink({ text: "Back", href: backUrl }) }}
+{% endblock %}
+
+{% block content %}
+  <div class="app-interruption" data-qa="interruption">
+    <h1 class="app-interruption__title">
+      {{ (prisonerName | convertToTitleCase) or "This person" }} has not been received into {{ establishmentName }}.
+    </h1>
+    <p class="app-interruption__body">
+      Property containers can no longer be edited by this establishment after it is removed.<br>
+      Continue if you know the person and property are both at the same establishment.
+    </p>
+    <div class="app-interruption__actions">
+      <a class="app-interruption__continue" href="{{ continueUrl }}" data-qa="interruption-continue">
+        Continue and remove property container
+      </a>
+      <a class="govuk-link app-interruption__return" href="{{ backUrl }}" data-qa="interruption-return">
+        Return to the previous screen
+      </a>
+    </div>
+  </div>
+{% endblock %}
