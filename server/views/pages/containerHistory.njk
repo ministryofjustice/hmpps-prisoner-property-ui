@@ -27,7 +27,13 @@
         <div class="moj-timeline__item">
           <div class="moj-timeline__header">
             <h2 class="moj-timeline__title">{{ event.eventType | eventTypeLabel }}</h2>
-            <p class="moj-timeline__byline">by {{ event.eventUserId }}</p>
+            <p class="moj-timeline__byline">
+              {%- if event.eventUserId == "PRISONER_PROPERTY_API" -%}
+                System generated
+              {%- else -%}
+                by {{ userNames[event.eventUserId] or event.eventUserId }}
+              {%- endif -%}
+            </p>
           </div>
           <p class="moj-timeline__date">
             <time datetime="{{ event.eventDateTime }}">{{ event.eventDateTime | formatDateTime }}</time>

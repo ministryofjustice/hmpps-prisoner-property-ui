@@ -41,4 +41,21 @@ describe('ManageUsersApiClient', () => {
       expect(mockAuthenticationClient.getToken).not.toHaveBeenCalled()
     })
   })
+
+  describe('getUser', () => {
+    it('should GET the user by username using a system token tied to the caller', async () => {
+      mockAuthenticationClient.getToken.mockResolvedValue('test-system-token')
+      const userDetails = { username: 'AUSER_GEN', name: 'John Doe', active: true }
+
+      nock(config.apis.manageUsersApi.url)
+        .get('/users/AUSER_GEN')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, userDetails)
+
+      const response = await manageUsersApiClient.getUser('AUSER_GEN', 'CALLER_GEN')
+
+      expect(response).toEqual(userDetails)
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('CALLER_GEN')
+    })
+  })
 })
