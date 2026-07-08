@@ -17,6 +17,7 @@ export default function nunjucksSetup(app: express.Express): void {
   app.locals.applicationName = 'Prisoner property'
   app.locals.environmentName = config.environmentName
   app.locals.environmentNameColour = config.environmentName === 'PRE-PRODUCTION' ? 'govuk-tag--green' : ''
+  app.locals.dpsUrl = config.serviceUrls.digitalPrison
   let assetManifest: Record<string, string> = {}
 
   try {
