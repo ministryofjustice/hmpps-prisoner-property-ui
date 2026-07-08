@@ -54,6 +54,9 @@ beforeEach(() => {
   prisonerService.getPrisonerDetails.mockResolvedValue(prisoner())
   // connect-flash always returns an array; the test harness mocks req.flash, so default it to empty.
   flashProvider.mockReturnValue([])
+  // The history + container pages resolve acting-user names; default to none so they fall back to the
+  // raw username. Tests that assert a resolved name override this.
+  userService.getUserDisplayNames.mockResolvedValue(new Map())
 })
 
 afterEach(() => {
@@ -694,6 +697,24 @@ describe('GET /prisoner/:prisonerNumber/history', () => {
       })
   })
 
+  it('resolves the acting user to their name in the byline', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([
+      timelineItem({ eventType: 'TRANSFERRED', eventStatus: 'TRANSFER', eventUserId: 'AUSER' }),
+    ])
+    userService.getUserDisplayNames.mockResolvedValue(new Map([['AUSER', 'John Doe']]))
+
+    return request(app)
+      .get('/prisoner/A1234BC/history')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('by John Doe, Leeds (HMP)')
+        expect(res.text).not.toContain('by AUSER')
+        expect(userService.getUserDisplayNames).toHaveBeenCalledWith(['AUSER'], user.username)
+      })
+  })
+
   it('shows an empty state when the prisoner has no history', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
@@ -760,6 +781,41 @@ describe('GET /prisoner/:prisonerNumber/container/:id', () => {
           Page.CONTAINER_HISTORY,
           expect.objectContaining({ who: user.username, subjectId: 'A1234BC', details: { containerId: 'c1' } }),
         )
+      })
+  })
+
+  it('resolves the acting user to their name, and shows "System generated" for system events', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ id: 'c1' })])
+    prisonerPropertyService.getContainerEvents.mockResolvedValue([
+      event({ id: 'e2', eventType: 'PRISONER_RELEASED', eventUserId: 'PRISONER_PROPERTY_API' }),
+      event({ id: 'e1', eventType: 'CREATED_SEALED', eventUserId: 'AUSER' }),
+    ])
+    userService.getUserDisplayNames.mockResolvedValue(new Map([['AUSER', 'John Doe']]))
+
+    return request(app)
+      .get('/prisoner/A1234BC/container/c1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('by John Doe')
+        expect(res.text).toContain('System generated')
+        expect(res.text).not.toContain('by AUSER')
+        expect(res.text).not.toContain('by PRISONER_PROPERTY_API')
+        expect(userService.getUserDisplayNames).toHaveBeenCalledWith(['PRISONER_PROPERTY_API', 'AUSER'], user.username)
+      })
+  })
+
+  it('falls back to the raw username when the name cannot be resolved', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ id: 'c1' })])
+    prisonerPropertyService.getContainerEvents.mockResolvedValue([event({ id: 'e1', eventUserId: 'AUSER' })])
+    userService.getUserDisplayNames.mockResolvedValue(new Map())
+
+    return request(app)
+      .get('/prisoner/A1234BC/container/c1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('by AUSER')
       })
   })
 

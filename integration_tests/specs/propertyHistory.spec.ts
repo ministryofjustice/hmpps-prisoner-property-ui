@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { login, resetStubs } from '../testUtils'
 import prisonerPropertyApi from '../mockApis/prisonerPropertyApi'
+import manageUsersApi from '../mockApis/manageUsersApi'
 import PrisonerPropertyPage from '../pages/prisonerPropertyPage'
 import PropertyHistoryPage from '../pages/propertyHistoryPage'
 import type { PrisonerPropertyContainer, PrisonerTimelineItem } from '../../server/data/prisonerPropertyApiTypes'
@@ -91,6 +92,7 @@ test.describe('Property history timeline', () => {
       priority: 1,
     })
     await prisonerPropertyApi.stubGetPrisonerPropertyHistory({ prisonerNumber: 'A1234BC', items, priority: 1 })
+    await manageUsersApi.stubGetUser({ username: 'AUSER', name: 'John Doe' })
     await page.goto('/prisoner/A1234BC')
 
     const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
@@ -103,7 +105,9 @@ test.describe('Property history timeline', () => {
     // interleaved, newest first: a container transfer, the prisoner movement, then the creation
     await expect(historyPage.timeline).toContainText('Property container SN880032 transferred to Isle of Wight (HMP)')
     await expect(historyPage.timeline).toContainText('Transferred out')
-    await expect(historyPage.timeline).toContainText('by AUSER, Leeds (HMP)')
+    // the acting user is resolved to their name, and the system movement shows "System generated"
+    await expect(historyPage.timeline).toContainText('by John Doe, Leeds (HMP)')
+    await expect(historyPage.timeline).toContainText('System generated')
     await expect(historyPage.timeline).toContainText('JOHN SMITH arrived at Isle of Wight (HMP)')
     await expect(historyPage.timeline).toContainText('Property container SN880032 added to storage at Leeds (HMP)')
 

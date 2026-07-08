@@ -83,9 +83,15 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
   }
 }
 
-/** "by {user}, {establishment}" for user actions, "System generated, {establishment}" for system ones. */
-const timelineByline = (item: PrisonerTimelineItem): string => {
-  const who = item.systemGenerated ? 'System generated' : `by ${item.eventUserId}`
+/**
+ * "by {name}, {establishment}" for user actions, "System generated, {establishment}" for system ones.
+ * The acting user's name is resolved from `nameByUsername`, falling back to the raw username when it
+ * could not be looked up.
+ */
+const timelineByline = (item: PrisonerTimelineItem, nameByUsername: Map<string, string>): string => {
+  const who = item.systemGenerated
+    ? 'System generated'
+    : `by ${nameByUsername.get(item.eventUserId) ?? item.eventUserId}`
   return item.actingEstablishmentName ? `${who}, ${item.actingEstablishmentName}` : who
 }
 
@@ -100,12 +106,20 @@ const timelineDetails = (item: PrisonerTimelineItem, prisonerNumber: string): Ti
   }
 }
 
-/** Build the render-ready timeline rows for the property-history tab. */
-export const buildPrisonerTimeline = (items: PrisonerTimelineItem[], prisonerNumber: string): TimelineRow[] =>
+/**
+ * Build the render-ready timeline rows for the property-history tab. `nameByUsername` maps acting-user
+ * usernames to display names (see `UserService.getUserDisplayNames`); it defaults to empty so callers
+ * that have not resolved names still get the raw username in the byline.
+ */
+export const buildPrisonerTimeline = (
+  items: PrisonerTimelineItem[],
+  prisonerNumber: string,
+  nameByUsername: Map<string, string> = new Map(),
+): TimelineRow[] =>
   items.map(item => ({
     title: timelineTitle(item),
     tag: item.eventStatus ? timelineTag(item.eventStatus) : null,
-    byline: timelineByline(item),
+    byline: timelineByline(item, nameByUsername),
     dateTime: item.eventDateTime,
     details: timelineDetails(item, prisonerNumber),
   }))

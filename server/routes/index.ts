@@ -224,11 +224,16 @@ export default function routes({
       ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId)
       : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
 
+    const nameByUsername = await userService.getUserDisplayNames(
+      timelineItems.map(item => item.eventUserId),
+      username,
+    )
+
     return res.render('pages/prisonerPropertyHistory', {
       prisonerNumber,
       prisonerName: containers[0]?.prisonerName ?? null,
       banner,
-      timeline: buildPrisonerTimeline(timelineItems, prisonerNumber),
+      timeline: buildPrisonerTimeline(timelineItems, prisonerNumber, nameByUsername),
       migrationDate: config.nomisMigrationDate,
       canManage: canManageProperty(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
@@ -288,11 +293,17 @@ export default function routes({
       details: { containerId: id },
     })
 
+    const nameByUsername = await userService.getUserDisplayNames(
+      events.map(event => event.eventUserId),
+      username,
+    )
+
     return res.render('pages/containerHistory', {
       prisonerNumber,
       prisonerName: container.prisonerName,
       container,
       events,
+      userNames: Object.fromEntries(nameByUsername),
       backUrl: `/prisoner/${prisonerNumber}`,
     })
   })

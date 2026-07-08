@@ -86,6 +86,14 @@ describe('buildPrisonerTimeline', () => {
     )
   })
 
+  it('resolves the acting user to their name when supplied, and falls back to the raw username', () => {
+    const names = new Map([['AUSER', 'John Doe']])
+    expect(buildPrisonerTimeline([containerEvent()], 'A1234BC', names)[0].byline).toBe('by John Doe, Leeds (HMP)')
+    expect(buildPrisonerTimeline([containerEvent({ eventUserId: 'BUSER' })], 'A1234BC', names)[0].byline).toBe(
+      'by BUSER, Leeds (HMP)',
+    )
+  })
+
   it('renders a prisoner movement as an "arrived at" row with no container details', () => {
     const [row] = buildPrisonerTimeline([movement()], 'A1234BC')
     expect(row.title).toBe('JOHN SMITH arrived at Moorland (HMP & YOI)')

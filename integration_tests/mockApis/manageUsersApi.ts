@@ -28,4 +28,26 @@ export default {
         },
       },
     }),
+
+  stubGetUser: ({
+    username,
+    name,
+    priority,
+  }: {
+    username: string
+    name: string
+    priority?: number
+  }): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'GET',
+        urlPath: `/manage-users-api/users/${username}`,
+      },
+      response: {
+        status: 200,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: { username, name, active: true },
+      },
+    }),
 }

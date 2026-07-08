@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { login, resetStubs } from '../testUtils'
 import prisonerPropertyApi from '../mockApis/prisonerPropertyApi'
+import manageUsersApi from '../mockApis/manageUsersApi'
 import ContainerHistoryPage from '../pages/containerHistoryPage'
 import type { PrisonerPropertyContainer, PropertyEvent } from '../../server/data/prisonerPropertyApiTypes'
 
@@ -69,6 +70,8 @@ test.describe('Container history timeline', () => {
       priority: 1,
     })
     await prisonerPropertyApi.stubGetContainerEvents({ id: 'c1', events, priority: 1 })
+    await manageUsersApi.stubGetUser({ username: 'AUSER', name: 'John Doe' })
+    await manageUsersApi.stubGetUser({ username: 'BUSER', name: 'Brian User' })
     await page.goto('/prisoner/A1234BC/container/c1')
 
     const historyPage = await ContainerHistoryPage.verifyOnPage(page)
@@ -78,7 +81,10 @@ test.describe('Container history timeline', () => {
     await expect(historyPage.timeline).toContainText('Moved')
     await expect(historyPage.timeline).toContainText('Moved to Branston (offsite)')
     await expect(historyPage.timeline).toContainText('Created and sealed')
-    await expect(historyPage.timeline).toContainText('by AUSER')
+    // the acting users are resolved to their names, not the raw usernames
+    await expect(historyPage.timeline).toContainText('by John Doe')
+    await expect(historyPage.timeline).toContainText('by Brian User')
+    await expect(historyPage.timeline).not.toContainText('by AUSER')
   })
 
   test('shows an empty state when the container has no events', async ({ page }) => {
