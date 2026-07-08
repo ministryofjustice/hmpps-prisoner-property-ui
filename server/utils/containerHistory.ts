@@ -1,4 +1,5 @@
 import type { PropertyEvent, PropertyEventType } from '../data/prisonerPropertyApiTypes'
+import { containerTypeLabel } from './propertyList'
 import { formatDate } from './utils'
 
 const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
@@ -30,7 +31,10 @@ export const eventDescription = (event: PropertyEvent): string => {
     case 'SEAL_CHANGED':
       return event.sealNumber ? `Seal number changed to ${event.sealNumber}.` : 'Seal number changed.'
     case 'CONTAINER_TYPE_CHANGE':
-      return 'Property type changed.'
+      // containerType is snapshotted as at this event, so it names what the type was changed to.
+      return event.containerType
+        ? `Property type changed to ${containerTypeLabel(event.containerType)}.`
+        : 'Property type changed.'
     case 'MOVED':
       return event.toStorageLocationType === 'BRANSTON'
         ? 'Moved to Branston (offsite).'
@@ -39,11 +43,13 @@ export const eventDescription = (event: PropertyEvent): string => {
       return 'The person was received at another establishment, so this property is due to be transferred out.'
     case 'PRISONER_RELEASED':
       return 'The person was released, so this property is due to be returned.'
-    case 'TRANSFERRED':
-      // The single-container events API returns the prison id, not a resolved name (unlike the timeline).
-      return event.toPrisonId
-        ? `Transferred to another establishment (${event.toPrisonId}).`
+    case 'TRANSFERRED': {
+      // Prefer the resolved prison name; fall back to the id if the API hasn't resolved it yet.
+      const destination = event.toPrisonName ?? event.toPrisonId
+      return destination
+        ? `Transferred to another establishment (${destination}).`
         : 'Transferred to another establishment.'
+    }
     case 'RETURNED':
       return 'Returned to the person.'
     case 'DISPOSAL_REQUIRED':

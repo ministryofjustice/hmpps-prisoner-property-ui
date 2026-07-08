@@ -11,7 +11,10 @@ const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
   toInternalLocationId: null,
   toStorageLocationType: null,
   fromPrisonId: null,
+  fromPrisonName: null,
   toPrisonId: null,
+  toPrisonName: null,
+  containerType: 'STANDARD',
   eventDate: null,
   relatedContainerId: null,
   ...overrides,
@@ -64,11 +67,20 @@ describe('eventDescription', () => {
     )
   })
 
-  it('shows the destination prison id on a transfer (name is not available in the events API)', () => {
-    expect(eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: 'MDI' }))).toBe(
+  it('names the container type on a type change', () => {
+    expect(eventDescription(event({ eventType: 'CONTAINER_TYPE_CHANGE', containerType: 'VALUABLES' }))).toBe(
+      'Property type changed to Valuables.',
+    )
+  })
+
+  it('shows the resolved destination prison name on a transfer, falling back to the id', () => {
+    expect(
+      eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: 'MDI', toPrisonName: 'Moorland (HMP & YOI)' })),
+    ).toBe('Transferred to another establishment (Moorland (HMP & YOI)).')
+    expect(eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: 'MDI', toPrisonName: null }))).toBe(
       'Transferred to another establishment (MDI).',
     )
-    expect(eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: null }))).toBe(
+    expect(eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: null, toPrisonName: null }))).toBe(
       'Transferred to another establishment.',
     )
   })

@@ -26,34 +26,47 @@ const container: PrisonerPropertyContainer = {
   archived: false,
 }
 
+const baseEvent = {
+  sealNumber: null,
+  fromInternalLocationId: null,
+  toInternalLocationId: null,
+  toStorageLocationType: null,
+  fromPrisonId: null,
+  fromPrisonName: null,
+  toPrisonId: null,
+  toPrisonName: null,
+  containerType: 'STANDARD' as const,
+  eventDate: null,
+  relatedContainerId: null,
+}
+
 const events: PropertyEvent[] = [
   {
+    ...baseEvent,
+    id: 'e3',
+    eventType: 'TRANSFERRED',
+    eventDateTime: '2026-06-03T09:00:00',
+    eventUserId: 'BUSER',
+    fromPrisonId: 'MDI',
+    fromPrisonName: 'Moorland (HMP & YOI)',
+    toPrisonId: 'LEI',
+    toPrisonName: 'Leeds (HMP)',
+  },
+  {
+    ...baseEvent,
     id: 'e2',
     eventType: 'MOVED',
     eventDateTime: '2026-06-02T14:30:00',
     eventUserId: 'BUSER',
-    sealNumber: null,
-    fromInternalLocationId: null,
-    toInternalLocationId: null,
     toStorageLocationType: 'BRANSTON',
-    fromPrisonId: null,
-    toPrisonId: null,
-    eventDate: null,
-    relatedContainerId: null,
   },
   {
+    ...baseEvent,
     id: 'e1',
     eventType: 'CREATED_SEALED',
     eventDateTime: '2026-06-01T10:00:00',
     eventUserId: 'AUSER',
     sealNumber: 'SN0001',
-    fromInternalLocationId: null,
-    toInternalLocationId: null,
-    toStorageLocationType: null,
-    fromPrisonId: null,
-    toPrisonId: null,
-    eventDate: null,
-    relatedContainerId: null,
   },
 ]
 
@@ -81,6 +94,9 @@ test.describe('Container history timeline', () => {
     await expect(historyPage.timeline).toContainText('Storage location changed')
     await expect(historyPage.timeline).toContainText('Moved to Branston (offsite)')
     await expect(historyPage.timeline).toContainText('Added to storage')
+    // the transfer shows the resolved destination prison name, not the raw id
+    await expect(historyPage.timeline).toContainText('Transferred to another establishment (Leeds (HMP))')
+    await expect(historyPage.timeline).not.toContainText('(LEI)')
     // the acting users are resolved to their names, not the raw usernames
     await expect(historyPage.timeline).toContainText('by John Doe')
     await expect(historyPage.timeline).toContainText('by Brian User')
