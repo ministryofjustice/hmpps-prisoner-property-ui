@@ -65,7 +65,14 @@ describe('PrisonerPropertyApiClient', () => {
 
       nock(config.apis.prisonerPropertyApi.url)
         .get('/property-containers/prison/MDI')
-        .query({ query: 'A1234BC', containerType: 'STANDARD', status: 'STORED', includeRemoved: 'true', page: '0', size: '20' })
+        .query({
+          query: 'A1234BC',
+          containerType: 'STANDARD',
+          status: 'STORED',
+          includeRemoved: 'true',
+          page: '0',
+          size: '20',
+        })
         .matchHeader('authorization', 'Bearer test-system-token')
         .reply(200, pageBody)
 
