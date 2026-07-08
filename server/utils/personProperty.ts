@@ -90,11 +90,13 @@ export const buildPersonPropertyView = (
 
 const inEstablishmentStatus = (container: PrisonerPropertyContainer, prisonerHere: boolean): PropertyStatusTag => {
   if (container.currentStatus === 'DISPOSAL_REQUIRED') return { text: 'Due for disposal', classes: 'govuk-tag--orange' }
+  if (container.currentStatus === 'DUE_FOR_RETURN') return { text: 'Due for return', classes: 'govuk-tag--yellow' }
   if (prisonerHere) return { text: 'Stored', classes: 'govuk-tag--green' }
   return { text: 'Due for transfer out', classes: 'govuk-tag--grey' }
 }
 
 const transferInStatus = (container: PrisonerPropertyContainer): PropertyStatusTag => {
   if (container.currentStatus === 'DISPOSAL_REQUIRED') return { text: 'Due for disposal', classes: 'govuk-tag--orange' }
+  if (container.currentStatus === 'DUE_FOR_RETURN') return { text: 'Due for return', classes: 'govuk-tag--yellow' }
   return { text: 'Due for transfer in', classes: 'govuk-tag--blue' }
 }

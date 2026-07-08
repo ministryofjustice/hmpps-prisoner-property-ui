@@ -7,6 +7,7 @@ const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
   CONTAINER_TYPE_CHANGE: 'Property type changed',
   MOVED: 'Moved',
   PRISONER_RECEIVED: 'Prisoner received at establishment',
+  PRISONER_RELEASED: 'Prisoner released',
   TRANSFERRED: 'Transferred out',
   RETURNED: 'Returned to prisoner',
   DISPOSAL_REQUIRED: 'Marked for disposal',
@@ -38,6 +39,8 @@ export const eventDescription = (event: PropertyEvent): string => {
         : 'Moved to a new storage location.'
     case 'PRISONER_RECEIVED':
       return 'Prisoner received at this establishment; property due for transfer out.'
+    case 'PRISONER_RELEASED':
+      return 'Prisoner released; property due for return.'
     case 'TRANSFERRED':
       return event.toPrisonId ? `Transferred out to ${event.toPrisonId}.` : 'Transferred out.'
     case 'RETURNED':

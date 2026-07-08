@@ -30,6 +30,7 @@ describe('propertyList utils', () => {
       expect(statusTag('STORED')).toEqual({ text: 'Stored', classes: 'govuk-tag--blue' })
       expect(statusTag('DISPOSAL_REQUIRED')).toEqual({ text: 'Due for disposal', classes: 'govuk-tag--orange' })
       expect(statusTag('DUE_FOR_TRANSFER_OUT')).toEqual({ text: 'Due for transfer out', classes: 'govuk-tag--yellow' })
+      expect(statusTag('DUE_FOR_RETURN')).toEqual({ text: 'Due for return', classes: 'govuk-tag--yellow' })
     })
   })
 
@@ -113,6 +114,13 @@ describe('propertyList utils', () => {
         page: 2,
         size: 20,
       })
+    })
+
+    it('accepts the DUE_FOR_RETURN status filter and passes it to the API', () => {
+      const result = parsePropertyListQuery({ status: 'DUE_FOR_RETURN' } as unknown as ParsedQs, 20)
+
+      expect(result.statuses).toEqual(['DUE_FOR_RETURN'])
+      expect(result.apiQuery.status).toEqual(['DUE_FOR_RETURN'])
     })
 
     it('defaults page to 1 and drops invalid container types / empty status / unticked includeRemoved', () => {

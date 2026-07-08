@@ -4,6 +4,7 @@
 export type ContainerStatus =
   | 'STORED'
   | 'DUE_FOR_TRANSFER_OUT'
+  | 'DUE_FOR_RETURN'
   | 'DISPOSAL_REQUIRED'
   | 'DISPOSED'
   | 'RETURNED'
@@ -71,6 +72,7 @@ export type PropertyEventType =
   | 'CONTAINER_TYPE_CHANGE'
   | 'MOVED'
   | 'PRISONER_RECEIVED'
+  | 'PRISONER_RELEASED'
   | 'TRANSFERRED'
   | 'RETURNED'
   | 'DISPOSAL_REQUIRED'

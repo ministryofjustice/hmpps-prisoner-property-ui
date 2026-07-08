@@ -148,6 +148,19 @@ describe('buildPersonPropertyView', () => {
     expect(view.dueToTransferIn[0]!.status.text).toBe('Due for disposal')
   })
 
+  it('shows Due for return for a released prisoner’s property held here', () => {
+    const released = container({
+      prisonId: 'MDI',
+      prisonerCurrentPrisonId: 'OUT',
+      inPrisonersCurrentPrison: false,
+      currentStatus: 'DUE_FOR_RETURN',
+    })
+
+    const view = buildPersonPropertyView([released], 'MDI')
+
+    expect(view.inEstablishment[0]!.status).toEqual({ text: 'Due for return', classes: 'govuk-tag--yellow' })
+  })
+
   it('excludes removed containers', () => {
     const removed = container({ prisonId: 'MDI', prisonerCurrentPrisonId: 'MDI', removalOutcome: 'RETURNED' })
     const view = buildPersonPropertyView([removed], 'MDI')

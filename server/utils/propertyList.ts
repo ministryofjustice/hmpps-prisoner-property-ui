@@ -13,6 +13,7 @@ const PRISON_NUMBER_PATTERN = /^[A-Za-z]\d{4}[A-Za-z]{2}$/
 const STATUS_TAGS: Record<ContainerStatus, { text: string; classes: string }> = {
   STORED: { text: 'Stored', classes: 'govuk-tag--blue' },
   DUE_FOR_TRANSFER_OUT: { text: 'Due for transfer out', classes: 'govuk-tag--yellow' },
+  DUE_FOR_RETURN: { text: 'Due for return', classes: 'govuk-tag--yellow' },
   DISPOSAL_REQUIRED: { text: 'Due for disposal', classes: 'govuk-tag--orange' },
   DISPOSED: { text: 'Disposed', classes: 'govuk-tag--red' },
   RETURNED: { text: 'Returned', classes: 'govuk-tag--green' },

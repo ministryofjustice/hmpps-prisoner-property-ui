@@ -29,6 +29,7 @@ export interface TimelineRow {
 const TIMELINE_STATUS_TAGS: Record<ContainerStatus, TimelineTag> = {
   STORED: { text: 'Stored', classes: 'govuk-tag--green' },
   DUE_FOR_TRANSFER_OUT: { text: 'Due for transfer out', classes: 'govuk-tag--grey' },
+  DUE_FOR_RETURN: { text: 'Due for return', classes: 'govuk-tag--yellow' },
   DISPOSAL_REQUIRED: { text: 'Due for disposal', classes: 'govuk-tag--orange' },
   DISPOSED: { text: 'Disposed', classes: 'govuk-tag--red' },
   RETURNED: { text: 'Returned', classes: 'govuk-tag--green' },
