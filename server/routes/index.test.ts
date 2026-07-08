@@ -679,7 +679,7 @@ describe('GET /prisoner/:prisonerNumber/history', () => {
         expect(res.text).toContain('data-qa="tab-history"')
         expect(res.text).toContain('data-qa="property-timeline"')
         // a container event line + status tag + byline
-        expect(res.text).toContain('Property container SN0001 transferred to Moorland (HMP &amp; YOI)')
+        expect(res.text).toContain('Property container SN0001 transferred out to Moorland (HMP &amp; YOI)')
         expect(res.text).toContain('Transferred out')
         expect(res.text).toContain('by AUSER, Leeds (HMP)')
         // the prisoner movement line
@@ -774,7 +774,7 @@ describe('GET /prisoner/:prisonerNumber/container/:id', () => {
       .expect(res => {
         expect(res.text).toContain('Property container history')
         expect(res.text).toContain('SN0001')
-        expect(res.text).toContain('Created and sealed')
+        expect(res.text).toContain('Added to storage')
         expect(res.text).toContain('Moved to Branston (offsite)')
         expect(prisonerPropertyService.getContainerEvents).toHaveBeenCalledWith('c1', user.username)
         expect(auditService.logPageView).toHaveBeenCalledWith(

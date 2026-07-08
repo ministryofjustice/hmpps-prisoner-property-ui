@@ -78,9 +78,9 @@ test.describe('Container history timeline', () => {
 
     await expect(historyPage.summary).toContainText('SN0001')
     await expect(historyPage.summary).toContainText('A1234BC')
-    await expect(historyPage.timeline).toContainText('Moved')
+    await expect(historyPage.timeline).toContainText('Storage location changed')
     await expect(historyPage.timeline).toContainText('Moved to Branston (offsite)')
-    await expect(historyPage.timeline).toContainText('Created and sealed')
+    await expect(historyPage.timeline).toContainText('Added to storage')
     // the acting users are resolved to their names, not the raw usernames
     await expect(historyPage.timeline).toContainText('by John Doe')
     await expect(historyPage.timeline).toContainText('by Brian User')

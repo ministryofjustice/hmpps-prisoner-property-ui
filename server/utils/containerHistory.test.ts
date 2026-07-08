@@ -19,16 +19,24 @@ const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
 
 describe('eventTypeLabel', () => {
   it('maps known event types to labels', () => {
-    expect(eventTypeLabel('CREATED_SEALED')).toBe('Created and sealed')
-    expect(eventTypeLabel('MOVED')).toBe('Moved')
-    expect(eventTypeLabel('DISPOSED')).toBe('Disposed')
+    expect(eventTypeLabel('CREATED_SEALED')).toBe('Added to storage')
+    expect(eventTypeLabel('MOVED')).toBe('Storage location changed')
+    expect(eventTypeLabel('DISPOSED')).toBe('Removed – disposed')
+  })
+
+  it('labels the "details changed" events the same and groups removals', () => {
+    expect(eventTypeLabel('SEAL_CHANGED')).toBe('Details changed')
+    expect(eventTypeLabel('CONTAINER_TYPE_CHANGE')).toBe('Details changed')
+    expect(eventTypeLabel('TRANSFERRED')).toBe('Removed – transferred out')
+    expect(eventTypeLabel('RETURNED')).toBe('Removed – returned')
+    expect(eventTypeLabel('CREATED_IN_ERROR')).toBe('Removed – created in error')
   })
 })
 
 describe('eventDescription', () => {
-  it('describes a created & sealed event with its seal number', () => {
+  it('describes an added-to-storage event with its seal number', () => {
     expect(eventDescription(event({ eventType: 'CREATED_SEALED', sealNumber: 'SN0001' }))).toBe(
-      'Container created and sealed with seal number SN0001.',
+      'Added to storage with seal number SN0001.',
     )
   })
 
@@ -47,19 +55,32 @@ describe('eventDescription', () => {
     )
   })
 
-  it('names the destination prison on a transfer', () => {
-    expect(eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: 'MDI' }))).toBe('Transferred out to MDI.')
-    expect(eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: null }))).toBe('Transferred out.')
+  it('describes the received and released events in person-centred terms', () => {
+    expect(eventDescription(event({ eventType: 'PRISONER_RECEIVED' }))).toBe(
+      'The person was received at another establishment, so this property is due to be transferred out.',
+    )
+    expect(eventDescription(event({ eventType: 'PRISONER_RELEASED' }))).toBe(
+      'The person was released, so this property is due to be returned.',
+    )
   })
 
-  it('includes the proposed date when marking for disposal', () => {
+  it('shows the destination prison id on a transfer (name is not available in the events API)', () => {
+    expect(eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: 'MDI' }))).toBe(
+      'Transferred to another establishment (MDI).',
+    )
+    expect(eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: null }))).toBe(
+      'Transferred to another establishment.',
+    )
+  })
+
+  it('includes the reached date when due for disposal', () => {
     expect(eventDescription(event({ eventType: 'DISPOSAL_REQUIRED', eventDate: '2026-09-01' }))).toBe(
-      'Marked for disposal (proposed 1 September 2026).',
+      'Disposal date reached (1 September 2026), so this property is due to be disposed of.',
     )
   })
 
   it('describes returned, disposed and combined events', () => {
-    expect(eventDescription(event({ eventType: 'RETURNED' }))).toBe('Returned to the prisoner.')
+    expect(eventDescription(event({ eventType: 'RETURNED' }))).toBe('Returned to the person.')
     expect(eventDescription(event({ eventType: 'DISPOSED' }))).toBe('Disposed of.')
     expect(eventDescription(event({ eventType: 'COMBINED' }))).toBe('Combined into another container.')
   })
