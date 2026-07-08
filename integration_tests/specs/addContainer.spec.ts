@@ -72,6 +72,11 @@ test.describe('Add a property container', () => {
     await personPage.addProperty.click()
 
     const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    // The optional disposal date shows Day/Month/Year labels, not the raw bracketed field names.
+    await expect(page.getByLabel('Day')).toBeVisible()
+    await expect(page.getByLabel('Month')).toBeVisible()
+    await expect(page.getByLabel('Year')).toBeVisible()
+    await expect(page.getByText('[disposalDate]')).toHaveCount(0)
     await detailsPage.completeWith({ seal: 'SN9', type: 'Valuables' })
 
     const locationPage = await AddContainerLocationPage.verifyOnPage(page)

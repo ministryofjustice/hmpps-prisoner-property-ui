@@ -91,9 +91,9 @@
         hint: { text: "For example, 17 1 2026." },
         errorMessage: { text: fieldErrors[idPrefix + "-disposalDate"] } if fieldErrors[idPrefix + "-disposalDate"] else undefined,
         items: [
-          { name: prefix + "[disposalDate][day]", classes: "govuk-input--width-2", value: container.disposalDate.day },
-          { name: prefix + "[disposalDate][month]", classes: "govuk-input--width-2", value: container.disposalDate.month },
-          { name: prefix + "[disposalDate][year]", classes: "govuk-input--width-4", value: container.disposalDate.year }
+          { id: idPrefix + "-disposalDate-day", name: prefix + "[disposalDate][day]", label: "Day", classes: "govuk-input--width-2", value: container.disposalDate.day },
+          { id: idPrefix + "-disposalDate-month", name: prefix + "[disposalDate][month]", label: "Month", classes: "govuk-input--width-2", value: container.disposalDate.month },
+          { id: idPrefix + "-disposalDate-year", name: prefix + "[disposalDate][year]", label: "Year", classes: "govuk-input--width-4", value: container.disposalDate.year }
         ]
       }) }}
 
