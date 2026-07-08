@@ -93,7 +93,11 @@ export interface PropertyEvent {
   toInternalLocationId: string | null
   toStorageLocationType: StorageLocationType | null
   fromPrisonId: string | null
+  fromPrisonName: string | null
   toPrisonId: string | null
+  toPrisonName: string | null
+  // The container's type as at this event (snapshotted for the durable history).
+  containerType: ContainerType
   eventDate: string | null
   relatedContainerId: string | null
 }
