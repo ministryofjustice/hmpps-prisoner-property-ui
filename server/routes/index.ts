@@ -30,6 +30,7 @@ import {
 import config from '../config'
 import logger from '../../logger'
 import requireManageRole, { canManageProperty } from '../middleware/requireManageRole'
+import requireAdminRole, { canAdminister } from '../middleware/requireAdminRole'
 
 const BOX_PAGE_SIZE = 20
 
@@ -82,6 +83,7 @@ export default function routes({
     return res.render('pages/propertyList', {
       establishmentName: activeCaseloadName,
       canManage: canManageProperty(res.locals.user.userRoles),
+      isAdmin: canAdminister(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
       includeRemoved,
       summary,
@@ -1312,6 +1314,46 @@ export default function routes({
     req.session.changeContainerJourney = undefined
     req.flash('success', 'Property container updated')
     return res.redirect(origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`)
+  })
+
+  // Admin console: switch the property service on/off per prison. Not caseload-scoped - it is a
+  // national rollout control gated on the admin role.
+  router.get('/admin/prisons', requireAdminRole, async (req, res) => {
+    const { username } = res.locals.user
+    const search = typeof req.query.q === 'string' ? req.query.q.trim() : ''
+
+    const agencies = await prisonerPropertyService.getAllAgencies(username)
+    const needle = search.toLowerCase()
+    const filtered = needle
+      ? agencies.filter(
+          agency => agency.name.toLowerCase().includes(needle) || agency.agencyId.toLowerCase().includes(needle),
+        )
+      : agencies
+
+    await auditService.logPageView(Page.ADMIN_PRISONS, { who: username, correlationId: req.id })
+
+    return res.render('pages/admin/prisons', {
+      agencies: filtered,
+      search,
+      activeCount: agencies.filter(agency => agency.active).length,
+      totalCount: agencies.length,
+      successMessage: req.flash('success')[0],
+    })
+  })
+
+  router.post('/admin/prisons/:agencyId', requireAdminRole, async (req, res) => {
+    const { username } = res.locals.user
+    const agencyId = String(req.params.agencyId)
+    const active = req.body.active === 'true'
+    const name = typeof req.body.name === 'string' && req.body.name ? req.body.name : agencyId
+
+    await prisonerPropertyService.setAgencyActive(agencyId, active, username)
+    req.flash('success', `Property is now switched ${active ? 'on' : 'off'} for ${name}.`)
+
+    const params = new URLSearchParams()
+    if (typeof req.body.q === 'string' && req.body.q) params.set('q', req.body.q)
+    const query = params.toString()
+    return res.redirect(`/admin/prisons${query ? `?${query}` : ''}`)
   })
 
   return router

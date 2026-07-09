@@ -86,4 +86,37 @@ describe('PrisonerPropertyApiClient', () => {
       expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
     })
   })
+
+  describe('getAllAgencies', () => {
+    it('should GET all prisons with their active state using a system token for the user', async () => {
+      const agencies = [
+        { agencyId: 'LEI', name: 'Leeds (HMP)', active: false },
+        { agencyId: 'MDI', name: 'Moorland (HMP & YOI)', active: true },
+      ]
+
+      nock(config.apis.prisonerPropertyApi.url)
+        .get('/active-agencies/all')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, agencies)
+
+      const response = await prisonerPropertyApiClient.getAllAgencies('AUSER_GEN')
+
+      expect(response).toEqual(agencies)
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+  })
+
+  describe('setAgencyActive', () => {
+    it('should PUT the new active state using a system token for the user', async () => {
+      nock(config.apis.prisonerPropertyApi.url)
+        .put('/active-agencies/MDI', { active: true })
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, { agencyId: 'MDI', active: true })
+
+      const response = await prisonerPropertyApiClient.setAgencyActive('MDI', true, 'AUSER_GEN')
+
+      expect(response).toEqual({ agencyId: 'MDI', active: true })
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+  })
 })

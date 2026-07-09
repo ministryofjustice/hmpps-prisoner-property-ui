@@ -40,6 +40,12 @@
     }) }}
   {% endif %}
 
+  {% if isAdmin %}
+    <p class="govuk-body">
+      <a class="govuk-link" href="/admin/prisons" data-qa="manage-prisons-link">Manage enabled prisons</a>
+    </p>
+  {% endif %}
+
   {% if summary %}
     {% set tiles = [
       { text: "Available storage locations on-site", value: summary.availableStorageLocations, qa: "summary-available-locations" },
