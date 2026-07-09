@@ -111,11 +111,11 @@ describe('PrisonerPropertyApiClient', () => {
       nock(config.apis.prisonerPropertyApi.url)
         .put('/active-agencies/MDI', { active: true })
         .matchHeader('authorization', 'Bearer test-system-token')
-        .reply(200, { agencyId: 'MDI', active: true })
+        .reply(200, { agencyId: 'MDI', name: 'Moorland (HMP & YOI)', active: true })
 
       const response = await prisonerPropertyApiClient.setAgencyActive('MDI', true, 'AUSER_GEN')
 
-      expect(response).toEqual({ agencyId: 'MDI', active: true })
+      expect(response).toEqual({ agencyId: 'MDI', name: 'Moorland (HMP & YOI)', active: true })
       expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
     })
   })

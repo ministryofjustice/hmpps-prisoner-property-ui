@@ -245,7 +245,7 @@ export default {
     }),
 
   stubSetAgencyActive: (
-    { agencyId = 'MDI', active = true, priority = undefined as number | undefined } = {},
+    { agencyId = 'MDI', name = agencyId, active = true, priority = undefined as number | undefined } = {},
     httpStatus = 200,
   ): SuperAgentRequest =>
     stubFor({
@@ -257,7 +257,7 @@ export default {
       response: {
         status: httpStatus,
         headers: { 'Content-Type': 'application/json;charset=UTF-8' },
-        jsonBody: { agencyId, active },
+        jsonBody: { agencyId, name, active },
       },
     }),
 }

@@ -1,6 +1,5 @@
 import PrisonerPropertyApiClient from '../data/prisonerPropertyApiClient'
 import type {
-  ActiveAgency,
   AgencyStatus,
   BoxLocation,
   CombineContainersRequest,
@@ -71,7 +70,7 @@ export default class PrisonerPropertyService {
     return this.prisonerPropertyApiClient.getAllAgencies(username)
   }
 
-  setAgencyActive(agencyId: string, active: boolean, username: string): Promise<ActiveAgency> {
+  setAgencyActive(agencyId: string, active: boolean, username: string): Promise<AgencyStatus> {
     return this.prisonerPropertyApiClient.setAgencyActive(agencyId, active, username)
   }
 }

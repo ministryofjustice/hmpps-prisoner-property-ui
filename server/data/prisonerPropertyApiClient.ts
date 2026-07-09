@@ -3,7 +3,6 @@ import type { AuthenticationClient } from '@ministryofjustice/hmpps-auth-clients
 import config from '../config'
 import logger from '../../logger'
 import type {
-  ActiveAgency,
   AgencyStatus,
   BoxLocation,
   CombineContainersRequest,
@@ -165,7 +164,7 @@ export default class PrisonerPropertyApiClient extends RestClient {
    * the signed-in user (`asSystem(username)`); the system client must hold the
    * ROLE_PRISONER_PROPERTY__ADMIN role.
    */
-  setAgencyActive(agencyId: string, active: boolean, username: string): Promise<ActiveAgency> {
-    return this.put<ActiveAgency>({ path: `/active-agencies/${agencyId}`, data: { active } }, asSystem(username))
+  setAgencyActive(agencyId: string, active: boolean, username: string): Promise<AgencyStatus> {
+    return this.put<AgencyStatus>({ path: `/active-agencies/${agencyId}`, data: { active } }, asSystem(username))
   }
 }

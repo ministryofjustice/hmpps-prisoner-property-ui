@@ -1802,7 +1802,11 @@ describe('Admin - manage enabled prisons', () => {
   })
 
   it('toggles a prison and redirects back with a success message', async () => {
-    prisonerPropertyService.setAgencyActive.mockResolvedValue({ agencyId: 'MDI', active: false })
+    prisonerPropertyService.setAgencyActive.mockResolvedValue({
+      agencyId: 'MDI',
+      name: 'Moorland (HMP & YOI)',
+      active: false,
+    })
 
     return request(adminApp())
       .post('/admin/prisons/MDI')
