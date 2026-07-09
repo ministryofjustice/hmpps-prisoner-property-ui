@@ -112,7 +112,9 @@ describe('GET /', () => {
       .expect('Content-Type', /html/)
       .expect(200)
       .expect(res => {
-        expect(res.text).toContain('Moorland (HMP &amp; YOI)')
+        // The heading is just "Prisoner property" - the establishment name is no longer appended (MAPB-642).
+        expect(res.text).toContain('<h1 class="govuk-heading-xl govuk-!-margin-bottom-4">Prisoner property</h1>')
+        expect(res.text).not.toContain('Moorland (HMP &amp; YOI)')
         expect(res.text).toContain('John Smith')
         expect(res.text).toContain('A1234BC')
         expect(res.text).toContain('SN8842K1')
