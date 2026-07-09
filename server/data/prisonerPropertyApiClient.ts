@@ -3,6 +3,7 @@ import type { AuthenticationClient } from '@ministryofjustice/hmpps-auth-clients
 import config from '../config'
 import logger from '../../logger'
 import type {
+  AgencyStatus,
   BoxLocation,
   CombineContainersRequest,
   CreateContainerRequest,
@@ -147,5 +148,23 @@ export default class PrisonerPropertyApiClient extends RestClient {
       { path: `/property-containers/${id}`, data: { ...body } },
       asSystem(username),
     )
+  }
+
+  /**
+   * List every prison with whether the property service is switched on, for the rollout admin console.
+   * Called with a system token tied to the signed-in user (`asSystem(username)`); the system client
+   * must hold the ROLE_PRISONER_PROPERTY__ADMIN role.
+   */
+  getAllAgencies(username: string): Promise<AgencyStatus[]> {
+    return this.get<AgencyStatus[]>({ path: `/active-agencies/all` }, asSystem(username))
+  }
+
+  /**
+   * Switch the property service on or off for a prison. Idempotent. Called with a system token tied to
+   * the signed-in user (`asSystem(username)`); the system client must hold the
+   * ROLE_PRISONER_PROPERTY__ADMIN role.
+   */
+  setAgencyActive(agencyId: string, active: boolean, username: string): Promise<AgencyStatus> {
+    return this.put<AgencyStatus>({ path: `/active-agencies/${agencyId}`, data: { active } }, asSystem(username))
   }
 }

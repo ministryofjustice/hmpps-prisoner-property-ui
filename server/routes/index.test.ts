@@ -1750,3 +1750,107 @@ describe('Change container journey', () => {
       })
   })
 })
+
+const adminUser = { ...user, userRoles: ['PRISONERPROP__ADMIN'] }
+const adminApp = () =>
+  appWithAllRoutes({
+    services: { auditService, prisonerPropertyService, prisonerService, userService },
+    userSupplier: () => adminUser,
+  })
+
+describe('Admin - manage enabled prisons', () => {
+  const agencies = [
+    { agencyId: 'LEI', name: 'Leeds (HMP)', active: false },
+    { agencyId: 'MDI', name: 'Moorland (HMP & YOI)', active: true },
+  ]
+
+  it('lists all prisons with their on/off state for an admin', async () => {
+    prisonerPropertyService.getAllAgencies.mockResolvedValue(agencies)
+
+    return request(adminApp())
+      .get('/admin/prisons')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Manage enabled prisons')
+        expect(res.text).toContain('Property is switched on for 1 of 2 prisons.')
+        expect(res.text).toContain('Leeds (HMP)')
+        expect(res.text).toContain('Moorland (HMP &amp; YOI)')
+        expect(res.text).toContain('Turn on') // LEI is off
+        expect(res.text).toContain('Turn off') // MDI is on
+      })
+  })
+
+  it('filters the list by search term', async () => {
+    prisonerPropertyService.getAllAgencies.mockResolvedValue(agencies)
+
+    return request(adminApp())
+      .get('/admin/prisons?q=leeds')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Leeds (HMP)')
+        expect(res.text).not.toContain('Moorland (HMP &amp; YOI)')
+      })
+  })
+
+  it('forbids the admin console for a user without the admin role', async () => {
+    return request(app)
+      .get('/admin/prisons')
+      .expect(403)
+      .expect(() => {
+        expect(prisonerPropertyService.getAllAgencies).not.toHaveBeenCalled()
+      })
+  })
+
+  it('toggles a prison and redirects back with a success message', async () => {
+    prisonerPropertyService.setAgencyActive.mockResolvedValue({
+      agencyId: 'MDI',
+      name: 'Moorland (HMP & YOI)',
+      active: false,
+    })
+
+    return request(adminApp())
+      .post('/admin/prisons/MDI')
+      .send({ active: 'false', name: 'Moorland (HMP & YOI)', q: 'moor' })
+      .expect(302)
+      .expect('location', '/admin/prisons?q=moor')
+      .expect(() => {
+        expect(prisonerPropertyService.setAgencyActive).toHaveBeenCalledWith('MDI', false, 'user1')
+        expect(flashProvider).toHaveBeenCalledWith('success', 'Property is now switched off for Moorland (HMP & YOI).')
+      })
+  })
+
+  it('forbids toggling for a user without the admin role', async () => {
+    return request(app)
+      .post('/admin/prisons/MDI')
+      .send({ active: 'true' })
+      .expect(403)
+      .expect(() => {
+        expect(prisonerPropertyService.setAgencyActive).not.toHaveBeenCalled()
+      })
+  })
+
+  it('shows the manage-prisons link on the establishment list for an admin', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+
+    return request(adminApp())
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('/admin/prisons')
+        expect(res.text).toContain('Manage enabled prisons')
+      })
+  })
+
+  it('hides the manage-prisons link from a non-admin', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).not.toContain('/admin/prisons')
+      })
+  })
+})

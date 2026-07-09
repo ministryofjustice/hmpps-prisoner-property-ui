@@ -1,6 +1,7 @@
 import type { SuperAgentRequest } from 'superagent'
 import { stubFor, stubPing } from './wiremock'
 import type {
+  AgencyStatus,
   BoxLocation,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
@@ -223,6 +224,40 @@ export default {
         status: httpStatus,
         headers: { 'Content-Type': 'application/json;charset=UTF-8' },
         jsonBody: container ?? {},
+      },
+    }),
+
+  stubGetAllAgencies: (
+    { agencies = [] as AgencyStatus[], priority = undefined as number | undefined } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'GET',
+        urlPath: `/prisoner-property-api/active-agencies/all`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: agencies,
+      },
+    }),
+
+  stubSetAgencyActive: (
+    { agencyId = 'MDI', name = agencyId, active = true, priority = undefined as number | undefined } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'PUT',
+        urlPath: `/prisoner-property-api/active-agencies/${agencyId}`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: { agencyId, name, active },
       },
     }),
 }

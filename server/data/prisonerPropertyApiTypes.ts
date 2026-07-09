@@ -208,6 +208,14 @@ export interface PrisonPropertyListQuery {
   size?: number
 }
 
+// A prison (agency) and whether the property service is switched on for it. Returned by the admin
+// list and by the toggle (the toggle resolves the name too), so one shape serves both.
+export interface AgencyStatus {
+  agencyId: string
+  name: string
+  active: boolean
+}
+
 // Minimal shape of a Spring Data `Page<T>` as serialised to JSON.
 export interface RestPage<T> {
   content: T[]
