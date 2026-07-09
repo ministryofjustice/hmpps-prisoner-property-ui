@@ -86,7 +86,9 @@ test.describe('Establishment property list', () => {
 
     const listPage = await PropertyListPage.verifyOnPage(page)
 
-    await expect(listPage.heading).toContainText('Moorland (HMP & YOI)')
+    // The heading is just "Prisoner property" - no establishment name appended (MAPB-642).
+    await expect(listPage.heading).toHaveText('Prisoner property')
+    await expect(listPage.heading).not.toContainText('Moorland (HMP & YOI)')
     await expect(listPage.prisonerHeadings).toContainText('John Smith')
     await expect(listPage.prisonerHeadings).toContainText('A1234BC')
     await expect(listPage.prisonerHeadings.getByRole('link', { name: /John Smith/ })).toHaveAttribute(

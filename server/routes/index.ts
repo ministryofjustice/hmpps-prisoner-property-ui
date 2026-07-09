@@ -48,7 +48,7 @@ export default function routes({
   router.get('/', async (req, res, _next) => {
     const { token, username } = res.locals.user
 
-    const { activeCaseloadId, activeCaseloadName } = await userService.getActiveCaseload(token)
+    const { activeCaseloadId } = await userService.getActiveCaseload(token)
 
     // Caseload protection: without an active caseload the user has no establishment to view, so we
     // show a guidance page and never call the property API. The list is always scoped to the user's
@@ -81,7 +81,6 @@ export default function routes({
     if (includeRemoved) baseQueryParams.set('includeRemoved', 'true')
 
     return res.render('pages/propertyList', {
-      establishmentName: activeCaseloadName,
       canManage: canManageProperty(res.locals.user.userRoles),
       isAdmin: canAdminister(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
