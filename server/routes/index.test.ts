@@ -210,6 +210,85 @@ describe('GET /', () => {
       })
   })
 
+  it('hides the Change/Remove links for removed containers but still renders the row (MAPB-642)', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: 'MDI',
+      activeCaseloadName: 'Moorland (HMP & YOI)',
+      caseloadIds: ['MDI'],
+    })
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue({
+      ...emptyPage,
+      totalElements: 1,
+      totalPages: 1,
+      numberOfElements: 1,
+      content: [
+        {
+          prisonerNumber: 'A1234BC',
+          prisonerName: 'John Smith',
+          prisonerCurrentPrisonId: 'MDI',
+          prisonerCurrentPrisonName: 'Moorland (HMP & YOI)',
+          containers: [
+            {
+              id: 'held',
+              prisonerNumber: 'A1234BC',
+              prisonerName: 'John Smith',
+              prisonId: 'MDI',
+              prisonName: 'Moorland (HMP & YOI)',
+              inPrisonersCurrentPrison: true,
+              containerType: 'STANDARD',
+              currentSealNumber: 'SN0001',
+              currentStatus: 'STORED',
+              currentLocation: null,
+              currentLocationType: 'INTERNAL',
+              locationDescription: 'Reception A1',
+              proposedDisposalDate: null,
+              removalOutcome: null,
+              removalDate: null,
+              createDateTime: '2026-06-01T10:00:00',
+              createdByUserId: 'AUSER',
+              archived: false,
+            },
+            {
+              id: 'removed',
+              prisonerNumber: 'A1234BC',
+              prisonerName: 'John Smith',
+              prisonId: 'MDI',
+              prisonName: 'Moorland (HMP & YOI)',
+              inPrisonersCurrentPrison: true,
+              containerType: 'EXCESS',
+              currentSealNumber: 'SN0002',
+              currentStatus: 'DISPOSED',
+              currentLocation: null,
+              currentLocationType: 'INTERNAL',
+              locationDescription: 'Reception A2',
+              proposedDisposalDate: null,
+              removalOutcome: 'DISPOSED',
+              removalDate: '2026-06-05T10:00:00',
+              createDateTime: '2026-06-02T10:00:00',
+              createdByUserId: 'AUSER',
+              archived: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    return request(manageApp())
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        // Only the held container gets action links; the removed one must not (the routes 404 on it).
+        expect(res.text.match(/data-qa="change-link"/g)).toHaveLength(1)
+        expect(res.text.match(/data-qa="remove-link"/g)).toHaveLength(1)
+        expect(res.text).toContain('change-container/held')
+        expect(res.text).not.toContain('change-container/removed')
+        expect(res.text).not.toContain('remove-container/removed')
+        // The removed row itself still renders, with its Disposed status tag.
+        expect(res.text).toContain('SN0002')
+        expect(res.text).toContain('Disposed')
+      })
+  })
+
   it('passes search and filters through to the service', async () => {
     userService.getActiveCaseload.mockResolvedValue({
       activeCaseloadId: 'MDI',
