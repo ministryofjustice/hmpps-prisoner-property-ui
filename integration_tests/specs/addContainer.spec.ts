@@ -50,6 +50,8 @@ const box: BoxLocation = {
   pathHierarchy: 'RECP-PROP1',
   name: 'Reception Store',
   containerCount: 0,
+  capacity: 10,
+  availableSpaces: 10,
 }
 
 test.describe('Add a property container', () => {

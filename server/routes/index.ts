@@ -559,6 +559,20 @@ export default function routes({
         username,
       )
 
+      // Other containers being added in this same journey may already be assigned to a location but not
+      // yet saved, so the API's spaces figure does not reflect them. Subtract those pending claims so the
+      // user cannot over-fill a location across a multi-container add (the API is still the final backstop).
+      const claimedByDraft = new Map<string, number>()
+      journey.containers.forEach((container, i) => {
+        if (i !== index && container.internalLocationId) {
+          claimedByDraft.set(container.internalLocationId, (claimedByDraft.get(container.internalLocationId) ?? 0) + 1)
+        }
+      })
+      const locations = result.content.map(location => ({
+        ...location,
+        availableSpaces: location.availableSpaces - (claimedByDraft.get(location.id) ?? 0),
+      }))
+
       const baseQuery = new URLSearchParams()
       if (query) baseQuery.set('query', query)
 
@@ -566,7 +580,7 @@ export default function routes({
         prisonerNumber: ctx.prisonerNumber,
         sealNumber: draft.sealNumber,
         query: query ?? '',
-        locations: result.content,
+        locations,
         pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
         searchError,
         errorBanner: req.flash('error')[0],

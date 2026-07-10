@@ -40,7 +40,7 @@ describe('PrisonerPropertyApiClient', () => {
   describe('getPrisonPropertySummary', () => {
     it('should GET the prison property summary using a system token for the user and return the body', async () => {
       const summary = {
-        availableStorageLocations: 150,
+        availableStorageSpaces: 150,
         storedOnSite: 3000,
         dueToTransferOut: 80,
         dueToBeReturned: 0,

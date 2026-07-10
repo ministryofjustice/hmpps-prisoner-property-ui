@@ -59,7 +59,7 @@ export interface PrisonerPropertyGroup {
 // Whole-prison property summary counts for the establishment summary tiles
 // (GET /property-containers/prison/{prisonId}/summary). See PrisonPropertySummaryDto in the API.
 export interface PrisonPropertySummary {
-  availableStorageLocations: number
+  availableStorageSpaces: number
   storedOnSite: number
   dueToTransferOut: number
   dueToBeReturned: number
@@ -132,8 +132,9 @@ export interface PrisonerTimelineItem {
   containerLocationDescription: string | null
 }
 
-// A property box location within a prison (GET /property-containers/prison/{prisonId}/box-locations),
-// annotated with how many containers it currently holds. See BoxLocationDto in the API.
+// A property storage location within a prison (GET /property-containers/prison/{prisonId}/box-locations),
+// with its capacity and how many containers it currently holds. Only locations with space are returned.
+// See BoxLocationDto in the API.
 export interface BoxLocation {
   id: string
   prisonId: string
@@ -142,6 +143,8 @@ export interface BoxLocation {
   pathHierarchy: string
   name: string
   containerCount: number
+  capacity: number
+  availableSpaces: number
 }
 
 // Payload to create a new container (POST /property-containers). See CreatePropertyContainerRequest

@@ -38,7 +38,7 @@ describe('PrisonerPropertyService', () => {
 
   it('should call getPrisonPropertySummary on the api client and return its result', async () => {
     const summary = {
-      availableStorageLocations: 150,
+      availableStorageSpaces: 150,
       storedOnSite: 3000,
       dueToTransferOut: 80,
       dueToBeReturned: 0,

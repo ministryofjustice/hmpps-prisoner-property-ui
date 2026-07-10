@@ -54,7 +54,7 @@
 
   {% if summary %}
     {% set tiles = [
-      { text: "Available storage locations on-site", value: summary.availableStorageLocations, qa: "summary-available-locations" },
+      { text: "Available storage spaces on-site", value: summary.availableStorageSpaces, qa: "summary-available-spaces" },
       { text: "Property containers stored on-site", value: summary.storedOnSite, qa: "summary-stored" },
       { text: "Property containers due to transfer out", value: summary.dueToTransferOut, qa: "summary-transfer-out" },
       { text: "Property containers due to be returned", value: summary.dueToBeReturned, qa: "summary-returned" },

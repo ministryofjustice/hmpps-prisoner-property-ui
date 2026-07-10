@@ -64,7 +64,7 @@ export default {
     {
       prisonId = 'MDI',
       summary = {
-        availableStorageLocations: 0,
+        availableStorageSpaces: 0,
         storedOnSite: 0,
         dueToTransferOut: 0,
         dueToBeReturned: 0,
