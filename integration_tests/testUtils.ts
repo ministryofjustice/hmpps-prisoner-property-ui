@@ -34,6 +34,9 @@ export const login = async (
     // an empty property page by default. Specs can re-stub for specific data before navigating.
     manageUsersApi.stubGetMyCaseloads(),
     prisonerPropertyApi.stubGetPrisonProperty(),
+    // The read pages resolve DPS-active prisons from /info; default the active caseload (MDI) to active
+    // so the write journeys stay enabled for existing specs.
+    prisonerPropertyApi.stubGetInfo(),
     // Prisoner banner defaults: prisoner-search details plus a 404 image (falls back to the placeholder).
     prisonerSearchApi.stubGetPrisoner(),
     prisonerSearchApi.stubGetPrisonerImage(),

@@ -227,6 +227,26 @@ export default {
       },
     }),
 
+  // The read pages resolve which prisons are switched on in DPS from the public /info endpoint. Default
+  // it to MDI (the default active caseload) so specs get the pre-active-prison-gate behaviour (writes
+  // enabled); a spec can pass `activeAgencies: []` to exercise the NOMIS read-only banner.
+  stubGetInfo: (
+    { activeAgencies = ['MDI'] as string[], priority = undefined as number | undefined } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'GET',
+        urlPath: `/prisoner-property-api/info`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: { activeAgencies },
+      },
+    }),
+
   stubGetAllAgencies: (
     { agencies = [] as AgencyStatus[], priority = undefined as number | undefined } = {},
     httpStatus = 200,

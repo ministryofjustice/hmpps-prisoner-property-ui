@@ -3,6 +3,7 @@ import AuditService from './auditService'
 import PrisonerPropertyService from './prisonerPropertyService'
 import PrisonerService from './prisonerService'
 import UserService from './userService'
+import ActiveAgenciesService from './activeAgenciesService'
 
 export const services = () => {
   const {
@@ -20,6 +21,7 @@ export const services = () => {
     prisonerPropertyService: new PrisonerPropertyService(prisonerPropertyApiClient),
     prisonerService: new PrisonerService(prisonerSearchApiClient, prisonApiClient),
     userService: new UserService(manageUsersApiClient),
+    activeAgenciesService: new ActiveAgenciesService(prisonerPropertyApiClient),
   }
 }
 

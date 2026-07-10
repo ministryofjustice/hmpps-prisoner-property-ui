@@ -28,6 +28,14 @@
     }) }}
   {% endif %}
 
+  {% if showNomisBanner %}
+    {{ govukNotificationBanner({
+      titleText: "View only",
+      text: "This establishment's property is currently managed in NOMIS. You can view records here but cannot change them.",
+      attributes: { "data-qa": "nomis-banner" }
+    }) }}
+  {% endif %}
+
   <h1 class="govuk-heading-xl govuk-!-margin-bottom-4">Prisoner property</h1>
 
   {% if canManage %}

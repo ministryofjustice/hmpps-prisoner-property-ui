@@ -7,6 +7,7 @@ import HmppsAuditClient from '../data/hmppsAuditClient'
 import PrisonerPropertyService from '../services/prisonerPropertyService'
 import PrisonerService from '../services/prisonerService'
 import UserService from '../services/userService'
+import ActiveAgenciesService from '../services/activeAgenciesService'
 import type {
   BoxLocation,
   PrisonerPropertyContainer,
@@ -21,11 +22,13 @@ jest.mock('../services/auditService')
 jest.mock('../services/prisonerPropertyService')
 jest.mock('../services/prisonerService')
 jest.mock('../services/userService')
+jest.mock('../services/activeAgenciesService')
 
 const auditService = new AuditService({} as HmppsAuditClient) as jest.Mocked<AuditService>
 const prisonerPropertyService = new PrisonerPropertyService(null as never) as jest.Mocked<PrisonerPropertyService>
 const prisonerService = new PrisonerService(null as never, null as never) as jest.Mocked<PrisonerService>
 const userService = new UserService(null as never) as jest.Mocked<UserService>
+const activeAgenciesService = new ActiveAgenciesService(null as never) as jest.Mocked<ActiveAgenciesService>
 
 let app: Express
 
@@ -42,10 +45,13 @@ const emptyPage: RestPage<PrisonerPropertyGroup> = {
 
 beforeEach(() => {
   app = appWithAllRoutes({
-    services: { auditService, prisonerPropertyService, prisonerService, userService },
+    services: { auditService, prisonerPropertyService, prisonerService, userService, activeAgenciesService },
     userSupplier: () => user,
   })
   auditService.logPageView.mockResolvedValue(undefined)
+  // Default every establishment to switched-on in DPS so existing behaviour (writes gated only on the
+  // manage role) holds; the active-prison tests override this to false.
+  activeAgenciesService.isPrisonActive.mockResolvedValue(true)
   // The list route always fetches the summary. Default it to null so existing tests render without the
   // bar; tests that assert the bar override this.
   prisonerPropertyService.getPrisonPropertySummary.mockResolvedValue(null as never)
@@ -969,7 +975,7 @@ const boxPage = (locations: BoxLocation[]): RestPage<BoxLocation> => ({
 const manageUser = { ...user, userRoles: ['PRISONERPROP__MANAGE'] }
 const manageApp = () =>
   appWithAllRoutes({
-    services: { auditService, prisonerPropertyService, prisonerService, userService },
+    services: { auditService, prisonerPropertyService, prisonerService, userService, activeAgenciesService },
     userSupplier: () => manageUser,
   })
 
@@ -1007,6 +1013,70 @@ describe('Add container journey - access control', () => {
       .expect(403)
       .expect(() => {
         expect(userService.getActiveCaseload).not.toHaveBeenCalled()
+      })
+  })
+})
+
+describe('Active-prison write gate', () => {
+  it('hides the Add button and shows the NOMIS banner on the list when the prison is not active in DPS', async () => {
+    withActiveCaseload()
+    activeAgenciesService.isPrisonActive.mockResolvedValue(false)
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+
+    return request(manageApp())
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('currently managed in NOMIS')
+        expect(res.text).not.toContain('Add a property container')
+      })
+  })
+
+  it('hides the Add property button and shows the NOMIS banner on the person view when the prison is not active', async () => {
+    withActiveCaseload()
+    activeAgenciesService.isPrisonActive.mockResolvedValue(false)
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('currently managed in NOMIS')
+        expect(res.text).not.toContain('/prisoner/A1234BC/add-container')
+      })
+  })
+
+  it('forbids a GET write journey when the prison is not active, even with the manage role', async () => {
+    withActiveCaseload()
+    activeAgenciesService.isPrisonActive.mockResolvedValue(false)
+
+    return request(manageApp()).get('/prisoner/A1234BC/add-container/details').expect(403)
+  })
+
+  it('forbids a POST write journey when the prison is not active, even with the manage role', async () => {
+    withActiveCaseload()
+    activeAgenciesService.isPrisonActive.mockResolvedValue(false)
+
+    return request(manageApp())
+      .post('/prisoner/A1234BC/add-container/confirm')
+      .type('form')
+      .send({})
+      .expect(403)
+      .expect(() => {
+        expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+      })
+  })
+
+  it('does not show the NOMIS banner to a user without the manage role', async () => {
+    withActiveCaseload()
+    activeAgenciesService.isPrisonActive.mockResolvedValue(false)
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).not.toContain('currently managed in NOMIS')
       })
   })
 })
@@ -1835,7 +1905,7 @@ describe('Change container journey', () => {
 const adminUser = { ...user, userRoles: ['PRISONERPROP__ADMIN'] }
 const adminApp = () =>
   appWithAllRoutes({
-    services: { auditService, prisonerPropertyService, prisonerService, userService },
+    services: { auditService, prisonerPropertyService, prisonerService, userService, activeAgenciesService },
     userSupplier: () => adminUser,
   })
 
@@ -1897,6 +1967,7 @@ describe('Admin - manage enabled prisons', () => {
       .expect(() => {
         expect(prisonerPropertyService.setAgencyActive).toHaveBeenCalledWith('MDI', false, 'user1')
         expect(flashProvider).toHaveBeenCalledWith('success', 'Property is now switched off for Moorland (HMP & YOI).')
+        expect(activeAgenciesService.invalidate).toHaveBeenCalled()
       })
   })
 
