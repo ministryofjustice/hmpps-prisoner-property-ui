@@ -27,10 +27,25 @@
     }) }}
   {% endif %}
 
+  {% if errorMessage %}
+    {{ govukNotificationBanner({
+      titleText: "There is a problem",
+      text: errorMessage,
+      attributes: { "data-qa": "error-banner" }
+    }) }}
+  {% endif %}
+
   <h1 class="govuk-heading-xl govuk-!-margin-bottom-2">Manage enabled prisons</h1>
   <p class="govuk-body-l govuk-!-margin-bottom-6" data-qa="active-count">
     Property is switched on for {{ activeCount }} of {{ totalCount }} prisons.
   </p>
+
+  {% if not nomisScreenAvailable %}
+    <p class="govuk-inset-text" data-qa="nomis-unavailable">
+      The NOMIS property screen ({{ nomisModule }}) status is currently unavailable. It may not have been
+      set up in NOMIS yet, so its controls are hidden.
+    </p>
+  {% endif %}
 
   <form method="get" action="/admin/prisons" class="govuk-!-margin-bottom-6">
     <div class="govuk-form-group govuk-!-margin-bottom-0">
@@ -71,11 +86,48 @@
           }) }}
         </form>
       {% endset %}
+      {% set nomisTag %}
+        {% if not nomisScreenAvailable %}
+          {{ govukTag({ text: "Unknown", classes: "govuk-tag--grey" }) }}
+        {% elif agency.nomisState == "BLOCKED" %}
+          {{ govukTag({ text: "Blocked", classes: "govuk-tag--red" }) }}
+        {% elif agency.nomisState == "WARNING" %}
+          {{ govukTag({ text: "Warning", classes: "govuk-tag--yellow" }) }}
+        {% else %}
+          {{ govukTag({ text: "Normal", classes: "govuk-tag--grey" }) }}
+        {% endif %}
+      {% endset %}
+      {% set nomisActions %}
+        {% if nomisScreenAvailable %}
+          {% set nomisTargets = [
+            { state: "WARNING", text: "Show warning", qa: "nomis-warning-" },
+            { state: "BLOCKED", text: "Block", qa: "nomis-block-" },
+            { state: "NORMAL", text: "Clear", qa: "nomis-clear-" }
+          ] %}
+          {% for target in nomisTargets %}
+            {% if agency.nomisState != target.state %}
+              <form method="post" action="/admin/prisons/{{ agency.agencyId }}/nomis-screen" novalidate style="display: inline-block; margin-left: 5px;">
+                <input type="hidden" name="_csrf" value="{{ csrfToken }}" />
+                <input type="hidden" name="state" value="{{ target.state }}" />
+                <input type="hidden" name="name" value="{{ agency.name }}" />
+                <input type="hidden" name="q" value="{{ search }}" />
+                {{ govukButton({
+                  text: target.text,
+                  classes: "govuk-button--secondary govuk-!-margin-bottom-0",
+                  attributes: { "data-qa": target.qa + agency.agencyId }
+                }) }}
+              </form>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endset %}
       {% set rows = (rows.push([
         { text: agency.name, attributes: { "data-qa": "name-" + agency.agencyId } },
         { text: agency.agencyId },
         { html: statusTag, attributes: { "data-qa": "status-" + agency.agencyId } },
-        { html: toggle, classes: "govuk-!-text-align-right" }
+        { html: toggle, classes: "govuk-!-text-align-right" },
+        { html: nomisTag, attributes: { "data-qa": "nomis-status-" + agency.agencyId } },
+        { html: nomisActions, classes: "govuk-!-text-align-right" }
       ]), rows) %}
     {% endfor %}
 
@@ -84,8 +136,10 @@
       head: [
         { text: "Prison" },
         { text: "ID" },
-        { text: "Property service" },
-        { text: "Action", classes: "govuk-!-text-align-right" }
+        { text: "Property service (DPS)" },
+        { text: "DPS action", classes: "govuk-!-text-align-right" },
+        { text: "NOMIS property screen" },
+        { text: "NOMIS action", classes: "govuk-!-text-align-right" }
       ],
       rows: rows
     }) }}

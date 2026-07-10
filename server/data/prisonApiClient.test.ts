@@ -37,4 +37,59 @@ describe('PrisonApiClient', () => {
       expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
     })
   })
+
+  describe('splash-screen', () => {
+    it('should GET a splash screen for a module using a system token', async () => {
+      const screen = {
+        moduleName: 'OIDMPCON',
+        conditions: [{ conditionType: 'CASELOAD', conditionValue: 'MDI', blockAccess: true }],
+      }
+      nock(config.apis.prisonApi.url)
+        .get('/api/splash-screen/OIDMPCON')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, screen)
+
+      const response = await prisonApiClient.getSplashScreen('OIDMPCON', 'AUSER_GEN')
+
+      expect(response).toEqual(screen)
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+
+    it('should POST a new condition using a system token', async () => {
+      nock(config.apis.prisonApi.url)
+        .post('/api/splash-screen/OIDMPCON/condition', {
+          conditionType: 'CASELOAD',
+          conditionValue: 'MDI',
+          blockAccess: true,
+        })
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, { moduleName: 'OIDMPCON', conditions: [] })
+
+      await prisonApiClient.addSplashCondition('OIDMPCON', 'CASELOAD', 'MDI', true, 'AUSER_GEN')
+
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+
+    it('should PUT a condition update with the block-access flag in the path', async () => {
+      nock(config.apis.prisonApi.url)
+        .put('/api/splash-screen/OIDMPCON/condition/CASELOAD/MDI/false')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, { moduleName: 'OIDMPCON', conditions: [] })
+
+      await prisonApiClient.updateSplashCondition('OIDMPCON', 'CASELOAD', 'MDI', false, 'AUSER_GEN')
+
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+
+    it('should DELETE a condition using a system token', async () => {
+      nock(config.apis.prisonApi.url)
+        .delete('/api/splash-screen/OIDMPCON/condition/CASELOAD/MDI')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200)
+
+      await prisonApiClient.removeSplashCondition('OIDMPCON', 'CASELOAD', 'MDI', 'AUSER_GEN')
+
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+  })
 })
