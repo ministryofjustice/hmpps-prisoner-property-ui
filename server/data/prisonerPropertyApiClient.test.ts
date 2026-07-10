@@ -119,4 +119,24 @@ describe('PrisonerPropertyApiClient', () => {
       expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
     })
   })
+
+  describe('getActiveAgencyIds', () => {
+    it('should GET the public /info endpoint unauthenticated and return the activeAgencies array', async () => {
+      nock(config.apis.prisonerPropertyApi.url)
+        .get('/info')
+        .reply(200, { activeAgencies: ['MDI', 'LEI'] })
+
+      const response = await prisonerPropertyApiClient.getActiveAgencyIds()
+
+      expect(response).toEqual(['MDI', 'LEI'])
+      // /info is public: no token is fetched for this call
+      expect(mockAuthenticationClient.getToken).not.toHaveBeenCalled()
+    })
+
+    it('should default to an empty array when /info has no activeAgencies key', async () => {
+      nock(config.apis.prisonerPropertyApi.url).get('/info').reply(200, {})
+
+      expect(await prisonerPropertyApiClient.getActiveAgencyIds()).toEqual([])
+    })
+  })
 })

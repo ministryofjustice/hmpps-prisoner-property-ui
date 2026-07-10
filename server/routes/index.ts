@@ -31,6 +31,7 @@ import config from '../config'
 import logger from '../../logger'
 import requireManageRole, { canManageProperty } from '../middleware/requireManageRole'
 import requireAdminRole, { canAdminister } from '../middleware/requireAdminRole'
+import requireActivePrison from '../middleware/requireActivePrison'
 
 const BOX_PAGE_SIZE = 20
 
@@ -42,8 +43,13 @@ export default function routes({
   prisonerPropertyService,
   prisonerService,
   userService,
+  activeAgenciesService,
 }: Services): Router {
   const router = Router()
+
+  // Write journeys are additionally gated on the user's establishment being switched on in DPS, so a
+  // prison still managed in NOMIS stays read-only here even for a user with the manage role.
+  const requireActivePrisonMw = requireActivePrison(userService, activeAgenciesService)
 
   router.get('/', async (req, res, _next) => {
     const { token, username } = res.locals.user
@@ -80,8 +86,15 @@ export default function routes({
     personLocations.forEach(location => baseQueryParams.append('personLocation', location))
     if (includeRemoved) baseQueryParams.set('includeRemoved', 'true')
 
+    // Writes are allowed only when the user holds the manage role AND the establishment is switched on
+    // in DPS. When they hold the role but the prison is still managed in NOMIS, show an explanatory
+    // "view only" banner so they understand why the edit controls are gone.
+    const hasManageRole = canManageProperty(res.locals.user.userRoles)
+    const isActivePrison = await activeAgenciesService.isPrisonActive(activeCaseloadId)
+
     return res.render('pages/propertyList', {
-      canManage: canManageProperty(res.locals.user.userRoles),
+      canManage: hasManageRole && isActivePrison,
+      showNomisBanner: hasManageRole && !isActivePrison,
       isAdmin: canAdminister(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
       includeRemoved,
@@ -175,6 +188,11 @@ export default function routes({
       ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId)
       : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
 
+    // Edits are gated on both the manage role and the establishment being switched on in DPS; a
+    // role-holder on a NOMIS-managed prison sees the property read-only with a "view only" banner.
+    const hasManageRole = canManageProperty(res.locals.user.userRoles)
+    const isActivePrison = await activeAgenciesService.isPrisonActive(activeCaseloadId)
+
     return res.render('pages/prisonerProperty', {
       prisonerNumber,
       prisonerName: containers[0]?.prisonerName ?? null,
@@ -183,7 +201,8 @@ export default function routes({
       banner,
       inEstablishment,
       dueToTransferIn,
-      canManage: canManageProperty(res.locals.user.userRoles),
+      canManage: hasManageRole && isActivePrison,
+      showNomisBanner: hasManageRole && !isActivePrison,
       successMessage: req.flash('success')[0],
       errorMessage: req.flash('error')[0],
       backUrl: '/',
@@ -397,7 +416,7 @@ export default function routes({
   }
 
   // Entry point 1 (establishment list): search for the person to add property for.
-  router.get('/add-container', requireManageRole, async (req, res) => {
+  router.get('/add-container', requireManageRole, requireActivePrisonMw, async (req, res) => {
     const { token, username } = res.locals.user
     const { activeCaseloadId, activeCaseloadName } = await userService.getActiveCaseload(token)
     if (!activeCaseloadId) return res.render('pages/noCaseload')
@@ -430,213 +449,251 @@ export default function routes({
     })
   })
 
-  router.get('/prisoner/:prisonerNumber/add-container', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const origin = req.query.from === 'list' ? 'list' : 'person'
-    req.session.addContainerJourney = { prisonerNumber: ctx.prisonerNumber, origin, containers: [{}] }
-    return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
-  })
+  router.get(
+    '/prisoner/:prisonerNumber/add-container',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const origin = req.query.from === 'list' ? 'list' : 'person'
+      req.session.addContainerJourney = { prisonerNumber: ctx.prisonerNumber, origin, containers: [{}] }
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+    },
+  )
 
-  router.get('/prisoner/:prisonerNumber/add-container/details', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.addContainerJourney
-    if (journey?.prisonerNumber !== ctx.prisonerNumber) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container`)
-    }
-    return renderAddDetails(req, res, ctx, journey.origin, journey.containers.map(draftToView))
-  })
-
-  router.post('/prisoner/:prisonerNumber/add-container/details', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.addContainerJourney
-    if (journey?.prisonerNumber !== ctx.prisonerNumber) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container`)
-    }
-
-    const blocks = toContainerBlocks(req.body.containers)
-
-    // "Add another": keep what's entered and append an empty block; no validation yet.
-    if (req.body.action === 'addAnother') {
-      return renderAddDetails(req, res, ctx, journey.origin, [...blocks, {}])
-    }
-
-    const { values, errors } = validateContainers(blocks)
-    if (!values) {
-      return renderAddDetails(req, res, ctx, journey.origin, blocks, errors)
-    }
-
-    // Keep any location already chosen for a container at the same index (editing from Check your
-    // answers), unless it is now Excess (off-site Branston, never gets an internal location).
-    const containers: AddContainerDraft[] = values.map((v, i) => {
-      const previous = journey.containers[i]
-      const keepLocation = v.containerType !== 'EXCESS' && previous?.internalLocationId
-      return {
-        sealNumber: v.sealNumber,
-        previousSealNumber: v.previousSealNumber,
-        containerType: v.containerType,
-        proposedDisposalDate: v.proposedDisposalDate,
-        internalLocationId: keepLocation ? previous.internalLocationId : undefined,
-        locationName: keepLocation ? previous.locationName : undefined,
+  router.get(
+    '/prisoner/:prisonerNumber/add-container/details',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.addContainerJourney
+      if (journey?.prisonerNumber !== ctx.prisonerNumber) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container`)
       }
-    })
-    req.session.addContainerJourney = { ...journey, containers }
+      return renderAddDetails(req, res, ctx, journey.origin, journey.containers.map(draftToView))
+    },
+  )
 
-    const index = nextLocationIndex(containers, 0)
-    return res.redirect(
-      index === -1
-        ? `/prisoner/${ctx.prisonerNumber}/add-container/check`
-        : `/prisoner/${ctx.prisonerNumber}/add-container/location/${index}`,
-    )
-  })
-
-  router.get('/prisoner/:prisonerNumber/add-container/location/:index', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.addContainerJourney
-    const index = Number.parseInt(String(req.params.index), 10)
-    const draft = journey?.containers?.[index]
-    if (journey?.prisonerNumber !== ctx.prisonerNumber || !draft?.sealNumber || !draft?.containerType) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
-    }
-
-    const { username } = res.locals.user
-    const rawQuery = req.query.query
-    const query = String(rawQuery ?? '').trim() || undefined
-    const searchError = rawQuery !== undefined && !query // Search clicked with an empty box
-    const parsedPage = Number.parseInt((req.query.page as string) ?? '1', 10)
-    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
-
-    const result = await prisonerPropertyService.getBoxLocations(
-      ctx.activeCaseloadId,
-      { query, page: page - 1, size: BOX_PAGE_SIZE },
-      username,
-    )
-
-    const baseQuery = new URLSearchParams()
-    if (query) baseQuery.set('query', query)
-
-    return res.render('pages/addContainer/location', {
-      prisonerNumber: ctx.prisonerNumber,
-      sealNumber: draft.sealNumber,
-      query: query ?? '',
-      locations: result.content,
-      pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
-      searchError,
-      errorBanner: req.flash('error')[0],
-      backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
-    })
-  })
-
-  router.post('/prisoner/:prisonerNumber/add-container/location/:index', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.addContainerJourney
-    const index = Number.parseInt(String(req.params.index), 10)
-    if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers[index]) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
-    }
-
-    journey.containers[index] = {
-      ...journey.containers[index],
-      internalLocationId: req.body.internalLocationId,
-      locationName: req.body.locationName,
-    }
-    req.session.addContainerJourney = journey
-
-    const nextIndex = nextLocationIndex(journey.containers, index + 1)
-    return res.redirect(
-      nextIndex === -1
-        ? `/prisoner/${ctx.prisonerNumber}/add-container/check`
-        : `/prisoner/${ctx.prisonerNumber}/add-container/location/${nextIndex}`,
-    )
-  })
-
-  router.get('/prisoner/:prisonerNumber/add-container/check', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.addContainerJourney
-    if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers.length) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
-    }
-    if (journey.containers.some(c => !c.sealNumber || !c.containerType)) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
-    }
-    const missing = nextLocationIndex(journey.containers, 0)
-    if (missing !== -1) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/location/${missing}`)
-    }
-
-    const { username } = res.locals.user
-    return res.render('pages/addContainer/checkAnswers', {
-      prisonerNumber: ctx.prisonerNumber,
-      prisonerName: await resolvePrisonerName(ctx.prisonerNumber, username),
-      establishmentName: ctx.activeCaseloadName,
-      containers: journey.containers.map((c, index) => ({
-        index,
-        sealNumber: c.sealNumber,
-        containerType: c.containerType,
-        proposedDisposalDate: c.proposedDisposalDate,
-        storageLocation: c.containerType === 'EXCESS' ? 'Branston (offsite)' : c.locationName,
-      })),
-      backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
-    })
-  })
-
-  router.post('/prisoner/:prisonerNumber/add-container/confirm', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.addContainerJourney
-    if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers.length) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
-    }
-
-    const { username } = res.locals.user
-    try {
-      // Sequential so seal-uniqueness is enforced deterministically and the first failure is surfaced.
-      for (const c of journey.containers) {
-        // eslint-disable-next-line no-await-in-loop
-        await prisonerPropertyService.createContainer(
-          {
-            prisonerNumber: ctx.prisonerNumber,
-            prisonId: ctx.activeCaseloadId,
-            containerType: c.containerType!,
-            sealNumber: c.sealNumber!,
-            previousSealNumber: c.previousSealNumber,
-            internalLocationId: c.containerType === 'EXCESS' ? undefined : c.internalLocationId,
-            proposedDisposalDate: c.proposedDisposalDate,
-          },
-          username,
-        )
+  router.post(
+    '/prisoner/:prisonerNumber/add-container/details',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.addContainerJourney
+      if (journey?.prisonerNumber !== ctx.prisonerNumber) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container`)
       }
-    } catch (error) {
-      const status = (error as { responseStatus?: number }).responseStatus
-      if (status === 409) {
-        req.flash('error', 'A property container with this seal number already exists. Enter a different seal number.')
+
+      const blocks = toContainerBlocks(req.body.containers)
+
+      // "Add another": keep what's entered and append an empty block; no validation yet.
+      if (req.body.action === 'addAnother') {
+        return renderAddDetails(req, res, ctx, journey.origin, [...blocks, {}])
+      }
+
+      const { values, errors } = validateContainers(blocks)
+      if (!values) {
+        return renderAddDetails(req, res, ctx, journey.origin, blocks, errors)
+      }
+
+      // Keep any location already chosen for a container at the same index (editing from Check your
+      // answers), unless it is now Excess (off-site Branston, never gets an internal location).
+      const containers: AddContainerDraft[] = values.map((v, i) => {
+        const previous = journey.containers[i]
+        const keepLocation = v.containerType !== 'EXCESS' && previous?.internalLocationId
+        return {
+          sealNumber: v.sealNumber,
+          previousSealNumber: v.previousSealNumber,
+          containerType: v.containerType,
+          proposedDisposalDate: v.proposedDisposalDate,
+          internalLocationId: keepLocation ? previous.internalLocationId : undefined,
+          locationName: keepLocation ? previous.locationName : undefined,
+        }
+      })
+      req.session.addContainerJourney = { ...journey, containers }
+
+      const index = nextLocationIndex(containers, 0)
+      return res.redirect(
+        index === -1
+          ? `/prisoner/${ctx.prisonerNumber}/add-container/check`
+          : `/prisoner/${ctx.prisonerNumber}/add-container/location/${index}`,
+      )
+    },
+  )
+
+  router.get(
+    '/prisoner/:prisonerNumber/add-container/location/:index',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.addContainerJourney
+      const index = Number.parseInt(String(req.params.index), 10)
+      const draft = journey?.containers?.[index]
+      if (journey?.prisonerNumber !== ctx.prisonerNumber || !draft?.sealNumber || !draft?.containerType) {
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
       }
-      if (status === 400) {
-        req.flash('error', 'A storage location could not be used. Check the containers and try again.')
+
+      const { username } = res.locals.user
+      const rawQuery = req.query.query
+      const query = String(rawQuery ?? '').trim() || undefined
+      const searchError = rawQuery !== undefined && !query // Search clicked with an empty box
+      const parsedPage = Number.parseInt((req.query.page as string) ?? '1', 10)
+      const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
+
+      const result = await prisonerPropertyService.getBoxLocations(
+        ctx.activeCaseloadId,
+        { query, page: page - 1, size: BOX_PAGE_SIZE },
+        username,
+      )
+
+      const baseQuery = new URLSearchParams()
+      if (query) baseQuery.set('query', query)
+
+      return res.render('pages/addContainer/location', {
+        prisonerNumber: ctx.prisonerNumber,
+        sealNumber: draft.sealNumber,
+        query: query ?? '',
+        locations: result.content,
+        pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
+        searchError,
+        errorBanner: req.flash('error')[0],
+        backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
+      })
+    },
+  )
+
+  router.post(
+    '/prisoner/:prisonerNumber/add-container/location/:index',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.addContainerJourney
+      const index = Number.parseInt(String(req.params.index), 10)
+      if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers[index]) {
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
       }
-      return next(error)
-    }
 
-    await auditService.logPageView(Page.ADD_PROPERTY_CONTAINER, {
-      who: username,
-      subjectId: ctx.prisonerNumber,
-      subjectType: 'PRISONER_NUMBER',
-      correlationId: req.id,
-      details: { count: journey.containers.length },
-    })
+      journey.containers[index] = {
+        ...journey.containers[index],
+        internalLocationId: req.body.internalLocationId,
+        locationName: req.body.locationName,
+      }
+      req.session.addContainerJourney = journey
 
-    const { origin } = journey
-    req.session.addContainerJourney = undefined
-    req.flash('success', 'Property container(s) added')
-    return res.redirect(origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`)
-  })
+      const nextIndex = nextLocationIndex(journey.containers, index + 1)
+      return res.redirect(
+        nextIndex === -1
+          ? `/prisoner/${ctx.prisonerNumber}/add-container/check`
+          : `/prisoner/${ctx.prisonerNumber}/add-container/location/${nextIndex}`,
+      )
+    },
+  )
+
+  router.get(
+    '/prisoner/:prisonerNumber/add-container/check',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.addContainerJourney
+      if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers.length) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+      }
+      if (journey.containers.some(c => !c.sealNumber || !c.containerType)) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+      }
+      const missing = nextLocationIndex(journey.containers, 0)
+      if (missing !== -1) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/location/${missing}`)
+      }
+
+      const { username } = res.locals.user
+      return res.render('pages/addContainer/checkAnswers', {
+        prisonerNumber: ctx.prisonerNumber,
+        prisonerName: await resolvePrisonerName(ctx.prisonerNumber, username),
+        establishmentName: ctx.activeCaseloadName,
+        containers: journey.containers.map((c, index) => ({
+          index,
+          sealNumber: c.sealNumber,
+          containerType: c.containerType,
+          proposedDisposalDate: c.proposedDisposalDate,
+          storageLocation: c.containerType === 'EXCESS' ? 'Branston (offsite)' : c.locationName,
+        })),
+        backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
+      })
+    },
+  )
+
+  router.post(
+    '/prisoner/:prisonerNumber/add-container/confirm',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.addContainerJourney
+      if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers.length) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+      }
+
+      const { username } = res.locals.user
+      try {
+        // Sequential so seal-uniqueness is enforced deterministically and the first failure is surfaced.
+        for (const c of journey.containers) {
+          // eslint-disable-next-line no-await-in-loop
+          await prisonerPropertyService.createContainer(
+            {
+              prisonerNumber: ctx.prisonerNumber,
+              prisonId: ctx.activeCaseloadId,
+              containerType: c.containerType!,
+              sealNumber: c.sealNumber!,
+              previousSealNumber: c.previousSealNumber,
+              internalLocationId: c.containerType === 'EXCESS' ? undefined : c.internalLocationId,
+              proposedDisposalDate: c.proposedDisposalDate,
+            },
+            username,
+          )
+        }
+      } catch (error) {
+        const status = (error as { responseStatus?: number }).responseStatus
+        if (status === 409) {
+          req.flash(
+            'error',
+            'A property container with this seal number already exists. Enter a different seal number.',
+          )
+          return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+        }
+        if (status === 400) {
+          req.flash('error', 'A storage location could not be used. Check the containers and try again.')
+          return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+        }
+        return next(error)
+      }
+
+      await auditService.logPageView(Page.ADD_PROPERTY_CONTAINER, {
+        who: username,
+        subjectId: ctx.prisonerNumber,
+        subjectType: 'PRISONER_NUMBER',
+        correlationId: req.id,
+        details: { count: journey.containers.length },
+      })
+
+      const { origin } = journey
+      req.session.addContainerJourney = undefined
+      req.flash('success', 'Property container(s) added')
+      return res.redirect(origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`)
+    },
+  )
 
   // ---- Remove a property container journey (gated on the manage role) ----
 
@@ -681,55 +738,66 @@ export default function routes({
       backUrl: removeBackUrl(ctx, origin),
     })
 
-  router.get('/prisoner/:prisonerNumber/remove-container/:id', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const { username } = res.locals.user
-    const id = String(req.params.id)
+  router.get(
+    '/prisoner/:prisonerNumber/remove-container/:id',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const { username } = res.locals.user
+      const id = String(req.params.id)
 
-    const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
-    if (!container) return next(createError(404, 'Property container not found'))
+      const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
+      if (!container) return next(createError(404, 'Property container not found'))
 
-    const origin = req.query.from === 'list' ? 'list' : 'person'
-    req.session.removeContainerJourney = { prisonerNumber: ctx.prisonerNumber, containerId: id, origin }
-    return renderRemoveReason(res, ctx, container, origin, { errorBanner: req.flash('error')[0] })
-  })
+      const origin = req.query.from === 'list' ? 'list' : 'person'
+      req.session.removeContainerJourney = { prisonerNumber: ctx.prisonerNumber, containerId: id, origin }
+      return renderRemoveReason(res, ctx, container, origin, { errorBanner: req.flash('error')[0] })
+    },
+  )
 
-  router.post('/prisoner/:prisonerNumber/remove-container/:id', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const { username } = res.locals.user
-    const id = String(req.params.id)
-    const origin = req.session.removeContainerJourney?.origin ?? 'person'
+  router.post(
+    '/prisoner/:prisonerNumber/remove-container/:id',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const { username } = res.locals.user
+      const id = String(req.params.id)
+      const origin = req.session.removeContainerJourney?.origin ?? 'person'
 
-    const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
-    if (!container) return next(createError(404, 'Property container not found'))
+      const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
+      if (!container) return next(createError(404, 'Property container not found'))
 
-    const { outcome } = req.body
-    if (!isRemoveReason(outcome)) {
-      return renderRemoveReason(res, ctx, container, origin, {
-        errorList: [{ text: 'Select why you are removing this property container record', href: '#outcome' }],
-      })
-    }
+      const { outcome } = req.body
+      if (!isRemoveReason(outcome)) {
+        return renderRemoveReason(res, ctx, container, origin, {
+          errorList: [{ text: 'Select why you are removing this property container record', href: '#outcome' }],
+        })
+      }
 
-    const target = outcome === 'TRANSFERRED' ? resolveTransferTarget(container, ctx.activeCaseloadId) : null
-    req.session.removeContainerJourney = {
-      prisonerNumber: ctx.prisonerNumber,
-      containerId: id,
-      origin,
-      outcome,
-      toPrisonId: target?.toPrisonId ?? undefined,
-    }
+      const target = outcome === 'TRANSFERRED' ? resolveTransferTarget(container, ctx.activeCaseloadId) : null
+      req.session.removeContainerJourney = {
+        prisonerNumber: ctx.prisonerNumber,
+        containerId: id,
+        origin,
+        outcome,
+        toPrisonId: target?.toPrisonId ?? undefined,
+      }
 
-    if (target?.needsInterruption) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}/interruption`)
-    }
-    return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}/check`)
-  })
+      if (target?.needsInterruption) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}/interruption`)
+      }
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}/check`)
+    },
+  )
 
   router.get(
     '/prisoner/:prisonerNumber/remove-container/:id/interruption',
     requireManageRole,
+    requireActivePrisonMw,
     async (req, res, next) => {
       const ctx = await resolveContext(req, res, next)
       if (!ctx) return undefined
@@ -755,83 +823,93 @@ export default function routes({
     },
   )
 
-  router.get('/prisoner/:prisonerNumber/remove-container/:id/check', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const { username } = res.locals.user
-    const id = String(req.params.id)
-    const journey = req.session.removeContainerJourney
+  router.get(
+    '/prisoner/:prisonerNumber/remove-container/:id/check',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const { username } = res.locals.user
+      const id = String(req.params.id)
+      const journey = req.session.removeContainerJourney
 
-    if (journey?.containerId !== id || !journey?.outcome) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}`)
-    }
-
-    const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
-    if (!container) return next(createError(404, 'Property container not found'))
-
-    return res.render('pages/removeContainer/checkAnswers', {
-      prisonerNumber: ctx.prisonerNumber,
-      prisonerName: container.prisonerName,
-      prisonerEstablishment: container.prisonerCurrentPrisonName || container.prisonName || null,
-      container,
-      outcome: journey.outcome,
-      resultStatus: removeResultStatus(journey.outcome),
-      removalDateLabel: removalDateLabel(journey.outcome),
-      removalDate: new Date().toISOString().slice(0, 10),
-      backUrl: `/prisoner/${ctx.prisonerNumber}/remove-container/${id}`,
-    })
-  })
-
-  router.post('/prisoner/:prisonerNumber/remove-container/:id/confirm', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const { username } = res.locals.user
-    const id = String(req.params.id)
-    const journey = req.session.removeContainerJourney
-
-    if (journey?.containerId !== id || !journey?.outcome) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}`)
-    }
-
-    // A transfer must reassign the container to a known receiving prison that differs from this one. If
-    // prisoner-search never settled a different destination, we cannot transfer - send the user back to
-    // pick another reason.
-    if (journey.outcome === 'TRANSFERRED' && (!journey.toPrisonId || journey.toPrisonId === ctx.activeCaseloadId)) {
-      req.flash(
-        'error',
-        'The prisoner’s new establishment is not known yet, so this container cannot be transferred. Choose another reason or try again once their move is recorded.',
-      )
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}`)
-    }
-
-    try {
-      await prisonerPropertyService.removeContainer(
-        id,
-        { outcome: journey.outcome, toPrisonId: journey.outcome === 'TRANSFERRED' ? journey.toPrisonId : undefined },
-        username,
-      )
-    } catch (error) {
-      const status = (error as { responseStatus?: number }).responseStatus
-      if (status === 409) {
-        req.flash('error', 'This property container has already been removed.')
+      if (journey?.containerId !== id || !journey?.outcome) {
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}`)
       }
-      return next(error)
-    }
 
-    await auditService.logPageView(Page.REMOVE_PROPERTY_CONTAINER, {
-      who: username,
-      subjectId: ctx.prisonerNumber,
-      subjectType: 'PRISONER_NUMBER',
-      correlationId: req.id,
-      details: { containerId: id, outcome: journey.outcome },
-    })
+      const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
+      if (!container) return next(createError(404, 'Property container not found'))
 
-    const { origin } = journey
-    req.session.removeContainerJourney = undefined
-    req.flash('success', 'Property container removed')
-    return res.redirect(origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`)
-  })
+      return res.render('pages/removeContainer/checkAnswers', {
+        prisonerNumber: ctx.prisonerNumber,
+        prisonerName: container.prisonerName,
+        prisonerEstablishment: container.prisonerCurrentPrisonName || container.prisonName || null,
+        container,
+        outcome: journey.outcome,
+        resultStatus: removeResultStatus(journey.outcome),
+        removalDateLabel: removalDateLabel(journey.outcome),
+        removalDate: new Date().toISOString().slice(0, 10),
+        backUrl: `/prisoner/${ctx.prisonerNumber}/remove-container/${id}`,
+      })
+    },
+  )
+
+  router.post(
+    '/prisoner/:prisonerNumber/remove-container/:id/confirm',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const { username } = res.locals.user
+      const id = String(req.params.id)
+      const journey = req.session.removeContainerJourney
+
+      if (journey?.containerId !== id || !journey?.outcome) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}`)
+      }
+
+      // A transfer must reassign the container to a known receiving prison that differs from this one. If
+      // prisoner-search never settled a different destination, we cannot transfer - send the user back to
+      // pick another reason.
+      if (journey.outcome === 'TRANSFERRED' && (!journey.toPrisonId || journey.toPrisonId === ctx.activeCaseloadId)) {
+        req.flash(
+          'error',
+          'The prisoner’s new establishment is not known yet, so this container cannot be transferred. Choose another reason or try again once their move is recorded.',
+        )
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}`)
+      }
+
+      try {
+        await prisonerPropertyService.removeContainer(
+          id,
+          { outcome: journey.outcome, toPrisonId: journey.outcome === 'TRANSFERRED' ? journey.toPrisonId : undefined },
+          username,
+        )
+      } catch (error) {
+        const status = (error as { responseStatus?: number }).responseStatus
+        if (status === 409) {
+          req.flash('error', 'This property container has already been removed.')
+          return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}`)
+        }
+        return next(error)
+      }
+
+      await auditService.logPageView(Page.REMOVE_PROPERTY_CONTAINER, {
+        who: username,
+        subjectId: ctx.prisonerNumber,
+        subjectType: 'PRISONER_NUMBER',
+        correlationId: req.id,
+        details: { containerId: id, outcome: journey.outcome },
+      })
+
+      const { origin } = journey
+      req.session.removeContainerJourney = undefined
+      req.flash('success', 'Property container removed')
+      return res.redirect(origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`)
+    },
+  )
 
   // ---- Combine property containers journey (person view, gated on the manage role) ----
 
@@ -872,7 +950,7 @@ export default function routes({
     })
   }
 
-  router.post('/prisoner/:prisonerNumber/combine', requireManageRole, async (req, res, next) => {
+  router.post('/prisoner/:prisonerNumber/combine', requireManageRole, requireActivePrisonMw, async (req, res, next) => {
     const ctx = await resolveContext(req, res, next)
     if (!ctx) return undefined
     const { username } = res.locals.user
@@ -895,189 +973,222 @@ export default function routes({
     return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
   })
 
-  router.get('/prisoner/:prisonerNumber/combine/details', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.combineJourney
-    if (journey?.prisonerNumber !== ctx.prisonerNumber || journey.sourceContainerIds.length < 2) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}`)
-    }
-    return renderCombineDetails(req, res, ctx, journey, {
-      sealNumber: journey.sealNumber,
-      containerType: journey.containerType,
-      ...isoToParts(journey.proposedDisposalDate),
-    })
-  })
+  router.get(
+    '/prisoner/:prisonerNumber/combine/details',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.combineJourney
+      if (journey?.prisonerNumber !== ctx.prisonerNumber || journey.sourceContainerIds.length < 2) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}`)
+      }
+      return renderCombineDetails(req, res, ctx, journey, {
+        sealNumber: journey.sealNumber,
+        containerType: journey.containerType,
+        ...isoToParts(journey.proposedDisposalDate),
+      })
+    },
+  )
 
-  router.post('/prisoner/:prisonerNumber/combine/details', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.combineJourney
-    if (journey?.prisonerNumber !== ctx.prisonerNumber || journey.sourceContainerIds.length < 2) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}`)
-    }
+  router.post(
+    '/prisoner/:prisonerNumber/combine/details',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.combineJourney
+      if (journey?.prisonerNumber !== ctx.prisonerNumber || journey.sourceContainerIds.length < 2) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}`)
+      }
 
-    const { values, errors } = validateDetails(req.body)
-    if (!values) {
-      return renderCombineDetails(
-        req,
-        res,
-        ctx,
-        journey,
-        {
-          sealNumber: req.body.sealNumber,
-          containerType: req.body.containerType,
-          day: req.body['disposalDate-day'],
-          month: req.body['disposalDate-month'],
-          year: req.body['disposalDate-year'],
-        },
-        errors,
-      )
-    }
+      const { values, errors } = validateDetails(req.body)
+      if (!values) {
+        return renderCombineDetails(
+          req,
+          res,
+          ctx,
+          journey,
+          {
+            sealNumber: req.body.sealNumber,
+            containerType: req.body.containerType,
+            day: req.body['disposalDate-day'],
+            month: req.body['disposalDate-month'],
+            year: req.body['disposalDate-year'],
+          },
+          errors,
+        )
+      }
 
-    // Excess property is stored off-site at Branston, so there is no internal storage-location step.
-    const excess = values.containerType === 'EXCESS'
-    req.session.combineJourney = {
-      ...journey,
-      sealNumber: values.sealNumber,
-      containerType: values.containerType,
-      proposedDisposalDate: values.proposedDisposalDate,
-      locationType: excess ? 'BRANSTON' : 'INTERNAL',
-      internalLocationId: excess ? undefined : journey.internalLocationId,
-      locationName: excess ? undefined : journey.locationName,
-    }
+      // Excess property is stored off-site at Branston, so there is no internal storage-location step.
+      const excess = values.containerType === 'EXCESS'
+      req.session.combineJourney = {
+        ...journey,
+        sealNumber: values.sealNumber,
+        containerType: values.containerType,
+        proposedDisposalDate: values.proposedDisposalDate,
+        locationType: excess ? 'BRANSTON' : 'INTERNAL',
+        internalLocationId: excess ? undefined : journey.internalLocationId,
+        locationName: excess ? undefined : journey.locationName,
+      }
 
-    if (excess) return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/check`)
-    // If a location was already chosen (editing details from Check your answers) return to CYA.
-    const next2 = req.session.combineJourney.internalLocationId ? 'check' : 'location'
-    return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/${next2}`)
-  })
+      if (excess) return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/check`)
+      // If a location was already chosen (editing details from Check your answers) return to CYA.
+      const next2 = req.session.combineJourney.internalLocationId ? 'check' : 'location'
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/${next2}`)
+    },
+  )
 
-  router.get('/prisoner/:prisonerNumber/combine/location', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.combineJourney
-    if (!journey?.sealNumber || !journey?.containerType) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
-    }
+  router.get(
+    '/prisoner/:prisonerNumber/combine/location',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.combineJourney
+      if (!journey?.sealNumber || !journey?.containerType) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
+      }
 
-    const { username } = res.locals.user
-    const query = (req.query.query as string)?.trim() || undefined
-    const parsedPage = Number.parseInt((req.query.page as string) ?? '1', 10)
-    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
+      const { username } = res.locals.user
+      const query = (req.query.query as string)?.trim() || undefined
+      const parsedPage = Number.parseInt((req.query.page as string) ?? '1', 10)
+      const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
 
-    const result = await prisonerPropertyService.getBoxLocations(
-      ctx.activeCaseloadId,
-      { query, page: page - 1, size: BOX_PAGE_SIZE },
-      username,
-    )
-
-    const baseQuery = new URLSearchParams()
-    if (query) baseQuery.set('query', query)
-
-    return res.render('pages/addContainer/location', {
-      prisonerNumber: ctx.prisonerNumber,
-      sealNumber: journey.sealNumber,
-      query: query ?? '',
-      locations: result.content,
-      pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
-      errorBanner: req.flash('error')[0],
-      backUrl: `/prisoner/${ctx.prisonerNumber}/combine/details`,
-    })
-  })
-
-  router.post('/prisoner/:prisonerNumber/combine/location', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.combineJourney
-    if (!journey?.sealNumber || !journey?.containerType) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
-    }
-    req.session.combineJourney = {
-      ...journey,
-      locationType: 'INTERNAL',
-      internalLocationId: req.body.internalLocationId,
-      locationName: req.body.locationName,
-    }
-    return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/check`)
-  })
-
-  router.get('/prisoner/:prisonerNumber/combine/check', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.combineJourney
-    if (!journey?.sealNumber || !journey?.containerType) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
-    }
-    if (journey.locationType === 'INTERNAL' && !journey.internalLocationId) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/location`)
-    }
-
-    const { username } = res.locals.user
-    const { containers, sources } = await combineSourceRows(ctx, journey.sourceContainerIds, username)
-    const branston = journey.locationType === 'BRANSTON'
-    return res.render('pages/combine/checkAnswers', {
-      prisonerNumber: ctx.prisonerNumber,
-      prisonerName: containers[0]?.prisonerName ?? null,
-      establishmentName: ctx.activeCaseloadName,
-      sources,
-      journey,
-      storageLocation: branston ? 'Branston (offsite)' : journey.locationName,
-      backUrl: branston
-        ? `/prisoner/${ctx.prisonerNumber}/combine/details`
-        : `/prisoner/${ctx.prisonerNumber}/combine/location`,
-    })
-  })
-
-  router.post('/prisoner/:prisonerNumber/combine/confirm', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.combineJourney
-    if (!journey?.sealNumber || !journey?.containerType || journey.sourceContainerIds.length < 2) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}`)
-    }
-    if (journey.locationType === 'INTERNAL' && !journey.internalLocationId) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/location`)
-    }
-
-    const { username } = res.locals.user
-    try {
-      const created = await prisonerPropertyService.combineContainers(
-        {
-          sourceContainerIds: journey.sourceContainerIds,
-          containerType: journey.containerType,
-          sealNumber: journey.sealNumber,
-          internalLocationId: journey.locationType === 'INTERNAL' ? journey.internalLocationId : undefined,
-          locationType: journey.locationType,
-        },
+      const result = await prisonerPropertyService.getBoxLocations(
+        ctx.activeCaseloadId,
+        { query, page: page - 1, size: BOX_PAGE_SIZE },
         username,
       )
 
-      await auditService.logPageView(Page.COMBINE_PROPERTY_CONTAINERS, {
-        who: username,
-        subjectId: ctx.prisonerNumber,
-        subjectType: 'PRISONER_NUMBER',
-        correlationId: req.id,
-        details: { containerId: created.id, sourceContainerIds: journey.sourceContainerIds },
-      })
+      const baseQuery = new URLSearchParams()
+      if (query) baseQuery.set('query', query)
 
-      req.session.combineJourney = undefined
-      req.flash('success', 'Property containers combined')
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}`)
-    } catch (error) {
-      const status = (error as { responseStatus?: number }).responseStatus
-      if (status === 409) {
-        req.flash('error', 'A property container with this seal number already exists. Enter a different seal number.')
+      return res.render('pages/addContainer/location', {
+        prisonerNumber: ctx.prisonerNumber,
+        sealNumber: journey.sealNumber,
+        query: query ?? '',
+        locations: result.content,
+        pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
+        errorBanner: req.flash('error')[0],
+        backUrl: `/prisoner/${ctx.prisonerNumber}/combine/details`,
+      })
+    },
+  )
+
+  router.post(
+    '/prisoner/:prisonerNumber/combine/location',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.combineJourney
+      if (!journey?.sealNumber || !journey?.containerType) {
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
       }
-      if (status === 400) {
-        req.flash('error', 'That storage location could not be used. Select a different location.')
-        const step = journey.locationType === 'BRANSTON' ? 'details' : 'location'
-        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/${step}`)
+      req.session.combineJourney = {
+        ...journey,
+        locationType: 'INTERNAL',
+        internalLocationId: req.body.internalLocationId,
+        locationName: req.body.locationName,
       }
-      return next(error)
-    }
-  })
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/check`)
+    },
+  )
+
+  router.get(
+    '/prisoner/:prisonerNumber/combine/check',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.combineJourney
+      if (!journey?.sealNumber || !journey?.containerType) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
+      }
+      if (journey.locationType === 'INTERNAL' && !journey.internalLocationId) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/location`)
+      }
+
+      const { username } = res.locals.user
+      const { containers, sources } = await combineSourceRows(ctx, journey.sourceContainerIds, username)
+      const branston = journey.locationType === 'BRANSTON'
+      return res.render('pages/combine/checkAnswers', {
+        prisonerNumber: ctx.prisonerNumber,
+        prisonerName: containers[0]?.prisonerName ?? null,
+        establishmentName: ctx.activeCaseloadName,
+        sources,
+        journey,
+        storageLocation: branston ? 'Branston (offsite)' : journey.locationName,
+        backUrl: branston
+          ? `/prisoner/${ctx.prisonerNumber}/combine/details`
+          : `/prisoner/${ctx.prisonerNumber}/combine/location`,
+      })
+    },
+  )
+
+  router.post(
+    '/prisoner/:prisonerNumber/combine/confirm',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.combineJourney
+      if (!journey?.sealNumber || !journey?.containerType || journey.sourceContainerIds.length < 2) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}`)
+      }
+      if (journey.locationType === 'INTERNAL' && !journey.internalLocationId) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/location`)
+      }
+
+      const { username } = res.locals.user
+      try {
+        const created = await prisonerPropertyService.combineContainers(
+          {
+            sourceContainerIds: journey.sourceContainerIds,
+            containerType: journey.containerType,
+            sealNumber: journey.sealNumber,
+            internalLocationId: journey.locationType === 'INTERNAL' ? journey.internalLocationId : undefined,
+            locationType: journey.locationType,
+          },
+          username,
+        )
+
+        await auditService.logPageView(Page.COMBINE_PROPERTY_CONTAINERS, {
+          who: username,
+          subjectId: ctx.prisonerNumber,
+          subjectType: 'PRISONER_NUMBER',
+          correlationId: req.id,
+          details: { containerId: created.id, sourceContainerIds: journey.sourceContainerIds },
+        })
+
+        req.session.combineJourney = undefined
+        req.flash('success', 'Property containers combined')
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}`)
+      } catch (error) {
+        const status = (error as { responseStatus?: number }).responseStatus
+        if (status === 409) {
+          req.flash(
+            'error',
+            'A property container with this seal number already exists. Enter a different seal number.',
+          )
+          return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
+        }
+        if (status === 400) {
+          req.flash('error', 'That storage location could not be used. Select a different location.')
+          const step = journey.locationType === 'BRANSTON' ? 'details' : 'location'
+          return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/${step}`)
+        }
+        return next(error)
+      }
+    },
+  )
 
   // ---- Change a property container journey (gated on the manage role) ----
 
@@ -1112,208 +1223,241 @@ export default function routes({
       backUrl: journey.origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`,
     })
 
-  router.get('/prisoner/:prisonerNumber/change-container/:id', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const { username } = res.locals.user
-    const id = String(req.params.id)
+  router.get(
+    '/prisoner/:prisonerNumber/change-container/:id',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const { username } = res.locals.user
+      const id = String(req.params.id)
 
-    const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
-    if (!container) return next(createError(404, 'Property container not found'))
+      const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
+      if (!container) return next(createError(404, 'Property container not found'))
 
-    const origin = req.query.from === 'list' ? 'list' : 'person'
-    req.session.changeContainerJourney = {
-      prisonerNumber: ctx.prisonerNumber,
-      containerId: id,
-      origin,
-      sealNumber: container.currentSealNumber ?? undefined,
-      containerType: container.containerType,
-      proposedDisposalDate: container.proposedDisposalDate ?? undefined,
-      locationChoice: 'current',
-    }
-    return renderChangeDetails(req, res, ctx, container, req.session.changeContainerJourney, {
-      sealNumber: container.currentSealNumber,
-      containerType: container.containerType,
-      locationChoice: 'current',
-      ...isoToParts(container.proposedDisposalDate ?? undefined),
-    })
-  })
+      const origin = req.query.from === 'list' ? 'list' : 'person'
+      req.session.changeContainerJourney = {
+        prisonerNumber: ctx.prisonerNumber,
+        containerId: id,
+        origin,
+        sealNumber: container.currentSealNumber ?? undefined,
+        containerType: container.containerType,
+        proposedDisposalDate: container.proposedDisposalDate ?? undefined,
+        locationChoice: 'current',
+      }
+      return renderChangeDetails(req, res, ctx, container, req.session.changeContainerJourney, {
+        sealNumber: container.currentSealNumber,
+        containerType: container.containerType,
+        locationChoice: 'current',
+        ...isoToParts(container.proposedDisposalDate ?? undefined),
+      })
+    },
+  )
 
-  router.post('/prisoner/:prisonerNumber/change-container/:id', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const { username } = res.locals.user
-    const id = String(req.params.id)
-    const journey = req.session.changeContainerJourney
-    if (journey?.containerId !== id) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}`)
-    }
-
-    const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
-    if (!container) return next(createError(404, 'Property container not found'))
-
-    const { values, errors } = validateDetails(req.body)
-    if (!values) {
-      return renderChangeDetails(
-        req,
-        res,
-        ctx,
-        container,
-        journey,
-        {
-          sealNumber: req.body.sealNumber,
-          containerType: req.body.containerType,
-          locationChoice: req.body.locationChoice,
-          day: req.body['disposalDate-day'],
-          month: req.body['disposalDate-month'],
-          year: req.body['disposalDate-year'],
-        },
-        errors,
-      )
-    }
-
-    const locationChoice = req.body.locationChoice === 'new' ? 'new' : 'current'
-    req.session.changeContainerJourney = {
-      ...journey,
-      sealNumber: values.sealNumber,
-      containerType: values.containerType,
-      proposedDisposalDate: values.proposedDisposalDate,
-      locationChoice,
-      internalLocationId: locationChoice === 'new' ? journey.internalLocationId : undefined,
-      locationName: locationChoice === 'new' ? journey.locationName : undefined,
-    }
-
-    // Keep-current, or picking a new location we already chose (editing from CYA), go straight to CYA.
-    if (locationChoice === 'current' || req.session.changeContainerJourney.internalLocationId) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}/check`)
-    }
-    return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}/location`)
-  })
-
-  router.get('/prisoner/:prisonerNumber/change-container/:id/location', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.changeContainerJourney
-    if (!journey?.sealNumber || !journey?.containerType) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${String(req.params.id)}`)
-    }
-
-    const { username } = res.locals.user
-    const query = (req.query.query as string)?.trim() || undefined
-    const parsedPage = Number.parseInt((req.query.page as string) ?? '1', 10)
-    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
-
-    const result = await prisonerPropertyService.getBoxLocations(
-      ctx.activeCaseloadId,
-      { query, page: page - 1, size: BOX_PAGE_SIZE },
-      username,
-    )
-
-    const baseQuery = new URLSearchParams()
-    if (query) baseQuery.set('query', query)
-
-    return res.render('pages/addContainer/location', {
-      prisonerNumber: ctx.prisonerNumber,
-      sealNumber: journey.sealNumber,
-      query: query ?? '',
-      locations: result.content,
-      pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
-      errorBanner: req.flash('error')[0],
-      backUrl: `/prisoner/${ctx.prisonerNumber}/change-container/${journey.containerId}`,
-    })
-  })
-
-  router.post('/prisoner/:prisonerNumber/change-container/:id/location', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const journey = req.session.changeContainerJourney
-    if (!journey?.sealNumber || !journey?.containerType) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${String(req.params.id)}`)
-    }
-    req.session.changeContainerJourney = {
-      ...journey,
-      locationChoice: 'new',
-      internalLocationId: req.body.internalLocationId,
-      locationName: req.body.locationName,
-    }
-    return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${journey.containerId}/check`)
-  })
-
-  router.get('/prisoner/:prisonerNumber/change-container/:id/check', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const { username } = res.locals.user
-    const id = String(req.params.id)
-    const journey = req.session.changeContainerJourney
-    if (journey?.containerId !== id || !journey.sealNumber || !journey.containerType) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}`)
-    }
-    if (journey.locationChoice === 'new' && !journey.internalLocationId) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}/location`)
-    }
-
-    const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
-    if (!container) return next(createError(404, 'Property container not found'))
-
-    return res.render('pages/changeContainer/checkAnswers', {
-      prisonerNumber: ctx.prisonerNumber,
-      prisonerName: container.prisonerName,
-      prisonerEstablishment: container.prisonerCurrentPrisonName || container.prisonName || null,
-      status: statusTag(container.currentStatus),
-      journey,
-      storageLocation: journey.locationChoice === 'new' ? journey.locationName : containerLocation(container),
-      backUrl: `/prisoner/${ctx.prisonerNumber}/change-container/${id}`,
-    })
-  })
-
-  router.post('/prisoner/:prisonerNumber/change-container/:id/confirm', requireManageRole, async (req, res, next) => {
-    const ctx = await resolveContext(req, res, next)
-    if (!ctx) return undefined
-    const { username } = res.locals.user
-    const id = String(req.params.id)
-    const journey = req.session.changeContainerJourney
-    if (journey?.containerId !== id || !journey.sealNumber || !journey.containerType) {
-      return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}`)
-    }
-
-    try {
-      await prisonerPropertyService.updateContainer(
-        id,
-        {
-          containerType: journey.containerType,
-          sealNumber: journey.sealNumber,
-          internalLocationId: journey.locationChoice === 'new' ? journey.internalLocationId : undefined,
-          proposedDisposalDate: journey.proposedDisposalDate,
-        },
-        username,
-      )
-    } catch (error) {
-      const status = (error as { responseStatus?: number }).responseStatus
-      if (status === 409) {
-        req.flash('error', 'A property container with this seal number already exists. Enter a different seal number.')
+  router.post(
+    '/prisoner/:prisonerNumber/change-container/:id',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const { username } = res.locals.user
+      const id = String(req.params.id)
+      const journey = req.session.changeContainerJourney
+      if (journey?.containerId !== id) {
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}`)
       }
-      if (status === 400) {
-        req.flash('error', 'That storage location could not be used. Select a different location.')
-        const step = journey.locationChoice === 'new' ? 'location' : ''
-        return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}${step ? `/${step}` : ''}`)
+
+      const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
+      if (!container) return next(createError(404, 'Property container not found'))
+
+      const { values, errors } = validateDetails(req.body)
+      if (!values) {
+        return renderChangeDetails(
+          req,
+          res,
+          ctx,
+          container,
+          journey,
+          {
+            sealNumber: req.body.sealNumber,
+            containerType: req.body.containerType,
+            locationChoice: req.body.locationChoice,
+            day: req.body['disposalDate-day'],
+            month: req.body['disposalDate-month'],
+            year: req.body['disposalDate-year'],
+          },
+          errors,
+        )
       }
-      return next(error)
-    }
 
-    await auditService.logPageView(Page.CHANGE_PROPERTY_CONTAINER, {
-      who: username,
-      subjectId: ctx.prisonerNumber,
-      subjectType: 'PRISONER_NUMBER',
-      correlationId: req.id,
-      details: { containerId: id },
-    })
+      const locationChoice = req.body.locationChoice === 'new' ? 'new' : 'current'
+      req.session.changeContainerJourney = {
+        ...journey,
+        sealNumber: values.sealNumber,
+        containerType: values.containerType,
+        proposedDisposalDate: values.proposedDisposalDate,
+        locationChoice,
+        internalLocationId: locationChoice === 'new' ? journey.internalLocationId : undefined,
+        locationName: locationChoice === 'new' ? journey.locationName : undefined,
+      }
 
-    const { origin } = journey
-    req.session.changeContainerJourney = undefined
-    req.flash('success', 'Property container updated')
-    return res.redirect(origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`)
-  })
+      // Keep-current, or picking a new location we already chose (editing from CYA), go straight to CYA.
+      if (locationChoice === 'current' || req.session.changeContainerJourney.internalLocationId) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}/check`)
+      }
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}/location`)
+    },
+  )
+
+  router.get(
+    '/prisoner/:prisonerNumber/change-container/:id/location',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.changeContainerJourney
+      if (!journey?.sealNumber || !journey?.containerType) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${String(req.params.id)}`)
+      }
+
+      const { username } = res.locals.user
+      const query = (req.query.query as string)?.trim() || undefined
+      const parsedPage = Number.parseInt((req.query.page as string) ?? '1', 10)
+      const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
+
+      const result = await prisonerPropertyService.getBoxLocations(
+        ctx.activeCaseloadId,
+        { query, page: page - 1, size: BOX_PAGE_SIZE },
+        username,
+      )
+
+      const baseQuery = new URLSearchParams()
+      if (query) baseQuery.set('query', query)
+
+      return res.render('pages/addContainer/location', {
+        prisonerNumber: ctx.prisonerNumber,
+        sealNumber: journey.sealNumber,
+        query: query ?? '',
+        locations: result.content,
+        pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
+        errorBanner: req.flash('error')[0],
+        backUrl: `/prisoner/${ctx.prisonerNumber}/change-container/${journey.containerId}`,
+      })
+    },
+  )
+
+  router.post(
+    '/prisoner/:prisonerNumber/change-container/:id/location',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.changeContainerJourney
+      if (!journey?.sealNumber || !journey?.containerType) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${String(req.params.id)}`)
+      }
+      req.session.changeContainerJourney = {
+        ...journey,
+        locationChoice: 'new',
+        internalLocationId: req.body.internalLocationId,
+        locationName: req.body.locationName,
+      }
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${journey.containerId}/check`)
+    },
+  )
+
+  router.get(
+    '/prisoner/:prisonerNumber/change-container/:id/check',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const { username } = res.locals.user
+      const id = String(req.params.id)
+      const journey = req.session.changeContainerJourney
+      if (journey?.containerId !== id || !journey.sealNumber || !journey.containerType) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}`)
+      }
+      if (journey.locationChoice === 'new' && !journey.internalLocationId) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}/location`)
+      }
+
+      const container = await loadRemovableContainer(ctx.prisonerNumber, id, username)
+      if (!container) return next(createError(404, 'Property container not found'))
+
+      return res.render('pages/changeContainer/checkAnswers', {
+        prisonerNumber: ctx.prisonerNumber,
+        prisonerName: container.prisonerName,
+        prisonerEstablishment: container.prisonerCurrentPrisonName || container.prisonName || null,
+        status: statusTag(container.currentStatus),
+        journey,
+        storageLocation: journey.locationChoice === 'new' ? journey.locationName : containerLocation(container),
+        backUrl: `/prisoner/${ctx.prisonerNumber}/change-container/${id}`,
+      })
+    },
+  )
+
+  router.post(
+    '/prisoner/:prisonerNumber/change-container/:id/confirm',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(req, res, next)
+      if (!ctx) return undefined
+      const { username } = res.locals.user
+      const id = String(req.params.id)
+      const journey = req.session.changeContainerJourney
+      if (journey?.containerId !== id || !journey.sealNumber || !journey.containerType) {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}`)
+      }
+
+      try {
+        await prisonerPropertyService.updateContainer(
+          id,
+          {
+            containerType: journey.containerType,
+            sealNumber: journey.sealNumber,
+            internalLocationId: journey.locationChoice === 'new' ? journey.internalLocationId : undefined,
+            proposedDisposalDate: journey.proposedDisposalDate,
+          },
+          username,
+        )
+      } catch (error) {
+        const status = (error as { responseStatus?: number }).responseStatus
+        if (status === 409) {
+          req.flash(
+            'error',
+            'A property container with this seal number already exists. Enter a different seal number.',
+          )
+          return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}`)
+        }
+        if (status === 400) {
+          req.flash('error', 'That storage location could not be used. Select a different location.')
+          const step = journey.locationChoice === 'new' ? 'location' : ''
+          return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}${step ? `/${step}` : ''}`)
+        }
+        return next(error)
+      }
+
+      await auditService.logPageView(Page.CHANGE_PROPERTY_CONTAINER, {
+        who: username,
+        subjectId: ctx.prisonerNumber,
+        subjectType: 'PRISONER_NUMBER',
+        correlationId: req.id,
+        details: { containerId: id },
+      })
+
+      const { origin } = journey
+      req.session.changeContainerJourney = undefined
+      req.flash('success', 'Property container updated')
+      return res.redirect(origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`)
+    },
+  )
 
   // Admin console: switch the property service on/off per prison. Not caseload-scoped - it is a
   // national rollout control gated on the admin role.
@@ -1347,6 +1491,9 @@ export default function routes({
     const name = typeof req.body.name === 'string' && req.body.name ? req.body.name : agencyId
 
     await prisonerPropertyService.setAgencyActive(agencyId, active, username)
+    // Drop the cached active-prison set so this pod reflects the toggle immediately (other pods
+    // converge on the TTL). Keeps the read-only gate in step with what the admin just changed.
+    activeAgenciesService.invalidate()
     req.flash('success', `Property is now switched ${active ? 'on' : 'off'} for ${name}.`)
 
     const params = new URLSearchParams()

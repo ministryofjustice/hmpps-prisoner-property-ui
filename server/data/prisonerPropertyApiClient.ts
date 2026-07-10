@@ -151,6 +151,17 @@ export default class PrisonerPropertyApiClient extends RestClient {
   }
 
   /**
+   * Get the agency ids for which the property service is switched on in DPS, from the public `/info`
+   * endpoint's `activeAgencies` array. Called **unauthenticated** (no token) — `/info` is public and
+   * this is on the ordinary read path, so we avoid needing a privileged token here. Returns `[]` when
+   * the key is absent (e.g. an older API deploy) so callers degrade to "no prison active" safely.
+   */
+  async getActiveAgencyIds(): Promise<string[]> {
+    const info = await this.get<{ activeAgencies?: string[] }>({ path: `/info` })
+    return info?.activeAgencies ?? []
+  }
+
+  /**
    * List every prison with whether the property service is switched on, for the rollout admin console.
    * Called with a system token tied to the signed-in user (`asSystem(username)`); the system client
    * must hold the ROLE_PRISONER_PROPERTY__ADMIN role.
