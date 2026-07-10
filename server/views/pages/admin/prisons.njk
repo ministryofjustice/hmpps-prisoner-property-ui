@@ -49,15 +49,10 @@
 
   <form method="get" action="/admin/prisons" class="govuk-!-margin-bottom-6">
     <div class="govuk-form-group govuk-!-margin-bottom-0">
-      <div class="moj-search" style="display: flex; gap: 10px; align-items: flex-end;">
-        {{ govukInput({
-          id: "q",
-          name: "q",
-          value: search,
-          label: { text: "Search by prison name or ID", classes: "govuk-label--s" },
-          formGroup: { classes: "govuk-!-margin-bottom-0" },
-          attributes: { "data-qa": "prison-search" }
-        }) }}
+      <label class="govuk-label govuk-label--s govuk-!-margin-bottom-1" for="q">Search by prison name or ID</label>
+      <div style="display: flex; gap: 10px; align-items: flex-start;">
+        <input class="govuk-input govuk-input--width-20 govuk-!-margin-bottom-0" id="q" name="q" type="text"
+          value="{{ search }}" data-qa="prison-search" />
         {{ govukButton({ text: "Search", classes: "govuk-!-margin-bottom-0", attributes: { "data-qa": "prison-search-button" } }) }}
       </div>
     </div>
