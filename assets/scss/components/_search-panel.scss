@@ -40,10 +40,12 @@
 }
 
 // Lay a checkbox group's items out horizontally (the filter groups in the design), wrapping on
-// narrow viewports.
+// narrow viewports. inline-flex keeps each item's checkbox and label side-by-side on one line —
+// inline-block would override GOV.UK's flex layout and drop the label below the checkbox.
 .app-checkboxes--inline {
   .govuk-checkboxes__item {
-    display: inline-block;
+    display: inline-flex;
     margin-right: govuk-spacing(4);
+    vertical-align: top;
   }
 }
