@@ -17,6 +17,7 @@ import type {
   RestPage,
 } from '../data/prisonerPropertyApiTypes'
 import type { Prisoner } from '../data/prisonerSearchApiTypes'
+import { NomisScreenNotSetUpError } from '../utils/nomisSplash'
 
 jest.mock('../services/auditService')
 jest.mock('../services/prisonerPropertyService')
@@ -63,6 +64,9 @@ beforeEach(() => {
   // The history + container pages resolve acting-user names; default to none so they fall back to the
   // raw username. Tests that assert a resolved name override this.
   userService.getUserDisplayNames.mockResolvedValue(new Map())
+  // The admin console reads NOMIS splash-screen states; default to an empty (all-Normal) map so it
+  // renders. Tests that assert specific NOMIS states or the unavailable notice override this.
+  prisonerService.getNomisScreenStates.mockResolvedValue(new Map())
 })
 
 afterEach(() => {
@@ -1978,6 +1982,94 @@ describe('Admin - manage enabled prisons', () => {
       .expect(403)
       .expect(() => {
         expect(prisonerPropertyService.setAgencyActive).not.toHaveBeenCalled()
+      })
+  })
+
+  it('shows each prison NOMIS property-screen state with the moves it can make', async () => {
+    prisonerPropertyService.getAllAgencies.mockResolvedValue(agencies)
+    prisonerService.getNomisScreenStates.mockResolvedValue(
+      new Map([
+        ['MDI', 'BLOCKED'],
+        ['LEI', 'WARNING'],
+      ]),
+    )
+
+    return request(adminApp())
+      .get('/admin/prisons')
+      .expect(200)
+      .expect(res => {
+        // MDI is blocked → offers warning + clear, not block
+        expect(res.text).toContain('data-qa="nomis-status-MDI"')
+        expect(res.text).toContain('data-qa="nomis-clear-MDI"')
+        expect(res.text).not.toContain('data-qa="nomis-block-MDI"')
+        // LEI shows a warning → offers block + clear
+        expect(res.text).toContain('data-qa="nomis-block-LEI"')
+        expect(res.text).toContain('data-qa="nomis-clear-LEI"')
+      })
+  })
+
+  it('degrades to an unavailable notice when the NOMIS screen cannot be read', async () => {
+    prisonerPropertyService.getAllAgencies.mockResolvedValue(agencies)
+    prisonerService.getNomisScreenStates.mockResolvedValue(null)
+
+    return request(adminApp())
+      .get('/admin/prisons')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('data-qa="nomis-unavailable"')
+        expect(res.text).toContain('Unknown')
+        // no NOMIS action buttons when unavailable
+        expect(res.text).not.toContain('data-qa="nomis-block-MDI"')
+      })
+  })
+
+  it('sets a prison NOMIS screen state and redirects back with a success message', async () => {
+    prisonerService.setNomisScreenState.mockResolvedValue(undefined)
+
+    return request(adminApp())
+      .post('/admin/prisons/MDI/nomis-screen')
+      .send({ state: 'BLOCKED', name: 'Moorland (HMP & YOI)', q: 'moor' })
+      .expect(302)
+      .expect('location', '/admin/prisons?q=moor')
+      .expect(() => {
+        expect(prisonerService.setNomisScreenState).toHaveBeenCalledWith('MDI', 'BLOCKED', 'user1')
+        expect(flashProvider).toHaveBeenCalledWith(
+          'success',
+          'NOMIS property access is now blocked for Moorland (HMP & YOI).',
+        )
+      })
+  })
+
+  it('rejects an invalid NOMIS screen state with an error and no API call', async () => {
+    return request(adminApp())
+      .post('/admin/prisons/MDI/nomis-screen')
+      .send({ state: 'NONSENSE', name: 'Moorland (HMP & YOI)' })
+      .expect(302)
+      .expect(() => {
+        expect(prisonerService.setNomisScreenState).not.toHaveBeenCalled()
+        expect(flashProvider).toHaveBeenCalledWith('error', 'Select a valid NOMIS property screen state.')
+      })
+  })
+
+  it('shows a helpful error when the NOMIS splash screen is not set up', async () => {
+    prisonerService.setNomisScreenState.mockRejectedValue(new NomisScreenNotSetUpError())
+
+    return request(adminApp())
+      .post('/admin/prisons/MDI/nomis-screen')
+      .send({ state: 'WARNING', name: 'Moorland (HMP & YOI)' })
+      .expect(302)
+      .expect(() => {
+        expect(flashProvider).toHaveBeenCalledWith('error', expect.stringContaining('has not been set up yet'))
+      })
+  })
+
+  it('forbids the NOMIS screen control for a user without the admin role', async () => {
+    return request(app)
+      .post('/admin/prisons/MDI/nomis-screen')
+      .send({ state: 'BLOCKED' })
+      .expect(403)
+      .expect(() => {
+        expect(prisonerService.setNomisScreenState).not.toHaveBeenCalled()
       })
   })
 

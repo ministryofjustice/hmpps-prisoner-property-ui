@@ -26,6 +26,14 @@ export default class AdminPrisonsPage extends AbstractPage {
     return this.page.getByTestId(`toggle-${agencyId}`)
   }
 
+  nomisStatus(agencyId: string): Locator {
+    return this.page.getByTestId(`nomis-status-${agencyId}`)
+  }
+
+  nomisBlock(agencyId: string): Locator {
+    return this.page.getByTestId(`nomis-block-${agencyId}`)
+  }
+
   static async verifyOnPage(page: Page): Promise<AdminPrisonsPage> {
     const adminPage = new AdminPrisonsPage(page)
     await expect(adminPage.heading).toBeVisible()
