@@ -1,0 +1,65 @@
+{% extends "../../../partials/layout.njk" %}
+
+{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+{% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
+
+{% set pageTitle = applicationName + " - Change a storage location" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: "Prisoner property", href: "/" },
+    { text: "Manage storage locations", href: "/admin/locations" },
+    { text: "Change a storage location" }
+  ] }) }}
+{% endblock %}
+
+{% block content %}
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+      {% set summaryErrors = [] %}
+      {% if errors.localName %}{% set _ = summaryErrors.push({ text: errors.localName, href: "#localName" }) %}{% endif %}
+      {% if errors.capacity %}{% set _ = summaryErrors.push({ text: errors.capacity, href: "#capacity" }) %}{% endif %}
+      {% if summaryErrors.length %}
+        {{ govukErrorSummary({
+          titleText: "There is a problem",
+          errorList: summaryErrors,
+          attributes: { "data-qa": "error-summary" }
+        }) }}
+      {% endif %}
+
+      <h1 class="govuk-heading-xl">Change a storage location</h1>
+
+      <form method="post" action="/admin/locations/{{ location.id }}/edit" novalidate>
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+
+        {{ govukInput({
+          label: { text: "Name", classes: "govuk-label--s" },
+          id: "localName",
+          name: "localName",
+          value: values.localName,
+          classes: "govuk-input--width-20",
+          errorMessage: { text: errors.localName } if errors.localName
+        }) }}
+
+        {{ govukInput({
+          label: { text: "Capacity", classes: "govuk-label--s" },
+          hint: { text: "How many containers can be stored here." },
+          id: "capacity",
+          name: "capacity",
+          value: values.capacity,
+          classes: "govuk-input--width-5",
+          inputmode: "numeric",
+          spellcheck: false,
+          errorMessage: { text: errors.capacity } if errors.capacity
+        }) }}
+
+        {{ govukButton({ text: "Save changes", attributes: { "data-qa": "submit" } }) }}
+        <a class="govuk-link govuk-!-margin-left-2" href="/admin/locations">Cancel</a>
+      </form>
+    </div>
+  </div>
+{% endblock %}

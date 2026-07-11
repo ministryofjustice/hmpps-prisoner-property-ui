@@ -216,6 +216,31 @@ export interface AgencyStatus {
   active: boolean
 }
 
+// A property storage location for the management screens, with its capacity and how full it is.
+// See PropertyLocationAdminDto in the API.
+export interface PropertyLocationAdmin {
+  id: string
+  prisonId: string
+  code: string
+  name: string
+  locationType?: string
+  capacity: number
+  containersHeld: number
+  availableSpaces: number
+}
+
+// Body for adding a property storage location.
+export interface CreatePropertyLocationRequest {
+  localName: string
+  capacity: number
+}
+
+// Body for updating a property storage location; omitted fields are left unchanged.
+export interface UpdatePropertyLocationRequest {
+  localName?: string
+  capacity?: number
+}
+
 // Minimal shape of a Spring Data `Page<T>` as serialised to JSON.
 export interface RestPage<T> {
   content: T[]

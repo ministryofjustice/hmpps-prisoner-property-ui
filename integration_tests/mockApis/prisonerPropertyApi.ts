@@ -8,6 +8,7 @@ import type {
   PrisonPropertySummary,
   PrisonerTimelineItem,
   PropertyEvent,
+  PropertyLocationAdmin,
 } from '../../server/data/prisonerPropertyApiTypes'
 
 export default {
@@ -278,6 +279,86 @@ export default {
         status: httpStatus,
         headers: { 'Content-Type': 'application/json;charset=UTF-8' },
         jsonBody: { agencyId, name, active },
+      },
+    }),
+
+  stubGetPropertyLocations: (
+    { prisonId = 'MDI', locations = [] as PropertyLocationAdmin[], priority = undefined as number | undefined } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'GET',
+        urlPath: `/prisoner-property-api/property-locations/prison/${prisonId}`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: locations,
+      },
+    }),
+
+  stubCreatePropertyLocation: (
+    {
+      prisonId = 'MDI',
+      location = undefined as PropertyLocationAdmin | undefined,
+      priority = undefined as number | undefined,
+    } = {},
+    httpStatus = 201,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'POST',
+        urlPath: `/prisoner-property-api/property-locations/prison/${prisonId}`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: location,
+      },
+    }),
+
+  stubUpdatePropertyLocation: (
+    {
+      id = 'loc-1',
+      location = undefined as PropertyLocationAdmin | undefined,
+      priority = undefined as number | undefined,
+    } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'PUT',
+        urlPath: `/prisoner-property-api/property-locations/${id}`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: location,
+      },
+    }),
+
+  stubRemovePropertyLocation: (
+    {
+      id = 'loc-1',
+      location = undefined as PropertyLocationAdmin | undefined,
+      priority = undefined as number | undefined,
+    } = {},
+    httpStatus = 200,
+  ): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'DELETE',
+        urlPath: `/prisoner-property-api/property-locations/${id}`,
+      },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: location,
       },
     }),
 }

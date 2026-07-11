@@ -1,0 +1,48 @@
+{% extends "../../../partials/layout.njk" %}
+
+{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
+
+{% set pageTitle = applicationName + " - Remove a storage location" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: "Prisoner property", href: "/" },
+    { text: "Manage storage locations", href: "/admin/locations" },
+    { text: "Remove a storage location" }
+  ] }) }}
+{% endblock %}
+
+{% block content %}
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+      <h1 class="govuk-heading-xl">Remove {{ location.name }}?</h1>
+
+      <p class="govuk-body">
+        This location will no longer be offered as a place to store property. It can only be removed while
+        it is empty.
+      </p>
+
+      {% if location.containersHeld > 0 %}
+        {{ govukWarningText({
+          text: "This location currently holds " + location.containersHeld + " container(s). Move or remove them before removing the location.",
+          iconFallbackText: "Warning",
+          attributes: { "data-qa": "in-use-warning" }
+        }) }}
+      {% endif %}
+
+      <form method="post" action="/admin/locations/{{ location.id }}/remove" novalidate>
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+        {{ govukButton({
+          text: "Remove storage location",
+          classes: "govuk-button--warning",
+          attributes: { "data-qa": "confirm-remove" }
+        }) }}
+        <a class="govuk-link govuk-!-margin-left-2" href="/admin/locations">Cancel</a>
+      </form>
+    </div>
+  </div>
+{% endblock %}

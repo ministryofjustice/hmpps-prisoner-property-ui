@@ -1,0 +1,71 @@
+{% extends "../../../partials/layout.njk" %}
+
+{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+
+{% set pageTitle = applicationName + " - Manage storage locations" %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: "Prisoner property", href: "/" },
+    { text: "Manage storage locations" }
+  ] }) }}
+{% endblock %}
+
+{% block content %}
+  {% if successMessage %}
+    {{ govukNotificationBanner({ type: "success", text: successMessage, attributes: { "data-qa": "success-banner" } }) }}
+  {% endif %}
+
+  {% if errorMessage %}
+    {{ govukNotificationBanner({ titleText: "There is a problem", text: errorMessage, attributes: { "data-qa": "error-banner" } }) }}
+  {% endif %}
+
+  <h1 class="govuk-heading-xl govuk-!-margin-bottom-2">Manage storage locations</h1>
+  <p class="govuk-body-l govuk-!-margin-bottom-6">
+    The places property can be stored in this establishment, and how many containers each can hold.
+  </p>
+
+  {{ govukButton({
+    text: "Add a storage location",
+    href: "/admin/locations/add",
+    attributes: { "data-qa": "add-location" }
+  }) }}
+
+  {% if locations.length == 0 %}
+    <p class="govuk-body" data-qa="no-locations">No storage locations have been set up yet.</p>
+  {% else %}
+    <table class="govuk-table" data-qa="locations">
+      <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+          <th scope="col" class="govuk-table__header">Storage location</th>
+          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Capacity</th>
+          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Containers held</th>
+          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Spaces left</th>
+          <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody class="govuk-table__body">
+        {% for location in locations %}
+          <tr class="govuk-table__row" data-qa="location-row">
+            <td class="govuk-table__cell">{{ location.name }}</td>
+            <td class="govuk-table__cell govuk-table__cell--numeric">{{ location.capacity }}</td>
+            <td class="govuk-table__cell govuk-table__cell--numeric">{{ location.containersHeld }}</td>
+            <td class="govuk-table__cell govuk-table__cell--numeric">{{ location.availableSpaces }}</td>
+            <td class="govuk-table__cell govuk-!-text-align-right">
+              <a class="govuk-link govuk-!-margin-right-3" href="/admin/locations/{{ location.id }}/edit" data-qa="edit-location">
+                Change<span class="govuk-visually-hidden"> {{ location.name }}</span>
+              </a>
+              <a class="govuk-link" href="/admin/locations/{{ location.id }}/remove" data-qa="remove-location">
+                Remove<span class="govuk-visually-hidden"> {{ location.name }}</span>
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

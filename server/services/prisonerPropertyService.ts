@@ -4,15 +4,18 @@ import type {
   BoxLocation,
   CombineContainersRequest,
   CreateContainerRequest,
+  CreatePropertyLocationRequest,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PrisonerTimelineItem,
   PrisonPropertyListQuery,
   PrisonPropertySummary,
   PropertyEvent,
+  PropertyLocationAdmin,
   RemoveContainerRequest,
   RestPage,
   UpdateContainerRequest,
+  UpdatePropertyLocationRequest,
 } from '../data/prisonerPropertyApiTypes'
 
 export default class PrisonerPropertyService {
@@ -72,5 +75,29 @@ export default class PrisonerPropertyService {
 
   setAgencyActive(agencyId: string, active: boolean, username: string): Promise<AgencyStatus> {
     return this.prisonerPropertyApiClient.setAgencyActive(agencyId, active, username)
+  }
+
+  getPropertyLocations(prisonId: string, username: string): Promise<PropertyLocationAdmin[]> {
+    return this.prisonerPropertyApiClient.getPropertyLocations(prisonId, username)
+  }
+
+  createPropertyLocation(
+    prisonId: string,
+    body: CreatePropertyLocationRequest,
+    username: string,
+  ): Promise<PropertyLocationAdmin> {
+    return this.prisonerPropertyApiClient.createPropertyLocation(prisonId, body, username)
+  }
+
+  updatePropertyLocation(
+    id: string,
+    body: UpdatePropertyLocationRequest,
+    username: string,
+  ): Promise<PropertyLocationAdmin> {
+    return this.prisonerPropertyApiClient.updatePropertyLocation(id, body, username)
+  }
+
+  removePropertyLocation(id: string, username: string): Promise<PropertyLocationAdmin> {
+    return this.prisonerPropertyApiClient.removePropertyLocation(id, username)
   }
 }

@@ -2098,3 +2098,163 @@ describe('Admin - manage enabled prisons', () => {
       })
   })
 })
+
+const locationAdminUser = { ...user, userRoles: ['PRISONERPROP__LOCATION_ADMIN'] }
+const locationAdminApp = () =>
+  appWithAllRoutes({
+    services: { auditService, prisonerPropertyService, prisonerService, userService, activeAgenciesService },
+    userSupplier: () => locationAdminUser,
+  })
+
+describe('Admin - manage storage locations', () => {
+  const locations = [
+    {
+      id: 'loc-1',
+      prisonId: 'MDI',
+      code: 'PROP1',
+      name: 'Reception Store',
+      locationType: 'BOX',
+      capacity: 10,
+      containersHeld: 3,
+      availableSpaces: 7,
+    },
+  ]
+
+  it('lists the property storage locations for the active caseload', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
+
+    return request(locationAdminApp())
+      .get('/admin/locations')
+      .expect(200)
+      .expect(res => {
+        expect(prisonerPropertyService.getPropertyLocations).toHaveBeenCalledWith('MDI', 'user1')
+        expect(res.text).toContain('Manage storage locations')
+        expect(res.text).toContain('Reception Store')
+        expect(res.text).toContain('Add a storage location')
+      })
+  })
+
+  it('forbids the screens for a user without the location-admin role', async () => {
+    return request(app)
+      .get('/admin/locations')
+      .expect(403)
+      .expect(() => {
+        expect(prisonerPropertyService.getPropertyLocations).not.toHaveBeenCalled()
+      })
+  })
+
+  it('rejects an add with a missing name or capacity', async () => {
+    withActiveCaseload()
+
+    return request(locationAdminApp())
+      .post('/admin/locations/add')
+      .send({ localName: '', capacity: '' })
+      .expect(400)
+      .expect(res => {
+        expect(res.text).toContain('Enter a name for the storage location')
+        expect(res.text).toContain('Enter how many containers this location can hold')
+        expect(prisonerPropertyService.createPropertyLocation).not.toHaveBeenCalled()
+      })
+  })
+
+  it('rejects a non-numeric capacity', async () => {
+    withActiveCaseload()
+
+    return request(locationAdminApp())
+      .post('/admin/locations/add')
+      .send({ localName: 'Reception Store', capacity: 'lots' })
+      .expect(400)
+      .expect(res => {
+        expect(res.text).toContain('Capacity must be a whole number')
+        expect(prisonerPropertyService.createPropertyLocation).not.toHaveBeenCalled()
+      })
+  })
+
+  it('adds a storage location and redirects with a success message', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.createPropertyLocation.mockResolvedValue(locations[0])
+
+    return request(locationAdminApp())
+      .post('/admin/locations/add')
+      .send({ localName: 'Reception Store', capacity: '10' })
+      .expect(302)
+      .expect('location', '/admin/locations')
+      .expect(() => {
+        expect(prisonerPropertyService.createPropertyLocation).toHaveBeenCalledWith(
+          'MDI',
+          { localName: 'Reception Store', capacity: 10 },
+          'user1',
+        )
+        expect(flashProvider).toHaveBeenCalledWith('success', expect.stringContaining('added'))
+      })
+  })
+
+  it('re-renders the add form when the name already exists', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.createPropertyLocation.mockRejectedValue({ responseStatus: 409 })
+
+    return request(locationAdminApp())
+      .post('/admin/locations/add')
+      .send({ localName: 'Reception Store', capacity: '10' })
+      .expect(400)
+      .expect(res => {
+        expect(res.text).toContain('A storage location with this name already exists')
+      })
+  })
+
+  it('updates a storage location and redirects', async () => {
+    prisonerPropertyService.updatePropertyLocation.mockResolvedValue(locations[0])
+
+    return request(locationAdminApp())
+      .post('/admin/locations/loc-1/edit')
+      .send({ localName: 'Reception Store', capacity: '25' })
+      .expect(302)
+      .expect('location', '/admin/locations')
+      .expect(() => {
+        expect(prisonerPropertyService.updatePropertyLocation).toHaveBeenCalledWith(
+          'loc-1',
+          { localName: 'Reception Store', capacity: 25 },
+          'user1',
+        )
+      })
+  })
+
+  it('removes an empty storage location and redirects with a success message', async () => {
+    prisonerPropertyService.removePropertyLocation.mockResolvedValue(locations[0])
+
+    return request(locationAdminApp())
+      .post('/admin/locations/loc-1/remove')
+      .expect(302)
+      .expect('location', '/admin/locations')
+      .expect(() => {
+        expect(prisonerPropertyService.removePropertyLocation).toHaveBeenCalledWith('loc-1', 'user1')
+        expect(flashProvider).toHaveBeenCalledWith('success', 'Storage location removed.')
+      })
+  })
+
+  it('flashes an error when removing a location that still holds property', async () => {
+    prisonerPropertyService.removePropertyLocation.mockRejectedValue({ responseStatus: 409 })
+
+    return request(locationAdminApp())
+      .post('/admin/locations/loc-1/remove')
+      .expect(302)
+      .expect('location', '/admin/locations')
+      .expect(() => {
+        expect(flashProvider).toHaveBeenCalledWith('error', expect.stringContaining('cannot be removed'))
+      })
+  })
+
+  it('shows the manage-storage-locations link for a location admin', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+
+    return request(locationAdminApp())
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('/admin/locations')
+        expect(res.text).toContain('Manage storage locations')
+      })
+  })
+})

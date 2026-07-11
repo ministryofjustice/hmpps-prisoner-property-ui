@@ -7,15 +7,18 @@ import type {
   BoxLocation,
   CombineContainersRequest,
   CreateContainerRequest,
+  CreatePropertyLocationRequest,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PrisonerTimelineItem,
   PrisonPropertyListQuery,
   PrisonPropertySummary,
   PropertyEvent,
+  PropertyLocationAdmin,
   RemoveContainerRequest,
   RestPage,
   UpdateContainerRequest,
+  UpdatePropertyLocationRequest,
 } from './prisonerPropertyApiTypes'
 
 export default class PrisonerPropertyApiClient extends RestClient {
@@ -177,5 +180,52 @@ export default class PrisonerPropertyApiClient extends RestClient {
    */
   setAgencyActive(agencyId: string, active: boolean, username: string): Promise<AgencyStatus> {
     return this.put<AgencyStatus>({ path: `/active-agencies/${agencyId}`, data: { active } }, asSystem(username))
+  }
+
+  /**
+   * List the property storage locations for a prison (including full ones), each with its capacity and
+   * how many containers it holds, for the management screens. Called with a system token tied to the
+   * signed-in user (`asSystem(username)`); the system client must hold the
+   * ROLE_PRISONER_PROPERTY__LOCATION_ADMIN role.
+   */
+  getPropertyLocations(prisonId: string, username: string): Promise<PropertyLocationAdmin[]> {
+    return this.get<PropertyLocationAdmin[]>({ path: `/property-locations/prison/${prisonId}` }, asSystem(username))
+  }
+
+  /**
+   * Add a property storage location to a prison. Called with a system token tied to the signed-in user
+   * (`asSystem(username)`); the system client must hold the ROLE_PRISONER_PROPERTY__LOCATION_ADMIN role.
+   */
+  createPropertyLocation(
+    prisonId: string,
+    body: CreatePropertyLocationRequest,
+    username: string,
+  ): Promise<PropertyLocationAdmin> {
+    return this.post<PropertyLocationAdmin>(
+      { path: `/property-locations/prison/${prisonId}`, data: { ...body } },
+      asSystem(username),
+    )
+  }
+
+  /**
+   * Update a property storage location's name and/or capacity. Called with a system token tied to the
+   * signed-in user (`asSystem(username)`); the system client must hold the
+   * ROLE_PRISONER_PROPERTY__LOCATION_ADMIN role.
+   */
+  updatePropertyLocation(
+    id: string,
+    body: UpdatePropertyLocationRequest,
+    username: string,
+  ): Promise<PropertyLocationAdmin> {
+    return this.put<PropertyLocationAdmin>({ path: `/property-locations/${id}`, data: { ...body } }, asSystem(username))
+  }
+
+  /**
+   * Remove the property designation from a location. Called with a system token tied to the signed-in
+   * user (`asSystem(username)`); the system client must hold the ROLE_PRISONER_PROPERTY__LOCATION_ADMIN
+   * role. The API rejects removal (409) if the location still holds containers.
+   */
+  removePropertyLocation(id: string, username: string): Promise<PropertyLocationAdmin> {
+    return this.delete<PropertyLocationAdmin>({ path: `/property-locations/${id}` }, asSystem(username))
   }
 }

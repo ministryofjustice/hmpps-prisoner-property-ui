@@ -46,9 +46,15 @@
     }) }}
   {% endif %}
 
-  {% if isAdmin %}
+  {% if isAdmin or isLocationAdmin %}
     <p class="govuk-body">
-      <a class="govuk-link" href="/admin/prisons" data-qa="manage-prisons-link">Manage enabled prisons</a>
+      {% if isLocationAdmin %}
+        <a class="govuk-link" href="/admin/locations" data-qa="manage-locations-link">Manage storage locations</a>
+      {% endif %}
+      {% if isAdmin and isLocationAdmin %}<br>{% endif %}
+      {% if isAdmin %}
+        <a class="govuk-link" href="/admin/prisons" data-qa="manage-prisons-link">Manage enabled prisons</a>
+      {% endif %}
     </p>
   {% endif %}
 

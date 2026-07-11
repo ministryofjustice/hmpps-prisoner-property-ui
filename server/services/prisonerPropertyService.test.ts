@@ -51,4 +51,89 @@ describe('PrisonerPropertyService', () => {
     expect(prisonerPropertyApiClient.getPrisonPropertySummary).toHaveBeenCalledWith('MDI', 'AUSER_GEN')
     expect(result).toEqual(summary)
   })
+  it('should delegate getPropertyLocations to the api client', async () => {
+    const locations = [
+      {
+        id: 'loc-1',
+        prisonId: 'MDI',
+        code: 'PROP1',
+        name: 'Reception Store',
+        capacity: 10,
+        containersHeld: 3,
+        availableSpaces: 7,
+      },
+    ]
+    prisonerPropertyApiClient.getPropertyLocations.mockResolvedValue(locations)
+
+    const result = await prisonerPropertyService.getPropertyLocations('MDI', 'AUSER_GEN')
+
+    expect(prisonerPropertyApiClient.getPropertyLocations).toHaveBeenCalledWith('MDI', 'AUSER_GEN')
+    expect(result).toEqual(locations)
+  })
+
+  it('should delegate createPropertyLocation to the api client', async () => {
+    const location = {
+      id: 'loc-1',
+      prisonId: 'MDI',
+      code: 'PROP1',
+      name: 'Reception Store',
+      capacity: 10,
+      containersHeld: 0,
+      availableSpaces: 10,
+    }
+    prisonerPropertyApiClient.createPropertyLocation.mockResolvedValue(location)
+
+    const result = await prisonerPropertyService.createPropertyLocation(
+      'MDI',
+      { localName: 'Reception Store', capacity: 10 },
+      'AUSER_GEN',
+    )
+
+    expect(prisonerPropertyApiClient.createPropertyLocation).toHaveBeenCalledWith(
+      'MDI',
+      { localName: 'Reception Store', capacity: 10 },
+      'AUSER_GEN',
+    )
+    expect(result).toEqual(location)
+  })
+
+  it('should delegate updatePropertyLocation to the api client', async () => {
+    const location = {
+      id: 'loc-1',
+      prisonId: 'MDI',
+      code: 'PROP1',
+      name: 'Reception Store',
+      capacity: 25,
+      containersHeld: 0,
+      availableSpaces: 25,
+    }
+    prisonerPropertyApiClient.updatePropertyLocation.mockResolvedValue(location)
+
+    const result = await prisonerPropertyService.updatePropertyLocation('loc-1', { capacity: 25 }, 'AUSER_GEN')
+
+    expect(prisonerPropertyApiClient.updatePropertyLocation).toHaveBeenCalledWith(
+      'loc-1',
+      { capacity: 25 },
+      'AUSER_GEN',
+    )
+    expect(result).toEqual(location)
+  })
+
+  it('should delegate removePropertyLocation to the api client', async () => {
+    const location = {
+      id: 'loc-1',
+      prisonId: 'MDI',
+      code: 'PROP1',
+      name: 'Reception Store',
+      capacity: 10,
+      containersHeld: 0,
+      availableSpaces: 10,
+    }
+    prisonerPropertyApiClient.removePropertyLocation.mockResolvedValue(location)
+
+    const result = await prisonerPropertyService.removePropertyLocation('loc-1', 'AUSER_GEN')
+
+    expect(prisonerPropertyApiClient.removePropertyLocation).toHaveBeenCalledWith('loc-1', 'AUSER_GEN')
+    expect(result).toEqual(location)
+  })
 })
