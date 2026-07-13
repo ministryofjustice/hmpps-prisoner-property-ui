@@ -2204,6 +2204,8 @@ describe('Admin - manage storage locations', () => {
   })
 
   it('updates a storage location and redirects', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
     prisonerPropertyService.updatePropertyLocation.mockResolvedValue(locations[0])
 
     return request(locationAdminApp())
@@ -2217,6 +2219,21 @@ describe('Admin - manage storage locations', () => {
           { localName: 'Reception Store', capacity: 25 },
           'user1',
         )
+      })
+  })
+
+  it('rejects an edit that sets capacity below the containers currently held', async () => {
+    withActiveCaseload()
+    // loc-1 holds 3 containers, so a capacity of 2 must be rejected without calling the API.
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
+
+    return request(locationAdminApp())
+      .post('/admin/locations/loc-1/edit')
+      .send({ localName: 'Reception Store', capacity: '2' })
+      .expect(400)
+      .expect(res => {
+        expect(res.text).toContain('Capacity cannot be less than the 3 containers currently stored here')
+        expect(prisonerPropertyService.updatePropertyLocation).not.toHaveBeenCalled()
       })
   })
 

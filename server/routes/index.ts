@@ -1632,13 +1632,23 @@ export default function routes({
   })
 
   router.post('/admin/locations/:id/edit', requireLocationAdminRole, async (req, res) => {
-    const { username } = res.locals.user
+    const { token, username } = res.locals.user
+    const { activeCaseloadId } = await userService.getActiveCaseload(token)
+    if (!activeCaseloadId) return res.render('pages/noCaseload')
+
     const id = String(req.params.id)
+    const location = (await prisonerPropertyService.getPropertyLocations(activeCaseloadId, username)).find(
+      candidate => candidate.id === id,
+    )
+    if (!location) {
+      req.flash('error', 'That storage location could not be found.')
+      return res.redirect('/admin/locations')
+    }
 
     const values = readPropertyLocationForm(req.body)
-    const errors = validatePropertyLocationForm(values)
+    const errors = validatePropertyLocationForm(values, location.containersHeld)
     if (Object.keys(errors).length > 0) {
-      return res.status(400).render('pages/admin/locations/edit', { location: { id }, values, errors })
+      return res.status(400).render('pages/admin/locations/edit', { location, values, errors })
     }
 
     try {
@@ -1652,11 +1662,13 @@ export default function routes({
     } catch (error) {
       const status = (error as { responseStatus?: number }).responseStatus
       if (status === 409) {
-        return res.status(400).render('pages/admin/locations/edit', {
-          location: { id },
-          values,
-          errors: { localName: 'A storage location with this name already exists' },
-        })
+        // A 409 is a name clash unless the capacity has since dropped below what the location now holds
+        // (a concurrent add between our read and the write).
+        const conflictErrors =
+          Number(values.capacity) < location.containersHeld
+            ? { capacity: capacityBelowHeldMessage(location.containersHeld) }
+            : { localName: 'A storage location with this name already exists' }
+        return res.status(400).render('pages/admin/locations/edit', { location, values, errors: conflictErrors })
       }
       if (status === 404) {
         req.flash('error', 'That storage location could not be found.')
@@ -1718,8 +1730,20 @@ function readPropertyLocationForm(body: unknown): { localName: string; capacity:
   }
 }
 
-/** Validate the property-location form, returning a field-keyed map of error messages (empty when valid). */
-function validatePropertyLocationForm(values: { localName: string; capacity: string }): Record<string, string> {
+/** Error shown when capacity would be set below the number of containers already stored in a location. */
+function capacityBelowHeldMessage(containersHeld: number): string {
+  return `Capacity cannot be less than the ${containersHeld} container${containersHeld === 1 ? '' : 's'} currently stored here`
+}
+
+/**
+ * Validate the property-location form, returning a field-keyed map of error messages (empty when valid).
+ * [containersHeld] is how many containers the location already holds (0 for the add flow); capacity may not
+ * be set below it.
+ */
+function validatePropertyLocationForm(
+  values: { localName: string; capacity: string },
+  containersHeld = 0,
+): Record<string, string> {
   const errors: Record<string, string> = {}
   if (!values.localName) {
     errors.localName = 'Enter a name for the storage location'
@@ -1732,6 +1756,8 @@ function validatePropertyLocationForm(values: { localName: string; capacity: str
     errors.capacity = 'Capacity must be a whole number'
   } else if (Number(values.capacity) < 1) {
     errors.capacity = 'Capacity must be at least 1'
+  } else if (Number(values.capacity) < containersHeld) {
+    errors.capacity = capacityBelowHeldMessage(containersHeld)
   }
   return errors
 }

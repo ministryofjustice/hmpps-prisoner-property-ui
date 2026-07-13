@@ -72,6 +72,20 @@ test.describe('Manage property storage locations', () => {
     await expect(managePage.errorBanner).toContainText('cannot be removed')
   })
 
+  test('rejects an edit that drops capacity below the containers currently held', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__LOCATION_ADMIN'] })
+    // loc-1 holds 3 containers, so a capacity of 2 must be rejected inline without calling the update.
+    await prisonerPropertyApi.stubGetPropertyLocations({ prisonId: 'MDI', locations: [location] })
+
+    await page.goto('/admin/locations/loc-1/edit')
+    await page.getByLabel('Capacity').fill('2')
+    await page.getByRole('button', { name: 'Save changes' }).click()
+
+    await expect(page.locator('body')).toContainText(
+      'Capacity cannot be less than the 3 containers currently stored here',
+    )
+  })
+
   test('is forbidden for a user without the location-admin role', async ({ page }) => {
     await login(page)
     await page.goto('/admin/locations')

@@ -47,7 +47,7 @@
 
         {{ govukInput({
           label: { text: "Capacity", classes: "govuk-label--s" },
-          hint: { text: "How many containers can be stored here." },
+          hint: { text: "How many containers can be stored here. This location currently holds " + location.containersHeld + (" container." if location.containersHeld == 1 else " containers.") },
           id: "capacity",
           name: "capacity",
           value: values.capacity,
