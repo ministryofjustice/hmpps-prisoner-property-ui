@@ -42,14 +42,11 @@
 
       {% set rows = [] %}
       {% for prisoner in results.prisoners %}
-        {% set nameHtml %}
-          <div class="app-search-result">
-            <img class="app-search-result__photo" src="/prisoner/{{ prisoner.prisonerNumber }}/image" alt="" width="60" height="80">
-            <a class="govuk-link" href="/prisoner/{{ prisoner.prisonerNumber }}">{{ [prisoner.lastName, prisoner.firstName] | join(", ") | convertToTitleCase }}</a>
-          </div>
-        {% endset %}
+        {% set photoHtml %}<img class="app-prisoner-photo" src="/prisoner/{{ prisoner.prisonerNumber }}/image" alt="" width="90" height="120">{% endset %}
+        {% set nameHtml %}<a class="govuk-link" href="/prisoner/{{ prisoner.prisonerNumber }}">{{ [prisoner.lastName, prisoner.firstName] | join(", ") | convertToTitleCase }}</a>{% endset %}
         {% set actionsHtml %}<a class="govuk-link" href="/prisoner/{{ prisoner.prisonerNumber }}/add-container?from=list" data-qa="add-link">Add property container</a> <br><a class="govuk-link" href="/prisoner/{{ prisoner.prisonerNumber }}">View property containers</a>{% endset %}
         {% set rows = (rows.push([
+          { html: photoHtml },
           { html: nameHtml },
           { text: prisoner.prisonerNumber },
           { text: prisoner.cellLocation or "-" },
@@ -60,6 +57,7 @@
       {{ govukTable({
         attributes: { "data-qa": "search-results" },
         head: [
+          { text: "Photo" },
           { text: "Name" },
           { text: "Prison number" },
           { text: "Location" },

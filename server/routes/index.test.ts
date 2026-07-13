@@ -1130,6 +1130,9 @@ describe('Add container journey - search entry', () => {
         expect(res.text).toContain('F-7-003')
         expect(res.text).toContain('/prisoner/A0038EA/add-container?from=list')
         expect(res.text).toContain('/prisoner/A0038EA/image')
+        // photo sits in its own leading column, sized to the standard 90px width
+        expect(res.text).toContain('class="app-prisoner-photo"')
+        expect(res.text).toContain('width="90"')
       })
 
     expect(prisonerService.searchPrisoners).toHaveBeenCalledWith('Sonom', 'MDI', 0, 50, user.username)
