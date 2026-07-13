@@ -69,6 +69,8 @@ export declare module 'express-session' {
     removeContainerJourney?: RemoveContainerJourney
     combineJourney?: CombineJourney
     changeContainerJourney?: ChangeContainerJourney
+    // Where to return to (a "Select a storage location" page) after managing storage locations.
+    manageLocationsReturnTo?: string
   }
 }
 

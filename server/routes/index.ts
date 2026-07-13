@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, type Request, type RequestHandler } from 'express'
 import createError from 'http-errors'
 
 import type { Services } from '../services'
@@ -103,7 +103,6 @@ export default function routes({
       canManage: hasManageRole && isActivePrison,
       showNomisBanner: hasManageRole && !isActivePrison,
       isAdmin: canAdminister(res.locals.user.userRoles),
-      isLocationAdmin: canManageLocations(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
       includeRemoved,
       summary,
@@ -587,6 +586,7 @@ export default function routes({
         searchError,
         errorBanner: req.flash('error')[0],
         backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
+        manageLocationsHref: manageLocationsHrefFor(req, res.locals.user.userRoles),
       })
     },
   )
@@ -1097,6 +1097,7 @@ export default function routes({
         pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
         errorBanner: req.flash('error')[0],
         backUrl: `/prisoner/${ctx.prisonerNumber}/combine/details`,
+        manageLocationsHref: manageLocationsHrefFor(req, res.locals.user.userRoles),
       })
     },
   )
@@ -1367,6 +1368,7 @@ export default function routes({
         pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
         errorBanner: req.flash('error')[0],
         backUrl: `/prisoner/${ctx.prisonerNumber}/change-container/${journey.containerId}`,
+        manageLocationsHref: manageLocationsHrefFor(req, res.locals.user.userRoles),
       })
     },
   )
@@ -1571,7 +1573,7 @@ export default function routes({
   // Property storage location management: add, rename, re-capacity and remove the locations the user's
   // establishment can store property in. Scoped to the user's active caseload and gated on the
   // location-admin role.
-  router.get('/admin/locations', requireLocationAdminRole, async (req, res) => {
+  router.get('/admin/locations', requireLocationAdminRole, captureManageLocationsReturnTo, async (req, res) => {
     const { token, username } = res.locals.user
     const { activeCaseloadId } = await userService.getActiveCaseload(token)
     if (!activeCaseloadId) return res.render('pages/noCaseload')
@@ -1590,11 +1592,11 @@ export default function routes({
     })
   })
 
-  router.get('/admin/locations/add', requireLocationAdminRole, (req, res) =>
+  router.get('/admin/locations/add', requireLocationAdminRole, captureManageLocationsReturnTo, (req, res) =>
     res.render('pages/admin/locations/add', { values: {}, errors: {} }),
   )
 
-  router.post('/admin/locations/add', requireLocationAdminRole, async (req, res) => {
+  router.post('/admin/locations/add', requireLocationAdminRole, captureManageLocationsReturnTo, async (req, res) => {
     const { token, username } = res.locals.user
     const { activeCaseloadId } = await userService.getActiveCaseload(token)
     if (!activeCaseloadId) return res.render('pages/noCaseload')
@@ -1624,115 +1626,168 @@ export default function routes({
     }
   })
 
-  router.get('/admin/locations/:id/edit', requireLocationAdminRole, async (req, res) => {
-    const { token, username } = res.locals.user
-    const { activeCaseloadId } = await userService.getActiveCaseload(token)
-    if (!activeCaseloadId) return res.render('pages/noCaseload')
+  router.get(
+    '/admin/locations/:id/edit',
+    requireLocationAdminRole,
+    captureManageLocationsReturnTo,
+    async (req, res) => {
+      const { token, username } = res.locals.user
+      const { activeCaseloadId } = await userService.getActiveCaseload(token)
+      if (!activeCaseloadId) return res.render('pages/noCaseload')
 
-    const id = String(req.params.id)
-    const location = (await prisonerPropertyService.getPropertyLocations(activeCaseloadId, username)).find(
-      candidate => candidate.id === id,
-    )
-    if (!location) {
-      req.flash('error', 'That storage location could not be found.')
-      return res.redirect('/admin/locations')
-    }
-
-    return res.render('pages/admin/locations/edit', {
-      location,
-      values: { localName: location.name, capacity: String(location.capacity) },
-      errors: {},
-    })
-  })
-
-  router.post('/admin/locations/:id/edit', requireLocationAdminRole, async (req, res) => {
-    const { token, username } = res.locals.user
-    const { activeCaseloadId } = await userService.getActiveCaseload(token)
-    if (!activeCaseloadId) return res.render('pages/noCaseload')
-
-    const id = String(req.params.id)
-    const location = (await prisonerPropertyService.getPropertyLocations(activeCaseloadId, username)).find(
-      candidate => candidate.id === id,
-    )
-    if (!location) {
-      req.flash('error', 'That storage location could not be found.')
-      return res.redirect('/admin/locations')
-    }
-
-    const values = readPropertyLocationForm(req.body)
-    const errors = validatePropertyLocationForm(values, location.containersHeld)
-    if (Object.keys(errors).length > 0) {
-      return res.status(400).render('pages/admin/locations/edit', { location, values, errors })
-    }
-
-    try {
-      await prisonerPropertyService.updatePropertyLocation(
-        id,
-        { localName: values.localName, capacity: Number(values.capacity) },
-        username,
+      const id = String(req.params.id)
+      const location = (await prisonerPropertyService.getPropertyLocations(activeCaseloadId, username)).find(
+        candidate => candidate.id === id,
       )
-      req.flash('success', `Storage location “${values.localName}” updated.`)
-      return res.redirect('/admin/locations')
-    } catch (error) {
-      const status = (error as { responseStatus?: number }).responseStatus
-      if (status === 409) {
-        // A 409 is a name clash unless the capacity has since dropped below what the location now holds
-        // (a concurrent add between our read and the write).
-        const conflictErrors =
-          Number(values.capacity) < location.containersHeld
-            ? { capacity: capacityBelowHeldMessage(location.containersHeld) }
-            : { localName: 'A storage location with this name already exists' }
-        return res.status(400).render('pages/admin/locations/edit', { location, values, errors: conflictErrors })
-      }
-      if (status === 404) {
+      if (!location) {
         req.flash('error', 'That storage location could not be found.')
         return res.redirect('/admin/locations')
       }
-      throw error
-    }
-  })
 
-  router.get('/admin/locations/:id/remove', requireLocationAdminRole, async (req, res) => {
-    const { token, username } = res.locals.user
-    const { activeCaseloadId } = await userService.getActiveCaseload(token)
-    if (!activeCaseloadId) return res.render('pages/noCaseload')
+      return res.render('pages/admin/locations/edit', {
+        location,
+        values: { localName: location.name, capacity: String(location.capacity) },
+        errors: {},
+      })
+    },
+  )
 
-    const id = String(req.params.id)
-    const location = (await prisonerPropertyService.getPropertyLocations(activeCaseloadId, username)).find(
-      candidate => candidate.id === id,
-    )
-    if (!location) {
-      req.flash('error', 'That storage location could not be found.')
-      return res.redirect('/admin/locations')
-    }
+  router.post(
+    '/admin/locations/:id/edit',
+    requireLocationAdminRole,
+    captureManageLocationsReturnTo,
+    async (req, res) => {
+      const { token, username } = res.locals.user
+      const { activeCaseloadId } = await userService.getActiveCaseload(token)
+      if (!activeCaseloadId) return res.render('pages/noCaseload')
 
-    return res.render('pages/admin/locations/remove', { location })
-  })
-
-  router.post('/admin/locations/:id/remove', requireLocationAdminRole, async (req, res) => {
-    const { username } = res.locals.user
-    const id = String(req.params.id)
-
-    try {
-      await prisonerPropertyService.removePropertyLocation(id, username)
-      req.flash('success', 'Storage location removed.')
-    } catch (error) {
-      const status = (error as { responseStatus?: number }).responseStatus
-      if (status === 409) {
-        req.flash(
-          'error',
-          'This location still holds property and cannot be removed. Move or remove the containers stored here first.',
-        )
-      } else if (status === 404) {
+      const id = String(req.params.id)
+      const location = (await prisonerPropertyService.getPropertyLocations(activeCaseloadId, username)).find(
+        candidate => candidate.id === id,
+      )
+      if (!location) {
         req.flash('error', 'That storage location could not be found.')
-      } else {
+        return res.redirect('/admin/locations')
+      }
+
+      const values = readPropertyLocationForm(req.body)
+      const errors = validatePropertyLocationForm(values, location.containersHeld)
+      if (Object.keys(errors).length > 0) {
+        return res.status(400).render('pages/admin/locations/edit', { location, values, errors })
+      }
+
+      try {
+        await prisonerPropertyService.updatePropertyLocation(
+          id,
+          { localName: values.localName, capacity: Number(values.capacity) },
+          username,
+        )
+        req.flash('success', `Storage location “${values.localName}” updated.`)
+        return res.redirect('/admin/locations')
+      } catch (error) {
+        const status = (error as { responseStatus?: number }).responseStatus
+        if (status === 409) {
+          // A 409 is a name clash unless the capacity has since dropped below what the location now holds
+          // (a concurrent add between our read and the write).
+          const conflictErrors =
+            Number(values.capacity) < location.containersHeld
+              ? { capacity: capacityBelowHeldMessage(location.containersHeld) }
+              : { localName: 'A storage location with this name already exists' }
+          return res.status(400).render('pages/admin/locations/edit', { location, values, errors: conflictErrors })
+        }
+        if (status === 404) {
+          req.flash('error', 'That storage location could not be found.')
+          return res.redirect('/admin/locations')
+        }
         throw error
       }
-    }
-    return res.redirect('/admin/locations')
-  })
+    },
+  )
+
+  router.get(
+    '/admin/locations/:id/remove',
+    requireLocationAdminRole,
+    captureManageLocationsReturnTo,
+    async (req, res) => {
+      const { token, username } = res.locals.user
+      const { activeCaseloadId } = await userService.getActiveCaseload(token)
+      if (!activeCaseloadId) return res.render('pages/noCaseload')
+
+      const id = String(req.params.id)
+      const location = (await prisonerPropertyService.getPropertyLocations(activeCaseloadId, username)).find(
+        candidate => candidate.id === id,
+      )
+      if (!location) {
+        req.flash('error', 'That storage location could not be found.')
+        return res.redirect('/admin/locations')
+      }
+
+      return res.render('pages/admin/locations/remove', { location })
+    },
+  )
+
+  router.post(
+    '/admin/locations/:id/remove',
+    requireLocationAdminRole,
+    captureManageLocationsReturnTo,
+    async (req, res) => {
+      const { username } = res.locals.user
+      const id = String(req.params.id)
+
+      try {
+        await prisonerPropertyService.removePropertyLocation(id, username)
+        req.flash('success', 'Storage location removed.')
+      } catch (error) {
+        const status = (error as { responseStatus?: number }).responseStatus
+        if (status === 409) {
+          req.flash(
+            'error',
+            'This location still holds property and cannot be removed. Move or remove the containers stored here first.',
+          )
+        } else if (status === 404) {
+          req.flash('error', 'That storage location could not be found.')
+        } else {
+          throw error
+        }
+      }
+      return res.redirect('/admin/locations')
+    },
+  )
 
   return router
+}
+
+/**
+ * The manage-storage-locations button href for a "Select a storage location" page, or undefined for users
+ * without the location-admin role. Carries the current journey URL as returnTo so the management area can
+ * offer a breadcrumb back to this exact search.
+ */
+function manageLocationsHrefFor(req: Request, userRoles: string[]): string | undefined {
+  return canManageLocations(userRoles) ? `/admin/locations?returnTo=${encodeURIComponent(req.originalUrl)}` : undefined
+}
+
+/** Whether a returnTo value is a safe local path back to a "Select a storage location" journey page. */
+function isSafeLocationReturnTo(returnTo: unknown): returnTo is string {
+  return (
+    typeof returnTo === 'string' &&
+    returnTo.startsWith('/prisoner/') &&
+    !returnTo.startsWith('//') &&
+    returnTo.includes('/location') &&
+    !returnTo.includes('://')
+  )
+}
+
+/**
+ * On the storage-location management routes, remember where a user came from so they can be offered a way
+ * back. When arriving from a location-search page the button passes a `returnTo`; store it in the session so
+ * it survives the several hops through the management screens, and expose it to the views for the breadcrumb.
+ */
+const captureManageLocationsReturnTo: RequestHandler = (req, res, next) => {
+  if (isSafeLocationReturnTo(req.query.returnTo)) {
+    req.session.manageLocationsReturnTo = req.query.returnTo
+  }
+  res.locals.returnTo = req.session.manageLocationsReturnTo
+  next()
 }
 
 /** Read and trim the property-location form fields from a request body. */
