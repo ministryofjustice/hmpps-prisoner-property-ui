@@ -120,6 +120,63 @@ describe('PrisonerPropertyApiClient', () => {
     })
   })
 
+  describe('property location management', () => {
+    const location = {
+      id: 'loc-1',
+      prisonId: 'MDI',
+      code: 'PROP1',
+      name: 'Reception Store',
+      locationType: 'BOX',
+      capacity: 10,
+      containersHeld: 0,
+      availableSpaces: 10,
+    }
+
+    it('should GET the property locations for a prison using a system token', async () => {
+      nock(config.apis.prisonerPropertyApi.url)
+        .get('/property-locations/prison/MDI')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, [location])
+
+      expect(await prisonerPropertyApiClient.getPropertyLocations('MDI', 'AUSER_GEN')).toEqual([location])
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+
+    it('should POST a new property location using a system token', async () => {
+      nock(config.apis.prisonerPropertyApi.url)
+        .post('/property-locations/prison/MDI', { localName: 'Reception Store', capacity: 10 })
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(201, location)
+
+      const response = await prisonerPropertyApiClient.createPropertyLocation(
+        'MDI',
+        { localName: 'Reception Store', capacity: 10 },
+        'AUSER_GEN',
+      )
+      expect(response).toEqual(location)
+    })
+
+    it('should PUT an update to a property location using a system token', async () => {
+      nock(config.apis.prisonerPropertyApi.url)
+        .put('/property-locations/loc-1', { capacity: 25 })
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, { ...location, capacity: 25, availableSpaces: 25 })
+
+      const response = await prisonerPropertyApiClient.updatePropertyLocation('loc-1', { capacity: 25 }, 'AUSER_GEN')
+      expect(response.capacity).toEqual(25)
+    })
+
+    it('should DELETE a property location using a system token', async () => {
+      nock(config.apis.prisonerPropertyApi.url)
+        .delete('/property-locations/loc-1')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, location)
+
+      const response = await prisonerPropertyApiClient.removePropertyLocation('loc-1', 'AUSER_GEN')
+      expect(response).toEqual(location)
+    })
+  })
+
   describe('getActiveAgencyIds', () => {
     it('should GET the public /info endpoint unauthenticated and return the activeAgencies array', async () => {
       nock(config.apis.prisonerPropertyApi.url)
