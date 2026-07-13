@@ -73,6 +73,7 @@ export type PropertyEventType =
   | 'MOVED'
   | 'PRISONER_RECEIVED'
   | 'PRISONER_RELEASED'
+  | 'DIED_IN_CUSTODY'
   | 'TRANSFERRED'
   | 'RETURNED'
   | 'DISPOSAL_REQUIRED'

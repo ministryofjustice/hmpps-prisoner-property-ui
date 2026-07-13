@@ -59,6 +59,7 @@ describe('buildPrisonerTimeline', () => {
       'Property container SN880032 due for transfer out to Moorland (HMP & YOI)',
     )
     expect(titleFor('PRISONER_RELEASED')).toBe('Property container SN880032 due for return')
+    expect(titleFor('DIED_IN_CUSTODY')).toBe('Property container SN880032 due for return following death in custody')
     expect(titleFor('TRANSFERRED', { toPrisonName: 'Isle of Wight (HMP)' })).toBe(
       'Property container SN880032 transferred out to Isle of Wight (HMP)',
     )
