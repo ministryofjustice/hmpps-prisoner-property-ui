@@ -50,7 +50,7 @@
       <thead class="govuk-table__head">
         <tr class="govuk-table__row">
           <th scope="col" class="govuk-table__header">Available storage location</th>
-          <th scope="col" class="govuk-table__header">Containers held</th>
+          <th scope="col" class="govuk-table__header">Spaces left</th>
           <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
       </thead>
@@ -58,16 +58,18 @@
         {% for location in locations %}
           <tr class="govuk-table__row">
             <td class="govuk-table__cell">{{ location.name }}</td>
-            <td class="govuk-table__cell">{{ location.containerCount }}</td>
+            <td class="govuk-table__cell">{{ location.availableSpaces if location.availableSpaces > 0 else "Full" }}</td>
             <td class="govuk-table__cell govuk-!-text-align-right">
-              <form method="post">
-                <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-                <input type="hidden" name="internalLocationId" value="{{ location.id }}">
-                <input type="hidden" name="locationName" value="{{ location.name }}">
-                <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">
-                  Select location<span class="govuk-visually-hidden"> {{ location.name }}</span>
-                </button>
-              </form>
+              {% if location.availableSpaces > 0 %}
+                <form method="post">
+                  <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+                  <input type="hidden" name="internalLocationId" value="{{ location.id }}">
+                  <input type="hidden" name="locationName" value="{{ location.name }}">
+                  <button class="govuk-button govuk-button--secondary govuk-!-margin-bottom-0" data-module="govuk-button">
+                    Select location<span class="govuk-visually-hidden"> {{ location.name }}</span>
+                  </button>
+                </form>
+              {% endif %}
             </td>
           </tr>
         {% endfor %}

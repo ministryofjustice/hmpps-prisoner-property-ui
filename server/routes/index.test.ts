@@ -376,7 +376,7 @@ describe('GET /', () => {
     withActiveCaseload()
     prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
     prisonerPropertyService.getPrisonPropertySummary.mockResolvedValue({
-      availableStorageLocations: 150,
+      availableStorageSpaces: 150,
       storedOnSite: 3000,
       dueToTransferOut: 80,
       dueToBeReturned: 0,
@@ -387,7 +387,7 @@ describe('GET /', () => {
       .get('/')
       .expect(200)
       .expect(res => {
-        expect(res.text).toContain('Available storage locations on-site')
+        expect(res.text).toContain('Available storage spaces on-site')
         expect(res.text).toContain('150')
         expect(res.text).toContain('Property containers stored on-site')
         expect(res.text).toContain('3000')
@@ -962,6 +962,8 @@ const box = (overrides: Partial<BoxLocation>): BoxLocation => ({
   pathHierarchy: 'RECP-PROP1',
   name: 'Reception Store',
   containerCount: 0,
+  capacity: 10,
+  availableSpaces: 10,
   ...overrides,
 })
 

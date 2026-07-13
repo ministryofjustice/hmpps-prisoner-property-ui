@@ -45,7 +45,7 @@ test.describe('Establishment property list', () => {
     await prisonerPropertyApi.stubGetPrisonPropertySummary({
       prisonId: 'MDI',
       summary: {
-        availableStorageLocations: 150,
+        availableStorageSpaces: 150,
         storedOnSite: 3000,
         dueToTransferOut: 80,
         dueToBeReturned: 70,
@@ -57,7 +57,7 @@ test.describe('Establishment property list', () => {
 
     const listPage = await PropertyListPage.verifyOnPage(page)
     await expect(listPage.summary).toBeVisible()
-    await expect(listPage.summaryValue('summary-available-locations')).toHaveText('150')
+    await expect(listPage.summaryValue('summary-available-spaces')).toHaveText('150')
     await expect(listPage.summaryValue('summary-stored')).toHaveText('3000')
     await expect(listPage.summaryValue('summary-transfer-out')).toHaveText('80')
     await expect(listPage.summaryValue('summary-returned')).toHaveText('70')
