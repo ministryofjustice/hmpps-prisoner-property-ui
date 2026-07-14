@@ -3,6 +3,7 @@ import { buildPrisonerTimeline } from './prisonerTimeline'
 
 const containerEvent = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTimelineItem => ({
   itemType: 'CONTAINER_EVENT',
+  movementKind: null,
   eventId: 'e1',
   eventType: 'CREATED_SEALED',
   eventStatus: 'STORED',
@@ -28,6 +29,7 @@ const containerEvent = (overrides: Partial<PrisonerTimelineItem> = {}): Prisoner
 const movement = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTimelineItem =>
   containerEvent({
     itemType: 'PRISONER_MOVEMENT',
+    movementKind: 'ADMISSION',
     eventType: null,
     eventStatus: null,
     systemGenerated: true,
@@ -113,11 +115,14 @@ describe('buildPrisonerTimeline', () => {
     )
   })
 
-  it('renders a prisoner movement as an "arrived at" row with no container details', () => {
-    const [row] = buildPrisonerTimeline([movement()], 'A1234BC')
-    expect(row.title).toBe('JOHN SMITH arrived at Moorland (HMP & YOI)')
-    expect(row.byline).toBe('System generated, Moorland (HMP & YOI)')
-    expect(row.details).toBeNull()
+  it('renders a prisoner movement as an admission or transfer-in row with no container details', () => {
+    const [admission] = buildPrisonerTimeline([movement({ movementKind: 'ADMISSION' })], 'A1234BC')
+    expect(admission.title).toBe('Admitted to Moorland (HMP & YOI)')
+    expect(admission.byline).toBe('System generated, Moorland (HMP & YOI)')
+    expect(admission.details).toBeNull()
+
+    const [transfer] = buildPrisonerTimeline([movement({ movementKind: 'TRANSFER_IN' })], 'A1234BC')
+    expect(transfer.title).toBe('Transferred in to Moorland (HMP & YOI)')
   })
 
   it('exposes the container summary and history link in the expandable details', () => {
