@@ -56,6 +56,10 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     return `Scheduled for release on ${formatDate(item.eventDate)}`
   }
 
+  if (item.itemType === 'DPS_FIRST_USED') {
+    return `Property management started in DPS at ${item.toPrisonName ?? 'this establishment'}`
+  }
+
   const container = containerPrefix(item.sealNumber)
   const establishment = item.actingEstablishmentName ?? 'this establishment'
   const toPrison = item.toPrisonName ?? 'another establishment'
