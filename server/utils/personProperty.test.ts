@@ -108,7 +108,7 @@ describe('buildPersonPropertyView', () => {
     expect(view.inEstablishment.map(r => r.container.id)).toEqual(['here'])
     expect(view.inEstablishment[0]!.status).toEqual({ text: 'Stored', classes: 'govuk-tag--green' })
     expect(view.dueToTransferIn.map(r => r.container.id)).toEqual(['away'])
-    expect(view.dueToTransferIn[0]!.status).toEqual({ text: 'Due for transfer in', classes: 'govuk-tag--blue' })
+    expect(view.dueToTransferIn[0]!.status).toEqual({ text: 'Due for transfer in', classes: 'govuk-tag--turquoise' })
   })
 
   it('variant B: prisoner has left - held property becomes Due for transfer out with no transfer-in section', () => {
