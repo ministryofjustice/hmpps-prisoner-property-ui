@@ -324,6 +324,29 @@ describe('GET /', () => {
       })
   })
 
+  it('maps the "Due for transfer in" filter to dueForTransferIn, not a status', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: 'MDI',
+      activeCaseloadName: 'Moorland (HMP & YOI)',
+      caseloadIds: ['MDI'],
+    })
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+
+    return request(app)
+      .get('/?status=DUE_FOR_TRANSFER_IN&status=DUE_FOR_RETURN')
+      .expect(200)
+      .expect(() => {
+        expect(prisonerPropertyService.getPrisonProperty).toHaveBeenCalledWith(
+          'MDI',
+          expect.objectContaining({
+            status: ['DUE_FOR_RETURN'],
+            dueForTransferIn: true,
+          }),
+          user.username,
+        )
+      })
+  })
+
   it('renders an uppercase prisoner name in title case', async () => {
     userService.getActiveCaseload.mockResolvedValue({
       activeCaseloadId: 'MDI',

@@ -34,10 +34,29 @@ export const ALL_STATUSES = Object.keys(STATUS_TAGS) as ContainerStatus[]
 export const ALL_CONTAINER_TYPES = Object.keys(CONTAINER_TYPE_LABELS) as ContainerType[]
 const ALL_PERSON_LOCATIONS: PersonLocation[] = ['IN_ESTABLISHMENT', 'LEFT_ESTABLISHMENT']
 
+// A pseudo-status the "Due for transfer in" checkbox submits alongside the real statuses. It is not a
+// ContainerStatus (it's a cross-prison relationship), so it is parsed out into its own boolean and sent
+// to the API as dueForTransferIn rather than as a status.
+export const TRANSFER_IN_FILTER_VALUE = 'DUE_FOR_TRANSFER_IN'
+
 export const isPrisonerNumber = (value: string): boolean => PRISON_NUMBER_PATTERN.test(value)
 
 export const statusTag = (status: ContainerStatus): { text: string; classes: string } =>
   STATUS_TAGS[status] ?? { text: status, classes: 'govuk-tag--grey' }
+
+/**
+ * The status tag for a container in the establishment list, relative to the viewed establishment. A
+ * container physically held at another prison is due to be transferred *in* here (its owner was received
+ * here), so it reads "Due for transfer in" rather than the API's viewer-independent "Due for transfer
+ * out". Everything held here uses its own status.
+ */
+export const establishmentListStatusTag = (
+  container: PrisonerPropertyContainer,
+  viewedPrisonId: string,
+): { text: string; classes: string } => {
+  if (container.prisonId !== viewedPrisonId) return { text: 'Due for transfer in', classes: 'govuk-tag--turquoise' }
+  return statusTag(container.currentStatus)
+}
 
 export const containerTypeLabel = (type: ContainerType): string => CONTAINER_TYPE_LABELS[type] ?? type
 
@@ -71,6 +90,7 @@ export interface ParsedPropertyListQuery {
   statuses: ContainerStatus[]
   includeRemoved: boolean
   personLocations: PersonLocation[]
+  dueForTransferIn: boolean
   page: number
   apiQuery: PrisonPropertyListQuery
 }
@@ -81,9 +101,12 @@ export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_S
   const containerTypes = toArray(reqQuery.containerType).filter((type): type is ContainerType =>
     ALL_CONTAINER_TYPES.includes(type as ContainerType),
   )
-  const statuses = toArray(reqQuery.status).filter((status): status is ContainerStatus =>
+  const rawStatuses = toArray(reqQuery.status)
+  const statuses = rawStatuses.filter((status): status is ContainerStatus =>
     ALL_STATUSES.includes(status as ContainerStatus),
   )
+  // The "Due for transfer in" checkbox shares the status group but isn't a real status - pull it out.
+  const dueForTransferIn = rawStatuses.includes(TRANSFER_IN_FILTER_VALUE)
   const personLocations = toArray(reqQuery.personLocation).filter((value): value is PersonLocation =>
     ALL_PERSON_LOCATIONS.includes(value as PersonLocation),
   )
@@ -100,11 +123,12 @@ export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_S
     // In vs no-longer-in are complementary, so only a single ticked box narrows the list; both/neither is
     // "everyone" and sends nothing.
     personLocation: personLocations.length === 1 ? personLocations[0] : undefined,
+    dueForTransferIn: dueForTransferIn || undefined,
     page: page - 1, // API pages are zero-based
     size,
   }
 
-  return { search, containerTypes, statuses, includeRemoved, personLocations, page, apiQuery }
+  return { search, containerTypes, statuses, includeRemoved, personLocations, dueForTransferIn, page, apiQuery }
 }
 
 export interface PaginationItem {

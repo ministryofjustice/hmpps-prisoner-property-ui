@@ -12,6 +12,7 @@ import {
   isPrisonerNumber,
   parsePropertyListQuery,
   statusTag,
+  TRANSFER_IN_FILTER_VALUE,
 } from '../utils/propertyList'
 import { buildPersonPropertyView } from '../utils/personProperty'
 import { buildPrisonerBanner, fallbackPrisonerBanner } from '../utils/prisonerBanner'
@@ -70,7 +71,7 @@ export default function routes({
       return res.render('pages/noCaseload')
     }
 
-    const { search, containerTypes, statuses, includeRemoved, personLocations, page, apiQuery } =
+    const { search, containerTypes, statuses, includeRemoved, personLocations, dueForTransferIn, page, apiQuery } =
       parsePropertyListQuery(req.query, DEFAULT_PAGE_SIZE)
 
     // The summary counts come from a separate endpoint. Fetch it alongside the list, but degrade
@@ -90,6 +91,8 @@ export default function routes({
     if (search) baseQueryParams.set('q', search)
     containerTypes.forEach(type => baseQueryParams.append('containerType', type))
     statuses.forEach(status => baseQueryParams.append('status', status))
+    // "Due for transfer in" shares the status checkbox group, so it round-trips as a status value.
+    if (dueForTransferIn) baseQueryParams.append('status', TRANSFER_IN_FILTER_VALUE)
     personLocations.forEach(location => baseQueryParams.append('personLocation', location))
     if (includeRemoved) baseQueryParams.set('includeRemoved', 'true')
 
@@ -106,6 +109,7 @@ export default function routes({
       successMessage: req.flash('success')[0],
       includeRemoved,
       summary,
+      viewedPrisonId: activeCaseloadId,
       groups: result.content,
       pagination: buildPagination(
         page,
@@ -137,7 +141,11 @@ export default function routes({
           text: statusTag('DUE_FOR_TRANSFER_OUT').text,
           checked: statuses.includes('DUE_FOR_TRANSFER_OUT'),
         },
-        { value: 'TRANSFER_IN_PLACEHOLDER', text: 'Due for transfer in', disabled: true },
+        {
+          value: TRANSFER_IN_FILTER_VALUE,
+          text: 'Due for transfer in',
+          checked: dueForTransferIn,
+        },
       ],
       personLocationItems: [
         {
