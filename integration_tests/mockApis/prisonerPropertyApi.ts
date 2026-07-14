@@ -266,7 +266,12 @@ export default {
     }),
 
   stubSetAgencyActive: (
-    { agencyId = 'MDI', name = agencyId, active = true, priority = undefined as number | undefined } = {},
+    {
+      agencyId = 'MDI',
+      name = agencyId,
+      active = true,
+      priority = undefined,
+    }: { agencyId?: string; name?: string; active?: boolean; priority?: number } = {},
     httpStatus = 200,
   ): SuperAgentRequest =>
     stubFor({
