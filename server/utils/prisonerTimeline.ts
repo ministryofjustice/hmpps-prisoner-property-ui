@@ -72,6 +72,8 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
       return `${container} due for transfer out to ${toPrison}`
     case 'PRISONER_RELEASED':
       return `${container} due for return`
+    case 'DIED_IN_CUSTODY':
+      return `${container} due for return following death in custody`
     case 'TRANSFERRED':
       return `${container} transferred out to ${toPrison}`
     case 'RETURNED':

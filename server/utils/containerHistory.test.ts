@@ -25,6 +25,7 @@ describe('eventTypeLabel', () => {
     expect(eventTypeLabel('CREATED_SEALED')).toBe('Added to storage')
     expect(eventTypeLabel('MOVED')).toBe('Storage location changed')
     expect(eventTypeLabel('DISPOSED')).toBe('Removed – disposed')
+    expect(eventTypeLabel('DIED_IN_CUSTODY')).toBe('Due for return – death in custody')
   })
 
   it('labels the "details changed" events the same and groups removals', () => {
@@ -64,6 +65,9 @@ describe('eventDescription', () => {
     )
     expect(eventDescription(event({ eventType: 'PRISONER_RELEASED' }))).toBe(
       'The person was released, so this property is due to be returned.',
+    )
+    expect(eventDescription(event({ eventType: 'DIED_IN_CUSTODY' }))).toBe(
+      "Following the person's death in custody, this property is due to be returned.",
     )
   })
 
