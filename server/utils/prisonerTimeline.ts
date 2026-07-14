@@ -1,5 +1,6 @@
 import type { ContainerStatus, PrisonerTimelineItem } from '../data/prisonerPropertyApiTypes'
 import { containerTypeLabel } from './propertyList'
+import { formatDate } from './utils'
 
 export interface TimelineTag {
   text: string
@@ -48,6 +49,10 @@ const containerPrefix = (seal: string | null): string => (seal ? `Property conta
 const timelineTitle = (item: PrisonerTimelineItem): string => {
   if (item.itemType === 'PRISONER_MOVEMENT') {
     return `${item.prisonerName ?? 'This person'} arrived at ${item.toPrisonName ?? 'another establishment'}`
+  }
+
+  if (item.itemType === 'SCHEDULED_FOR_RELEASE') {
+    return `Scheduled for release on ${formatDate(item.eventDate)}`
   }
 
   const container = containerPrefix(item.sealNumber)

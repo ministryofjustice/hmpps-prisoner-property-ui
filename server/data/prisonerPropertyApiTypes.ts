@@ -102,7 +102,7 @@ export interface PropertyEvent {
   relatedContainerId: string | null
 }
 
-export type TimelineItemType = 'CONTAINER_EVENT' | 'PRISONER_MOVEMENT'
+export type TimelineItemType = 'CONTAINER_EVENT' | 'PRISONER_MOVEMENT' | 'SCHEDULED_FOR_RELEASE'
 
 // A single item in a prisoner's whole-property history timeline
 // (GET /property-containers/prisoner/{prisonerNumber}/events), newest first. See

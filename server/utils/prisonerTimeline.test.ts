@@ -73,6 +73,23 @@ describe('buildPrisonerTimeline', () => {
     expect(titleFor('CREATED_SEALED', { sealNumber: null })).toBe('Property container added to storage at Leeds (HMP)')
   })
 
+  it('renders a scheduled-for-release item from its release date, with no tag or details', () => {
+    const [row] = buildPrisonerTimeline(
+      [
+        containerEvent({
+          itemType: 'SCHEDULED_FOR_RELEASE',
+          eventType: null,
+          eventStatus: null,
+          eventDate: '2026-08-12',
+        }),
+      ],
+      'A1234BC',
+    )
+    expect(row.title).toBe('Scheduled for release on 12 August 2026')
+    expect(row.tag).toBeNull()
+    expect(row.details).toBeNull()
+  })
+
   it('maps the event status to a tag, and leaves movement items untagged', () => {
     const [event] = buildPrisonerTimeline([containerEvent({ eventStatus: 'TRANSFER' })], 'A1234BC')
     expect(event.tag).toEqual({ text: 'Transferred out', classes: 'govuk-tag--grey' })
