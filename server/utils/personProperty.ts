@@ -98,5 +98,5 @@ const inEstablishmentStatus = (container: PrisonerPropertyContainer, prisonerHer
 const transferInStatus = (container: PrisonerPropertyContainer): PropertyStatusTag => {
   if (container.currentStatus === 'DISPOSAL_REQUIRED') return { text: 'Due for disposal', classes: 'govuk-tag--orange' }
   if (container.currentStatus === 'DUE_FOR_RETURN') return { text: 'Due for return', classes: 'govuk-tag--yellow' }
-  return { text: 'Due for transfer in', classes: 'govuk-tag--blue' }
+  return { text: 'Due for transfer in', classes: 'govuk-tag--turquoise' }
 }
