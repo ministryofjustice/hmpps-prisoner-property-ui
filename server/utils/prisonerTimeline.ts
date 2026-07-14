@@ -49,7 +49,9 @@ const containerPrefix = (seal: string | null): string => (seal ? `Property conta
 const timelineTitle = (item: PrisonerTimelineItem): string => {
   if (item.itemType === 'PRISONER_MOVEMENT') {
     const prison = item.toPrisonName ?? 'another establishment'
-    return item.movementKind === 'TRANSFER_IN' ? `Transferred in to ${prison}` : `Admitted to ${prison}`
+    const arrival = item.movementKind === 'TRANSFER_IN' ? `Transferred in to ${prison}` : `Admitted to ${prison}`
+    // The receiving establishment's property system at that date: DPS or NOMIS.
+    return item.propertySystem ? `${arrival} — property managed in ${item.propertySystem}` : arrival
   }
 
   if (item.itemType === 'SCHEDULED_FOR_RELEASE') {

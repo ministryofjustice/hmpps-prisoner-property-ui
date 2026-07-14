@@ -4,6 +4,7 @@ import { buildPrisonerTimeline } from './prisonerTimeline'
 const containerEvent = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTimelineItem => ({
   itemType: 'CONTAINER_EVENT',
   movementKind: null,
+  propertySystem: null,
   eventId: 'e1',
   eventType: 'CREATED_SEALED',
   eventStatus: 'STORED',
@@ -145,6 +146,14 @@ describe('buildPrisonerTimeline', () => {
 
     const [transfer] = buildPrisonerTimeline([movement({ movementKind: 'TRANSFER_IN' })], 'A1234BC')
     expect(transfer.title).toBe('Transferred in to Moorland (HMP & YOI)')
+  })
+
+  it('appends the receiving prison’s property system to an arrival title when known', () => {
+    const [nomis] = buildPrisonerTimeline([movement({ movementKind: 'ADMISSION', propertySystem: 'NOMIS' })], 'A1234BC')
+    expect(nomis.title).toBe('Admitted to Moorland (HMP & YOI) — property managed in NOMIS')
+
+    const [dps] = buildPrisonerTimeline([movement({ movementKind: 'TRANSFER_IN', propertySystem: 'DPS' })], 'A1234BC')
+    expect(dps.title).toBe('Transferred in to Moorland (HMP & YOI) — property managed in DPS')
   })
 
   it('exposes the container summary and history link in the expandable details', () => {

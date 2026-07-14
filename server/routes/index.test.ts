@@ -741,6 +741,7 @@ const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
 const timelineItem = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTimelineItem => ({
   itemType: 'CONTAINER_EVENT',
   movementKind: null,
+  propertySystem: null,
   eventId: 'e1',
   eventType: 'CREATED_SEALED',
   eventStatus: 'STORED',
