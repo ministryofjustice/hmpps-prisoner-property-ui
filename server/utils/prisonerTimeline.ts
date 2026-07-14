@@ -48,7 +48,12 @@ const containerPrefix = (seal: string | null): string => (seal ? `Property conta
 /** The title sentence for a timeline item, using the resolved prison names and seal-as-of-event. */
 const timelineTitle = (item: PrisonerTimelineItem): string => {
   if (item.itemType === 'PRISONER_MOVEMENT') {
-    return `${item.prisonerName ?? 'This person'} arrived at ${item.toPrisonName ?? 'another establishment'}`
+    const prison = item.toPrisonName ?? 'another establishment'
+    return item.movementKind === 'TRANSFER_IN' ? `Transferred in to ${prison}` : `Admitted to ${prison}`
+  }
+
+  if (item.itemType === 'SCHEDULED_FOR_RELEASE') {
+    return `Scheduled for release on ${formatDate(item.eventDate)}`
   }
 
   if (item.itemType === 'SCHEDULED_FOR_RELEASE') {

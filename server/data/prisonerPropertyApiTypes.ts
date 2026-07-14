@@ -110,8 +110,12 @@ export type TimelineItemType = 'CONTAINER_EVENT' | 'PRISONER_MOVEMENT' | 'SCHEDU
 // PrisonerTimelineItemDto in the API for the source of truth. Prison and location ids are already
 // resolved to names; seal number and acting establishment are the values as at that point in the
 // container's history. Container fields are null for prisoner-movement items.
+// For a prisoner-movement item, whether it was an initial admission into custody or a transfer in from another prison.
+export type MovementKind = 'ADMISSION' | 'TRANSFER_IN'
+
 export interface PrisonerTimelineItem {
   itemType: TimelineItemType
+  movementKind: MovementKind | null
   eventId: string
   eventType: PropertyEventType | null
   eventStatus: ContainerStatus | null

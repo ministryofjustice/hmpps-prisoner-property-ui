@@ -717,6 +717,7 @@ const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
 
 const timelineItem = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTimelineItem => ({
   itemType: 'CONTAINER_EVENT',
+  movementKind: null,
   eventId: 'e1',
   eventType: 'CREATED_SEALED',
   eventStatus: 'STORED',
@@ -746,6 +747,7 @@ describe('GET /prisoner/:prisonerNumber/history', () => {
     prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([
       timelineItem({
         itemType: 'PRISONER_MOVEMENT',
+        movementKind: 'ADMISSION',
         eventType: null,
         eventStatus: null,
         systemGenerated: true,
@@ -777,7 +779,7 @@ describe('GET /prisoner/:prisonerNumber/history', () => {
         expect(res.text).toContain('Transferred out')
         expect(res.text).toContain('by AUSER, Leeds (HMP)')
         // the prisoner movement line
-        expect(res.text).toContain('JOHN SMITH arrived at Moorland (HMP &amp; YOI)')
+        expect(res.text).toContain('Admitted to Moorland (HMP &amp; YOI)')
         // the expandable container details + link
         expect(res.text).toContain('Property container details')
         expect(res.text).toContain('/prisoner/A1234BC/container/c1')
