@@ -56,10 +56,6 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     return `Scheduled for release on ${formatDate(item.eventDate)}`
   }
 
-  if (item.itemType === 'SCHEDULED_FOR_RELEASE') {
-    return `Scheduled for release on ${formatDate(item.eventDate)}`
-  }
-
   const container = containerPrefix(item.sealNumber)
   const establishment = item.actingEstablishmentName ?? 'this establishment'
   const toPrison = item.toPrisonName ?? 'another establishment'
