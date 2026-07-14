@@ -985,6 +985,13 @@ const manageApp = () =>
     userSupplier: () => manageUser,
   })
 
+const locationAdminManageUser = { ...user, userRoles: ['PRISONERPROP__MANAGE', 'PRISONERPROP__LOCATION_ADMIN'] }
+const locationAdminManageApp = () =>
+  appWithAllRoutes({
+    services: { auditService, prisonerPropertyService, prisonerService, userService, activeAgenciesService },
+    userSupplier: () => locationAdminManageUser,
+  })
+
 describe('Add container journey - access control', () => {
   it('renders the Add property button on the person view for a user with the manage role', async () => {
     withActiveCaseload()
@@ -1248,6 +1255,49 @@ describe('Add container journey - steps', () => {
       Page.ADD_PROPERTY_CONTAINER,
       expect.objectContaining({ subjectId: 'A1234BC', details: { count: 1 } }),
     )
+  })
+
+  it('shows a Manage storage locations button on the location page for a location admin, returning here', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
+    prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
+
+    const agent = request.agent(locationAdminManageApp())
+    await startJourney(agent)
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({ 'containers[0][sealNumber]': 'SN9', 'containers[0][containerType]': 'VALUABLES' })
+      .expect(302)
+
+    await agent
+      .get('/prisoner/A1234BC/add-container/location/0')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('data-qa="manage-locations"')
+        expect(res.text).toContain(
+          `/admin/locations?returnTo=${encodeURIComponent('/prisoner/A1234BC/add-container/location/0')}`,
+        )
+      })
+  })
+
+  it('hides the Manage storage locations button from a user without the location-admin role', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
+    prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
+
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({ 'containers[0][sealNumber]': 'SN9', 'containers[0][containerType]': 'VALUABLES' })
+      .expect(302)
+
+    await agent
+      .get('/prisoner/A1234BC/add-container/location/0')
+      .expect(200)
+      .expect(res => expect(res.text).not.toContain('data-qa="manage-locations"'))
   })
 
   it('adds multiple containers in one journey, skipping the location step for excess', async () => {
@@ -2267,7 +2317,7 @@ describe('Admin - manage storage locations', () => {
       })
   })
 
-  it('shows the manage-storage-locations link for a location admin', async () => {
+  it('no longer shows a manage-storage-locations link on the main page', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
 
@@ -2275,8 +2325,43 @@ describe('Admin - manage storage locations', () => {
       .get('/')
       .expect(200)
       .expect(res => {
-        expect(res.text).toContain('/admin/locations')
-        expect(res.text).toContain('Manage storage locations')
+        expect(res.text).not.toContain('data-qa="manage-locations-link"')
+        expect(res.text).not.toContain('/admin/locations')
+      })
+  })
+
+  it('remembers a safe returnTo and offers a breadcrumb back to the location search', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
+    const returnTo = '/prisoner/A1234BC/add-container/location/0'
+
+    const agent = request.agent(locationAdminApp())
+    // Arrive from the search with a returnTo - it is remembered and shown as a breadcrumb.
+    await agent
+      .get(`/admin/locations?returnTo=${encodeURIComponent(returnTo)}`)
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Select a storage location')
+        expect(res.text).toContain(returnTo)
+      })
+
+    // A later visit without the param still shows it (held in session across the management round-trips).
+    await agent
+      .get('/admin/locations')
+      .expect(200)
+      .expect(res => expect(res.text).toContain(returnTo))
+  })
+
+  it('ignores an unsafe returnTo', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
+
+    return request(locationAdminApp())
+      .get('/admin/locations?returnTo=https://evil.example')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).not.toContain('evil.example')
+        expect(res.text).not.toContain('Select a storage location')
       })
   })
 })

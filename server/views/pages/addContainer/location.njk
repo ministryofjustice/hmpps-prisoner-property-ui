@@ -43,6 +43,17 @@
     <a class="govuk-link govuk-!-margin-left-2" href="?" data-qa="clear-search">Clear search</a>
   </form>
 
+  {% if manageLocationsHref %}
+    <p class="govuk-body">
+      {{ govukButton({
+        text: "Manage storage locations",
+        href: manageLocationsHref,
+        classes: "govuk-button--secondary",
+        attributes: { "data-qa": "manage-locations" }
+      }) }}
+    </p>
+  {% endif %}
+
   {% if locations.length == 0 %}
     <p class="govuk-body" data-qa="no-locations">No available storage locations found.</p>
   {% else %}

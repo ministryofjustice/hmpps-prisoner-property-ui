@@ -8,12 +8,14 @@
 {% set mainClasses = "govuk-body" %}
 
 {% block beforeContent %}
-  {{ govukBreadcrumbs({ items: [
+  {% set crumbs = [
     { text: "Digital Prison Services", href: dpsUrl },
-    { text: "Prisoner property", href: "/" },
-    { text: "Manage storage locations", href: "/admin/locations" },
-    { text: "Remove a storage location" }
-  ] }) }}
+    { text: "Prisoner property", href: "/" }
+  ] %}
+  {% if returnTo %}{% set _ = crumbs.push({ text: "Select a storage location", href: returnTo }) %}{% endif %}
+  {% set _ = crumbs.push({ text: "Manage storage locations", href: "/admin/locations" }) %}
+  {% set _ = crumbs.push({ text: "Remove a storage location" }) %}
+  {{ govukBreadcrumbs({ items: crumbs }) }}
 {% endblock %}
 
 {% block content %}
