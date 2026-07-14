@@ -4,7 +4,13 @@ import nunjucks from 'nunjucks'
 import express from 'express'
 import fs from 'fs'
 import { initialiseName, formatDate, formatShortDate, formatDateTime, convertToTitleCase } from './utils'
-import { statusTag, containerTypeLabel, containerLocation, establishmentLabel } from './propertyList'
+import {
+  statusTag,
+  establishmentListStatusTag,
+  containerTypeLabel,
+  containerLocation,
+  establishmentLabel,
+} from './propertyList'
 import { removalOutcomeLabel } from './personProperty'
 import { eventTypeLabel, eventDescription } from './containerHistory'
 import config from '../config'
@@ -50,6 +56,7 @@ export default function nunjucksSetup(app: express.Express): void {
   njkEnv.addFilter('formatShortDate', formatShortDate)
   njkEnv.addFilter('formatDateTime', formatDateTime)
   njkEnv.addFilter('statusTag', statusTag)
+  njkEnv.addFilter('establishmentListStatusTag', establishmentListStatusTag)
   njkEnv.addFilter('containerTypeLabel', containerTypeLabel)
   njkEnv.addFilter('containerLocation', containerLocation)
   njkEnv.addFilter('establishmentLabel', establishmentLabel)

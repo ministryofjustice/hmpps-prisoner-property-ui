@@ -212,6 +212,9 @@ export interface PrisonPropertyListQuery {
   // Where the property's owner currently is, from prisoner-search. Set only when exactly one of the two
   // person-location checkboxes is ticked (both/neither means "everyone", so it's omitted).
   personLocation?: PersonLocation
+  // Additionally surface property held at another prison that is due to be transferred in to this
+  // establishment (its owner was received here). Additive to the held-here list.
+  dueForTransferIn?: boolean
   page?: number
   size?: number
 }

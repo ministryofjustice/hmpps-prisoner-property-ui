@@ -5,6 +5,7 @@ import {
   containerLocation,
   containerTypeLabel,
   establishmentLabel,
+  establishmentListStatusTag,
   isPrisonerNumber,
   parsePropertyListQuery,
   statusTag,
@@ -31,6 +32,26 @@ describe('propertyList utils', () => {
       expect(statusTag('DISPOSAL_REQUIRED')).toEqual({ text: 'Due for disposal', classes: 'govuk-tag--orange' })
       expect(statusTag('DUE_FOR_TRANSFER_OUT')).toEqual({ text: 'Due for transfer out', classes: 'govuk-tag--yellow' })
       expect(statusTag('DUE_FOR_RETURN')).toEqual({ text: 'Due for return', classes: 'govuk-tag--yellow' })
+    })
+  })
+
+  describe('establishmentListStatusTag', () => {
+    it('tags property held at another prison as "Due for transfer in" relative to the viewed prison', () => {
+      const incoming = { prisonId: 'LEI', currentStatus: 'DUE_FOR_TRANSFER_OUT' } as PrisonerPropertyContainer
+
+      expect(establishmentListStatusTag(incoming, 'MDI')).toEqual({
+        text: 'Due for transfer in',
+        classes: 'govuk-tag--turquoise',
+      })
+    })
+
+    it('uses the container status for property held at the viewed prison', () => {
+      const heldHere = { prisonId: 'MDI', currentStatus: 'DUE_FOR_TRANSFER_OUT' } as PrisonerPropertyContainer
+
+      expect(establishmentListStatusTag(heldHere, 'MDI')).toEqual({
+        text: 'Due for transfer out',
+        classes: 'govuk-tag--yellow',
+      })
     })
   })
 
@@ -121,6 +142,26 @@ describe('propertyList utils', () => {
 
       expect(result.statuses).toEqual(['DUE_FOR_RETURN'])
       expect(result.apiQuery.status).toEqual(['DUE_FOR_RETURN'])
+    })
+
+    it('pulls the "Due for transfer in" pseudo-status out into the dueForTransferIn flag', () => {
+      const result = parsePropertyListQuery(
+        { status: ['DUE_FOR_TRANSFER_IN', 'DUE_FOR_RETURN'] } as unknown as ParsedQs,
+        20,
+      )
+
+      // It isn't a real status, so it never reaches the API's status list.
+      expect(result.statuses).toEqual(['DUE_FOR_RETURN'])
+      expect(result.dueForTransferIn).toBe(true)
+      expect(result.apiQuery.status).toEqual(['DUE_FOR_RETURN'])
+      expect(result.apiQuery.dueForTransferIn).toBe(true)
+    })
+
+    it('leaves dueForTransferIn unset when the box is not ticked', () => {
+      const result = parsePropertyListQuery({ status: 'DUE_FOR_RETURN' } as unknown as ParsedQs, 20)
+
+      expect(result.dueForTransferIn).toBe(false)
+      expect(result.apiQuery.dueForTransferIn).toBeUndefined()
     })
 
     it('passes a single person-location filter to the API', () => {

@@ -173,7 +173,7 @@ test.describe('Establishment property list', () => {
     await expect(listPage.pagination).toHaveCount(2)
   })
 
-  test('exposes the four filter groups with disabled placeholders for unsupported filters', async ({ page }) => {
+  test('exposes the filter groups as real, submittable checkboxes', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
     await page.goto('/')
@@ -189,15 +189,42 @@ test.describe('Establishment property list', () => {
     await expect(
       listPage.filters.getByRole('checkbox', { name: 'Show property that has been returned or disposed of' }),
     ).toBeEnabled()
-    // Person-location filters are now enabled.
+    // Person-location filters are enabled.
     await expect(
       listPage.filters.getByRole('checkbox', { name: 'Property for people in this establishment' }),
     ).toBeEnabled()
     await expect(
       listPage.filters.getByRole('checkbox', { name: 'Property for people no longer in this establishment' }),
     ).toBeEnabled()
-    // The remaining group is a placeholder until the API supports it.
-    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeDisabled()
+    // "Due for transfer in" is now backed by the API's receiving-prison view.
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeEnabled()
+  })
+
+  test('surfaces incoming property with a Due for transfer in tag when the filter is applied', async ({ page }) => {
+    // Held at another prison (LEI) but its owner is now at the viewed establishment (MDI), so it is due
+    // to be transferred in. The API reports it as DUE_FOR_TRANSFER_OUT; the list relabels it for MDI.
+    const incoming: PrisonerPropertyGroup = {
+      ...group,
+      prisonerCurrentPrisonId: 'MDI',
+      prisonerCurrentPrisonName: 'Moorland (HMP & YOI)',
+      containers: [
+        {
+          ...group.containers[0]!,
+          prisonId: 'LEI',
+          prisonName: 'Leeds (HMP)',
+          currentStatus: 'DUE_FOR_TRANSFER_OUT',
+          currentLocationType: 'INTERNAL',
+        },
+      ],
+    }
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [incoming], priority: 1 })
+    await page.goto('/?status=DUE_FOR_TRANSFER_IN')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await expect(page.getByRole('cell', { name: 'Due for transfer in' })).toBeVisible()
+    await listPage.filters.locator('summary').click()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeChecked()
   })
 
   test('keeps the person-location filter ticked when applied', async ({ page }) => {
