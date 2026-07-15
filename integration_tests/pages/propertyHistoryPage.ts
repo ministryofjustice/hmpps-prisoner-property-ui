@@ -14,8 +14,6 @@ export default class PropertyHistoryPage extends AbstractPage {
 
   readonly noHistory: Locator
 
-  readonly migrationNote: Locator
-
   private constructor(page: Page) {
     super(page)
     this.name = page.getByTestId('prisoner-name')
@@ -24,7 +22,6 @@ export default class PropertyHistoryPage extends AbstractPage {
     this.tabHistory = page.getByTestId('tab-history')
     this.timeline = page.getByTestId('property-timeline')
     this.noHistory = page.getByTestId('no-history')
-    this.migrationNote = page.getByTestId('history-migration-note')
   }
 
   static async verifyOnPage(page: Page): Promise<PropertyHistoryPage> {

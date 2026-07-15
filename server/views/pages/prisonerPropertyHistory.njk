@@ -3,7 +3,6 @@
 {% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/details/macro.njk" import govukDetails %}
-{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 
 {% set pageTitle = applicationName + " - Property history" %}
@@ -74,10 +73,5 @@
         </div>
       {% endfor %}
     </div>
-
-    {{ govukInsetText({
-      attributes: { "data-qa": "history-migration-note" },
-      html: "Property containers can now be managed in DPS. History events before " + migrationDate + " may not display in full."
-    }) }}
   {% endif %}
 {% endblock %}
