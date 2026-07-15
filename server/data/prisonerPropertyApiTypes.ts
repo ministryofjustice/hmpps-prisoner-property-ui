@@ -113,9 +113,14 @@ export type TimelineItemType = 'CONTAINER_EVENT' | 'PRISONER_MOVEMENT' | 'SCHEDU
 // For a prisoner-movement item, whether it was an initial admission into custody or a transfer in from another prison.
 export type MovementKind = 'ADMISSION' | 'TRANSFER_IN'
 
+// For a prisoner-movement item, whether the receiving establishment was managing property in DPS or NOMIS
+// at the date of arrival.
+export type PropertySystem = 'DPS' | 'NOMIS'
+
 export interface PrisonerTimelineItem {
   itemType: TimelineItemType
   movementKind: MovementKind | null
+  propertySystem: PropertySystem | null
   eventId: string
   eventType: PropertyEventType | null
   eventStatus: ContainerStatus | null

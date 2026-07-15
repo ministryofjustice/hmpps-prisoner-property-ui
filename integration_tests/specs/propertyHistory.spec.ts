@@ -30,6 +30,7 @@ const container: PrisonerPropertyContainer = {
 const timelineItem = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTimelineItem => ({
   itemType: 'CONTAINER_EVENT',
   movementKind: null,
+  propertySystem: null,
   eventId: 'e1',
   eventType: 'CREATED_SEALED',
   eventStatus: 'STORED',
@@ -64,6 +65,7 @@ const items: PrisonerTimelineItem[] = [
     eventId: 'e2',
     itemType: 'PRISONER_MOVEMENT',
     movementKind: 'ADMISSION',
+    propertySystem: 'NOMIS',
     eventType: null,
     eventStatus: null,
     eventDateTime: '2026-06-02T14:30:00',
@@ -129,7 +131,7 @@ test.describe('Property history timeline', () => {
     // the acting user is resolved to their name, and the system movement shows "System generated"
     await expect(historyPage.timeline).toContainText('by John Doe, Leeds (HMP)')
     await expect(historyPage.timeline).toContainText('System generated')
-    await expect(historyPage.timeline).toContainText('Admitted to Isle of Wight (HMP)')
+    await expect(historyPage.timeline).toContainText('Admitted to Isle of Wight (HMP) — property managed in NOMIS')
     await expect(historyPage.timeline).toContainText('Property container SN880032 added to storage at Leeds (HMP)')
     // the establishment-level DPS-first-used marker
     await expect(historyPage.timeline).toContainText('Property management started in DPS at Leeds (HMP)')
