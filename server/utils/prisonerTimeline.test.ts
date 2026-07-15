@@ -93,6 +93,27 @@ describe('buildPrisonerTimeline', () => {
     expect(row.details).toBeNull()
   })
 
+  it('renders a DPS first-used item naming the establishment, with no tag or details', () => {
+    const [row] = buildPrisonerTimeline(
+      [
+        containerEvent({
+          itemType: 'DPS_FIRST_USED',
+          eventType: null,
+          eventStatus: null,
+          systemGenerated: true,
+          actingEstablishmentName: null,
+          toPrisonName: 'Leeds (HMP)',
+          containerId: null,
+        }),
+      ],
+      'A1234BC',
+    )
+    expect(row.title).toBe('Property management started in DPS at Leeds (HMP)')
+    expect(row.byline).toBe('System generated')
+    expect(row.tag).toBeNull()
+    expect(row.details).toBeNull()
+  })
+
   it('maps the event status to a tag, and leaves movement items untagged', () => {
     const [event] = buildPrisonerTimeline([containerEvent({ eventStatus: 'TRANSFER' })], 'A1234BC')
     expect(event.tag).toEqual({ text: 'Transferred out', classes: 'govuk-tag--grey' })

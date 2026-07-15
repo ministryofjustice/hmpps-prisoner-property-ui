@@ -79,6 +79,23 @@ const items: PrisonerTimelineItem[] = [
     containerLocationDescription: null,
   }),
   timelineItem({ eventId: 'e1' }),
+  timelineItem({
+    eventId: 'dps1',
+    itemType: 'DPS_FIRST_USED',
+    eventType: null,
+    eventStatus: null,
+    eventDateTime: '2026-05-01T00:00:00',
+    eventDate: '2026-05-01',
+    systemGenerated: true,
+    actingEstablishmentName: null,
+    toPrisonName: 'Leeds (HMP)',
+    sealNumber: null,
+    containerId: null,
+    containerType: null,
+    containerSealNumber: null,
+    containerStatus: null,
+    containerLocationDescription: null,
+  }),
 ]
 
 test.describe('Property history timeline', () => {
@@ -114,6 +131,8 @@ test.describe('Property history timeline', () => {
     await expect(historyPage.timeline).toContainText('System generated')
     await expect(historyPage.timeline).toContainText('Admitted to Isle of Wight (HMP)')
     await expect(historyPage.timeline).toContainText('Property container SN880032 added to storage at Leeds (HMP)')
+    // the establishment-level DPS-first-used marker
+    await expect(historyPage.timeline).toContainText('Property management started in DPS at Leeds (HMP)')
 
     // the expandable container details link through to the per-container history
     await expect(historyPage.timeline.getByText('Property container details').first()).toBeVisible()
