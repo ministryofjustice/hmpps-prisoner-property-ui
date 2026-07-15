@@ -6,6 +6,19 @@
 Frontend UI for the prisoner property service — find, view and maintain prisoner property records.
 Backed by [hmpps-prisoner-property-api](https://github.com/ministryofjustice/hmpps-prisoner-property-api).
 
+## Documentation
+
+| Doc | For |
+| --- | --- |
+| [Business overview](https://github.com/ministryofjustice/hmpps-prisoner-property-api/blob/main/docs/business-overview.md) | What the service does and why, in plain English. Start here. |
+| [Architecture](https://github.com/ministryofjustice/hmpps-prisoner-property-api/blob/main/docs/architecture.md) | The whole service — both repos, diagrams, messaging, domain model. |
+| [Technical implementation](docs/technical-implementation.md) | This app's internals: routes, services, data clients, auth. |
+| [API technical implementation](https://github.com/ministryofjustice/hmpps-prisoner-property-api/blob/main/docs/technical-implementation.md) | The back end's internals. |
+
+The whole-service docs live in the API repo, so those links are absolute.
+
+The rest of this README covers setup, credentials and running the app locally.
+
 # Instructions
 
 If this is a HMPPS project then the creation of new services is automated and cloning/forking this repository is not required.
