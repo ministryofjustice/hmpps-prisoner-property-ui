@@ -28,7 +28,6 @@ import {
   removeResultStatus,
   resolveTransferTarget,
 } from '../utils/removeContainer'
-import config from '../config'
 import logger from '../../logger'
 import requireManageRole, { canManageProperty } from '../middleware/requireManageRole'
 import requireAdminRole, { canAdminister } from '../middleware/requireAdminRole'
@@ -269,7 +268,6 @@ export default function routes({
       prisonerName: containers[0]?.prisonerName ?? null,
       banner,
       timeline: buildPrisonerTimeline(timelineItems, prisonerNumber, nameByUsername),
-      migrationDate: config.nomisMigrationDate,
       canManage: canManageProperty(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
       backUrl: '/',

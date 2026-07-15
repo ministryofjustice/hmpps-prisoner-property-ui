@@ -143,7 +143,8 @@ test.describe('Property history timeline', () => {
       historyPage.timeline.getByRole('link', { name: 'View full container history' }).first(),
     ).toHaveAttribute('href', '/prisoner/A1234BC/container/c1')
 
-    await expect(historyPage.migrationNote).toContainText('History events before')
+    // the NOMIS-migration note was removed - the per-prison DPS-first-used marker says this instead
+    await expect(page.getByText('History events before')).toHaveCount(0)
   })
 
   test('shows an empty state when the prisoner has no history', async ({ page }) => {

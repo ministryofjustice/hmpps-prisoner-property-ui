@@ -807,8 +807,8 @@ describe('GET /prisoner/:prisonerNumber/history', () => {
         // the expandable container details + link
         expect(res.text).toContain('Property container details')
         expect(res.text).toContain('/prisoner/A1234BC/container/c1')
-        // the NOMIS-migration closing note
-        expect(res.text).toContain('History events before')
+        // the NOMIS-migration note was removed - the per-prison DPS-first-used marker says this instead
+        expect(res.text).not.toContain('History events before')
         expect(prisonerPropertyService.getPrisonerPropertyHistory).toHaveBeenCalledWith('A1234BC', user.username)
         expect(auditService.logPageView).toHaveBeenCalledWith(
           Page.PRISONER_PROPERTY_HISTORY,
