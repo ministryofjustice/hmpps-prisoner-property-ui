@@ -207,6 +207,6 @@ Commands are in the [README](../README.md).
 
 ## Gaps worth knowing
 
-- **No `CLAUDE.md`** in this repo, unlike the API. Contributor conventions live only in this doc and in
-  code comments.
+- **Contributor conventions aren't written down** anywhere in this repo — they live in this doc and in
+  code comments only.
 - **`server/routes/index.ts` is one large file.** Splitting it per journey is the obvious next tidy-up.
