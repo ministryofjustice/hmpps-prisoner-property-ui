@@ -56,9 +56,11 @@ export const eventDescription = (event: PropertyEvent): string => {
     case 'RETURNED':
       return 'Returned to the person.'
     case 'DISPOSAL_REQUIRED':
+      // Records that a proposed disposal date was set - which may be in the future - not that it has been
+      // reached. The container only becomes "due for disposal" once that date arrives (a derived status).
       return event.eventDate
-        ? `Disposal date reached (${formatDate(event.eventDate)}), so this property is due to be disposed of.`
-        : 'Property due to be disposed of.'
+        ? `Proposed disposal date set to ${formatDate(event.eventDate)}.`
+        : 'Proposed disposal date set.'
     case 'DISPOSED':
       return 'Disposed of.'
     case 'COMBINED':
