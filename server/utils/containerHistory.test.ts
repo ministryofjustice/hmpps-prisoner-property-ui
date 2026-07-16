@@ -89,9 +89,12 @@ describe('eventDescription', () => {
     )
   })
 
-  it('includes the reached date when due for disposal', () => {
-    expect(eventDescription(event({ eventType: 'DISPOSAL_REQUIRED', eventDate: '2026-09-01' }))).toBe(
-      'Disposal date reached (1 September 2026), so this property is due to be disposed of.',
+  it('states the proposed disposal date was set, without implying it has been reached', () => {
+    expect(eventDescription(event({ eventType: 'DISPOSAL_REQUIRED', eventDate: '2030-01-01' }))).toBe(
+      'Proposed disposal date set to 1 January 2030.',
+    )
+    expect(eventDescription(event({ eventType: 'DISPOSAL_REQUIRED', eventDate: null }))).toBe(
+      'Proposed disposal date set.',
     )
   })
 
