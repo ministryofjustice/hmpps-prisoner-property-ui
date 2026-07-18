@@ -96,7 +96,9 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     case 'DISPOSED':
       return `${container} disposed of`
     case 'COMBINED':
-      return `${container} combined into another container`
+      return item.relatedContainerSealNumber
+        ? `${container} combined into property container ${item.relatedContainerSealNumber}`
+        : `${container} combined into another container`
     case 'CREATED_IN_ERROR':
       return `${container} removed — created in error`
     case 'REMOVED':

@@ -63,7 +63,11 @@ export const containerTypeLabel = (type: ContainerType): string => CONTAINER_TYP
 
 export const containerLocation = (container: PrisonerPropertyContainer): string => {
   if (container.currentLocationType === 'BRANSTON') return 'Branston (offsite)'
-  return container.locationDescription || '-'
+  if (container.locationDescription) return container.locationDescription
+  // Excess property with no internal location is held off-site at Branston (covers records created before the
+  // BRANSTON location type was set); excess stored in a prison location falls through above to its location.
+  if (container.containerType === 'EXCESS') return 'Branston (offsite)'
+  return '-'
 }
 
 /**

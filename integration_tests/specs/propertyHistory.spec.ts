@@ -44,6 +44,7 @@ const timelineItem = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTi
   toStorageLocationType: null,
   sealNumber: 'SN880032',
   relatedContainerId: null,
+  relatedContainerSealNumber: null,
   containerId: 'c1',
   containerType: 'VALUABLES',
   containerSealNumber: 'SN880032',

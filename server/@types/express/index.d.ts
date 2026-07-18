@@ -1,13 +1,15 @@
 import { HmppsUser } from '../../interfaces/hmppsUser'
 import { ContainerType, RemovalOutcome } from '../../data/prisonerPropertyApiTypes'
 
-// One container being added within the multi-add journey. Excess property is stored off-site at Branston,
-// so it never gets an internalLocationId.
+// One container being added within the multi-add journey. Excess property can be stored either off-site at
+// Branston (storageChoice 'branston', no internalLocationId) or in a prison location (storageChoice
+// 'internal' + internalLocationId); storageChoice is only used for excess and is undefined until chosen.
 export interface AddContainerDraft {
   sealNumber?: string
   previousSealNumber?: string
   containerType?: ContainerType
   proposedDisposalDate?: string // ISO yyyy-mm-dd
+  storageChoice?: 'branston' | 'internal'
   internalLocationId?: string
   locationName?: string
 }
@@ -34,7 +36,9 @@ export interface RemoveContainerJourney {
 
 // Working state for the multi-step "change a property container" journey. Cleared on confirm/cancel.
 // `origin` records where the user started (list or person view). `locationChoice` is 'current' (keep the
-// existing storage location) or 'new' (pick one via the box picker).
+// existing storage location) or 'new' (pick one via the box picker). For excess property, `storageChoice`
+// records whether it is stored off-site at Branston or in a prison location (the current/new choice does not
+// apply); undefined for non-excess.
 export interface ChangeContainerJourney {
   prisonerNumber: string
   containerId: string
@@ -43,6 +47,7 @@ export interface ChangeContainerJourney {
   containerType?: ContainerType
   proposedDisposalDate?: string // ISO yyyy-mm-dd
   locationChoice?: 'current' | 'new'
+  storageChoice?: 'branston' | 'internal'
   internalLocationId?: string
   locationName?: string
 }

@@ -19,6 +19,7 @@ const containerEvent = (overrides: Partial<PrisonerTimelineItem> = {}): Prisoner
   toStorageLocationType: null,
   sealNumber: 'SN880032',
   relatedContainerId: null,
+  relatedContainerSealNumber: null,
   containerId: 'c1',
   containerType: 'VALUABLES',
   containerSealNumber: 'SN880032',
@@ -70,6 +71,9 @@ describe('buildPrisonerTimeline', () => {
     expect(titleFor('DISPOSAL_REQUIRED')).toBe('Property container SN880032 due for disposal')
     expect(titleFor('DISPOSED')).toBe('Property container SN880032 disposed of')
     expect(titleFor('COMBINED')).toBe('Property container SN880032 combined into another container')
+    expect(titleFor('COMBINED', { relatedContainerSealNumber: 'SN991234' })).toBe(
+      'Property container SN880032 combined into property container SN991234',
+    )
     expect(titleFor('CREATED_IN_ERROR')).toBe('Property container SN880032 removed — created in error')
     expect(titleFor('REMOVED')).toBe('Property container SN880032 marked as removed from the establishment')
     expect(titleFor('REACTIVATED')).toBe('Property container SN880032 reactivated')

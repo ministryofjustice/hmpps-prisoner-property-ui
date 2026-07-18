@@ -79,6 +79,26 @@ describe('propertyList utils', () => {
       ).toBe('Reception Store')
     })
 
+    it('shows Branston for excess property even without a BRANSTON location type', () => {
+      expect(
+        containerLocation({
+          containerType: 'EXCESS',
+          currentLocationType: null,
+          locationDescription: null,
+        } as PrisonerPropertyContainer),
+      ).toBe('Branston (offsite)')
+    })
+
+    it('shows the internal location for excess property stored in a prison location', () => {
+      expect(
+        containerLocation({
+          containerType: 'EXCESS',
+          currentLocationType: 'INTERNAL',
+          locationDescription: 'Reception Store',
+        } as PrisonerPropertyContainer),
+      ).toBe('Reception Store')
+    })
+
     it('falls back to a dash when there is no location', () => {
       expect(
         containerLocation({ currentLocationType: null, locationDescription: null } as PrisonerPropertyContainer),

@@ -6,6 +6,7 @@ import PrisonerPropertyPage from '../pages/prisonerPropertyPage'
 import PropertyListPage from '../pages/propertyListPage'
 import AddContainerDetailsPage from '../pages/addContainerDetailsPage'
 import AddContainerLocationPage from '../pages/addContainerLocationPage'
+import AddContainerWhereStoredPage from '../pages/addContainerWhereStoredPage'
 import AddContainerCheckAnswersPage from '../pages/addContainerCheckAnswersPage'
 import type { BoxLocation, PrisonerPropertyContainer } from '../../server/data/prisonerPropertyApiTypes'
 import type { Prisoner } from '../../server/data/prisonerSearchApiTypes'
@@ -111,7 +112,7 @@ test.describe('Add a property container', () => {
     await page.getByRole('button', { name: 'Search' }).click()
     await page.getByTestId('add-link').first().click()
 
-    // Two containers: a Standard (needs a location) and an Excess (off-site, skips the location step).
+    // Two containers: a Standard (needs a location) and an Excess (chooses where it is stored).
     const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
     await detailsPage.fillContainer(0, { seal: 'SN1', type: 'Standard' })
     await detailsPage.addAnother()
@@ -121,6 +122,11 @@ test.describe('Add a property container', () => {
     const locationPage = await AddContainerLocationPage.verifyOnPage(page)
     await expect(locationPage.heading).toContainText('SN1')
     await locationPage.selectFirstLocation()
+
+    // The excess container SN2 is then asked where it is stored; send it off-site to Branston.
+    const whereStoredPage = await AddContainerWhereStoredPage.verifyOnPage(page)
+    await expect(whereStoredPage.heading).toContainText('SN2')
+    await whereStoredPage.chooseBranston()
 
     const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
     await expect(page.getByRole('heading', { name: /Property container SN1/ })).toBeVisible()
