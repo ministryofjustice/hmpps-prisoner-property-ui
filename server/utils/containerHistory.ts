@@ -64,7 +64,9 @@ export const eventDescription = (event: PropertyEvent): string => {
     case 'DISPOSED':
       return 'Disposed of.'
     case 'COMBINED':
-      return 'Combined into another container.'
+      return event.relatedContainerSealNumber
+        ? `Combined into property container ${event.relatedContainerSealNumber}.`
+        : 'Combined into another container.'
     case 'CREATED_IN_ERROR':
       return 'Removed because the record was created in error.'
     default:

@@ -101,6 +101,8 @@ export interface PropertyEvent {
   containerType: ContainerType
   eventDate: string | null
   relatedContainerId: string | null
+  // For a COMBINED event, the seal number of the container the sources were combined into.
+  relatedContainerSealNumber: string | null
 }
 
 export type TimelineItemType = 'CONTAINER_EVENT' | 'PRISONER_MOVEMENT' | 'SCHEDULED_FOR_RELEASE' | 'DPS_FIRST_USED'
@@ -135,6 +137,8 @@ export interface PrisonerTimelineItem {
   toStorageLocationType: StorageLocationType | null
   sealNumber: string | null
   relatedContainerId: string | null
+  // For a COMBINED event, the seal number of the container the sources were combined into.
+  relatedContainerSealNumber: string | null
   containerId: string | null
   containerType: ContainerType | null
   containerSealNumber: string | null
@@ -166,16 +170,21 @@ export interface CreateContainerRequest {
   sealNumber: string
   previousSealNumber?: string
   internalLocationId?: string
+  // Where it's stored: INTERNAL (given by internalLocationId) or BRANSTON (offsite, no location - excess
+  // property held offsite). Defaults to INTERNAL when an internalLocationId is given.
+  locationType?: StorageLocationType
   proposedDisposalDate?: string
 }
 
 // Payload to change a container's editable details (PUT /property-containers/{id}). See
 // UpdatePropertyContainerRequest in the API. A full replace of the mutable fields; omit or null
-// `internalLocationId` to leave the storage location unchanged.
+// `internalLocationId` (and `locationType`) to leave the storage location unchanged, or send
+// `locationType: 'BRANSTON'` to move excess property offsite.
 export interface UpdateContainerRequest {
   containerType: ContainerType
   sealNumber: string
   internalLocationId?: string
+  locationType?: StorageLocationType
   proposedDisposalDate?: string
 }
 

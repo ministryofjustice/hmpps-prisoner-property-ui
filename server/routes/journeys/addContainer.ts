@@ -24,10 +24,30 @@ export default function addContainerRoutes(
   type AddContainerJourney = NonNullable<import('express-session').SessionData['addContainerJourney']>
   type AddContainerDraft = AddContainerJourney['containers'][number]
 
-  // The index of the next container that still needs a storage location (non-Excess, none picked yet),
-  // from `from` onwards; -1 when they all have one (or are Excess/offsite).
-  const nextLocationIndex = (containers: AddContainerDraft[], from: number): number =>
-    containers.findIndex((c, i) => i >= from && c.containerType !== 'EXCESS' && !c.internalLocationId)
+  // The next container that still needs a storage decision, from `from` onwards, and which step it needs:
+  // excess property first chooses where it is stored ('where-stored'), then picks a prison location only if it
+  // was not sent off-site to Branston; other types just pick a location. null when all are resolved.
+  const nextStep = (
+    containers: AddContainerDraft[],
+    from: number,
+  ): { index: number; step: 'where-stored' | 'location' } | null => {
+    for (let i = from; i < containers.length; i += 1) {
+      const c = containers[i]
+      if (c.containerType === 'EXCESS') {
+        if (!c.storageChoice) return { index: i, step: 'where-stored' }
+        if (c.storageChoice === 'internal' && !c.internalLocationId) return { index: i, step: 'location' }
+      } else if (!c.internalLocationId) {
+        return { index: i, step: 'location' }
+      }
+    }
+    return null
+  }
+
+  // The URL of the next step (the check-answers page when there is none left).
+  const nextStepUrl = (prisonerNumber: string, next: ReturnType<typeof nextStep>): string =>
+    next === null
+      ? `/prisoner/${prisonerNumber}/add-container/check`
+      : `/prisoner/${prisonerNumber}/add-container/${next.step}/${next.index}`
 
   // The prisoner's display name, from their property if any, else prisoner-search (zero-property people
   // reached via the search entry have no property yet). Null if it can't be resolved.
@@ -159,28 +179,84 @@ export default function addContainerRoutes(
         return renderAddDetails(req, res, ctx, journey.origin, blocks, errors)
       }
 
-      // Keep any location already chosen for a container at the same index (editing from Check your
-      // answers), unless it is now Excess (off-site Branston, never gets an internal location).
+      // Keep the storage decision already made for a container at the same index (editing from Check your
+      // answers), but only while its type is unchanged - changing the type (e.g. to/from Excess) resets the
+      // storage choice so the correct steps are taken again.
       const containers: AddContainerDraft[] = values.map((v, i) => {
         const previous = journey.containers[i]
-        const keepLocation = v.containerType !== 'EXCESS' && previous?.internalLocationId
+        const keep = previous?.containerType === v.containerType
         return {
           sealNumber: v.sealNumber,
           previousSealNumber: v.previousSealNumber,
           containerType: v.containerType,
           proposedDisposalDate: v.proposedDisposalDate,
-          internalLocationId: keepLocation ? previous.internalLocationId : undefined,
-          locationName: keepLocation ? previous.locationName : undefined,
+          storageChoice: keep ? previous?.storageChoice : undefined,
+          internalLocationId: keep ? previous?.internalLocationId : undefined,
+          locationName: keep ? previous?.locationName : undefined,
         }
       })
       req.session.addContainerJourney = { ...journey, containers }
 
-      const index = nextLocationIndex(containers, 0)
-      return res.redirect(
-        index === -1
-          ? `/prisoner/${ctx.prisonerNumber}/add-container/check`
-          : `/prisoner/${ctx.prisonerNumber}/add-container/location/${index}`,
-      )
+      return res.redirect(nextStepUrl(ctx.prisonerNumber, nextStep(containers, 0)))
+    },
+  )
+
+  // Excess property only: choose whether it is stored off-site at Branston or in a prison location.
+  router.get(
+    '/prisoner/:prisonerNumber/add-container/where-stored/:index',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(userService, req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.addContainerJourney
+      const index = Number.parseInt(String(req.params.index), 10)
+      const draft = journey?.containers?.[index]
+      if (journey?.prisonerNumber !== ctx.prisonerNumber || !draft?.sealNumber || draft.containerType !== 'EXCESS') {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+      }
+      return res.render('pages/addContainer/whereStored', {
+        prisonerNumber: ctx.prisonerNumber,
+        index,
+        sealNumber: draft.sealNumber,
+        storageChoice: draft.storageChoice,
+        backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
+        errorBanner: req.flash('error')[0],
+      })
+    },
+  )
+
+  router.post(
+    '/prisoner/:prisonerNumber/add-container/where-stored/:index',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(userService, req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.addContainerJourney
+      const index = Number.parseInt(String(req.params.index), 10)
+      const draft = journey?.containers?.[index]
+      if (journey?.prisonerNumber !== ctx.prisonerNumber || !draft || draft.containerType !== 'EXCESS') {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+      }
+
+      const rawChoice = req.body.storageChoice
+      const storageChoice = rawChoice === 'internal' || rawChoice === 'branston' ? rawChoice : undefined
+      if (!storageChoice) {
+        req.flash('error', 'Select where this property is stored')
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/where-stored/${index}`)
+      }
+
+      // Branston is off-site with no internal location, so clear any location previously picked.
+      journey.containers[index] = {
+        ...draft,
+        storageChoice,
+        internalLocationId: storageChoice === 'branston' ? undefined : draft.internalLocationId,
+        locationName: storageChoice === 'branston' ? undefined : draft.locationName,
+      }
+      req.session.addContainerJourney = journey
+
+      return res.redirect(nextStepUrl(ctx.prisonerNumber, nextStep(journey.containers, index)))
     },
   )
 
@@ -236,7 +312,11 @@ export default function addContainerRoutes(
         pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
         searchError,
         errorBanner: req.flash('error')[0],
-        backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
+        // Excess reached the location step by choosing "a prison location", so Back returns to that choice.
+        backUrl:
+          draft.containerType === 'EXCESS'
+            ? `/prisoner/${ctx.prisonerNumber}/add-container/where-stored/${index}`
+            : `/prisoner/${ctx.prisonerNumber}/add-container/details`,
         manageLocationsHref: manageLocationsHrefFor(req, res.locals.user.userRoles),
       })
     },
@@ -262,12 +342,7 @@ export default function addContainerRoutes(
       }
       req.session.addContainerJourney = journey
 
-      const nextIndex = nextLocationIndex(journey.containers, index + 1)
-      return res.redirect(
-        nextIndex === -1
-          ? `/prisoner/${ctx.prisonerNumber}/add-container/check`
-          : `/prisoner/${ctx.prisonerNumber}/add-container/location/${nextIndex}`,
-      )
+      return res.redirect(nextStepUrl(ctx.prisonerNumber, nextStep(journey.containers, index + 1)))
     },
   )
 
@@ -285,9 +360,9 @@ export default function addContainerRoutes(
       if (journey.containers.some(c => !c.sealNumber || !c.containerType)) {
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
       }
-      const missing = nextLocationIndex(journey.containers, 0)
-      if (missing !== -1) {
-        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/location/${missing}`)
+      const missing = nextStep(journey.containers, 0)
+      if (missing !== null) {
+        return res.redirect(nextStepUrl(ctx.prisonerNumber, missing))
       }
 
       const { username } = res.locals.user
@@ -300,7 +375,10 @@ export default function addContainerRoutes(
           sealNumber: c.sealNumber,
           containerType: c.containerType,
           proposedDisposalDate: c.proposedDisposalDate,
-          storageLocation: c.containerType === 'EXCESS' ? 'Branston (offsite)' : c.locationName,
+          // Excess sent off-site reads "Branston (offsite)"; excess in a prison location (or any other type)
+          // shows its picked location.
+          storageLocation:
+            c.containerType === 'EXCESS' && c.storageChoice !== 'internal' ? 'Branston (offsite)' : c.locationName,
         })),
         backUrl: `/prisoner/${ctx.prisonerNumber}/add-container/details`,
       })
@@ -331,7 +409,10 @@ export default function addContainerRoutes(
               containerType: c.containerType!,
               sealNumber: c.sealNumber!,
               previousSealNumber: c.previousSealNumber,
-              internalLocationId: c.containerType === 'EXCESS' ? undefined : c.internalLocationId,
+              internalLocationId: c.internalLocationId,
+              // Excess sent off-site is stored at Branston (no internal location); otherwise the API infers
+              // INTERNAL from the location id.
+              locationType: c.containerType === 'EXCESS' && c.storageChoice === 'branston' ? 'BRANSTON' : undefined,
               proposedDisposalDate: c.proposedDisposalDate,
             },
             username,

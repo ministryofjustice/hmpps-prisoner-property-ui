@@ -17,6 +17,7 @@ const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
   containerType: 'STANDARD',
   eventDate: null,
   relatedContainerId: null,
+  relatedContainerSealNumber: null,
   ...overrides,
 })
 
@@ -102,5 +103,8 @@ describe('eventDescription', () => {
     expect(eventDescription(event({ eventType: 'RETURNED' }))).toBe('Returned to the person.')
     expect(eventDescription(event({ eventType: 'DISPOSED' }))).toBe('Disposed of.')
     expect(eventDescription(event({ eventType: 'COMBINED' }))).toBe('Combined into another container.')
+    expect(eventDescription(event({ eventType: 'COMBINED', relatedContainerSealNumber: 'SN991234' }))).toBe(
+      'Combined into property container SN991234.',
+    )
   })
 })

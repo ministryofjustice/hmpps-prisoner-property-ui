@@ -35,11 +35,13 @@ function capacityBelowHeldMessage(containersHeld: number): string {
 /**
  * Validate the property-location form, returning a field-keyed map of error messages (empty when valid).
  * [containersHeld] is how many containers the location already holds (0 for the add flow); capacity may not
- * be set below it.
+ * be set below it. When [allowZeroCapacity] is set (the edit flow), an empty location may be dropped to 0 to
+ * take it out of use; new locations still require at least 1.
  */
 function validatePropertyLocationForm(
   values: { localName: string; capacity: string },
   containersHeld = 0,
+  allowZeroCapacity = false,
 ): Record<string, string> {
   const errors: Record<string, string> = {}
   if (!values.localName) {
@@ -51,7 +53,7 @@ function validatePropertyLocationForm(
     errors.capacity = 'Enter how many containers this location can hold'
   } else if (!/^\d+$/.test(values.capacity)) {
     errors.capacity = 'Capacity must be a whole number'
-  } else if (Number(values.capacity) < 1) {
+  } else if (Number(values.capacity) < 1 && !allowZeroCapacity) {
     errors.capacity = 'Capacity must be at least 1'
   } else if (Number(values.capacity) < containersHeld) {
     errors.capacity = capacityBelowHeldMessage(containersHeld)
@@ -163,7 +165,7 @@ export default function adminLocationsRoutes({ auditService, prisonerPropertySer
       }
 
       const values = readPropertyLocationForm(req.body)
-      const errors = validatePropertyLocationForm(values, location.containersHeld)
+      const errors = validatePropertyLocationForm(values, location.containersHeld, true)
       if (Object.keys(errors).length > 0) {
         return res.status(400).render('pages/admin/locations/edit', { location, values, errors })
       }
