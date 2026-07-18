@@ -38,6 +38,7 @@ const baseEvent = {
   containerType: 'STANDARD' as const,
   eventDate: null,
   relatedContainerId: null,
+  relatedContainerSealNumber: null,
 }
 
 const events: PropertyEvent[] = [
