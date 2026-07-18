@@ -103,8 +103,8 @@ describe('eventDescription', () => {
     expect(eventDescription(event({ eventType: 'RETURNED' }))).toBe('Returned to the person.')
     expect(eventDescription(event({ eventType: 'DISPOSED' }))).toBe('Disposed of.')
     expect(eventDescription(event({ eventType: 'COMBINED' }))).toBe('Combined into another container.')
-    expect(
-      eventDescription(event({ eventType: 'COMBINED', relatedContainerSealNumber: 'SN991234' })),
-    ).toBe('Combined into property container SN991234.')
+    expect(eventDescription(event({ eventType: 'COMBINED', relatedContainerSealNumber: 'SN991234' }))).toBe(
+      'Combined into property container SN991234.',
+    )
   })
 })
