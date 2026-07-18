@@ -735,6 +735,7 @@ const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
   containerType: 'STANDARD',
   eventDate: null,
   relatedContainerId: null,
+  relatedContainerSealNumber: null,
   ...overrides,
 })
 
@@ -756,6 +757,7 @@ const timelineItem = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTi
   toStorageLocationType: null,
   sealNumber: 'SN0001',
   relatedContainerId: null,
+  relatedContainerSealNumber: null,
   containerId: 'c1',
   containerType: 'STANDARD',
   containerSealNumber: 'SN0001',
@@ -1326,7 +1328,7 @@ describe('Add container journey - steps', () => {
       .expect(res => expect(res.text).not.toContain('data-qa="manage-locations"'))
   })
 
-  it('adds multiple containers in one journey, skipping the location step for excess', async () => {
+  it('adds multiple containers in one journey, routing excess through the where-stored step', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
     prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
@@ -1335,7 +1337,7 @@ describe('Add container journey - steps', () => {
     const agent = request.agent(manageApp())
     await startJourney(agent)
 
-    // Two containers: a Standard (needs a location) and an Excess (off-site Branston, no location step).
+    // Two containers: a Standard (needs a location) and an Excess (chooses where it is stored).
     await agent
       .post('/prisoner/A1234BC/add-container/details')
       .type('form')
@@ -1348,11 +1350,19 @@ describe('Add container journey - steps', () => {
       .expect(302)
       .expect('location', '/prisoner/A1234BC/add-container/location/0')
 
-    // Only container 0 needs a location; selecting it goes straight to check (container 1 is Excess).
+    // Container 0 gets a location; then the excess container 1 is asked where it is stored.
     await agent
       .post('/prisoner/A1234BC/add-container/location/0')
       .type('form')
       .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/add-container/where-stored/1')
+
+    // The excess container goes off-site to Branston, then straight to check.
+    await agent
+      .post('/prisoner/A1234BC/add-container/where-stored/1')
+      .type('form')
+      .send({ storageChoice: 'branston' })
       .expect(302)
       .expect('location', '/prisoner/A1234BC/add-container/check')
 
@@ -1366,7 +1376,55 @@ describe('Add container journey - steps', () => {
     )
     expect(prisonerPropertyService.createContainer).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ sealNumber: 'SN2', containerType: 'EXCESS', internalLocationId: undefined }),
+      expect.objectContaining({
+        sealNumber: 'SN2',
+        containerType: 'EXCESS',
+        internalLocationId: undefined,
+        locationType: 'BRANSTON',
+      }),
+      user.username,
+    )
+  })
+
+  it('lets an excess container be added into a prison location via the where-stored step', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
+    prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'newC' }))
+
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({ 'containers[0][sealNumber]': 'EX1', 'containers[0][containerType]': 'EXCESS' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/add-container/where-stored/0')
+
+    await agent
+      .post('/prisoner/A1234BC/add-container/where-stored/0')
+      .type('form')
+      .send({ storageChoice: 'internal' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/add-container/location/0')
+
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/0')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/add-container/check')
+
+    await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+
+    expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sealNumber: 'EX1',
+        containerType: 'EXCESS',
+        internalLocationId: 'box1',
+        locationType: undefined,
+      }),
       user.username,
     )
   })
@@ -1936,6 +1994,146 @@ describe('Change container journey', () => {
     )
   })
 
+  it('lets excess property be stored off-site at Branston via the where-stored step', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.updateContainer.mockResolvedValue(container({}))
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    // Excess routes to the where-stored choice rather than the current/new location radio.
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ sealNumber: 'SN0001', containerType: 'EXCESS', locationChoice: 'new' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/where-stored')
+
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1/where-stored')
+      .type('form')
+      .send({ storageChoice: 'branston' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/check')
+
+    await agent
+      .get('/prisoner/A1234BC/change-container/c1/check')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Branston (offsite)')
+      })
+
+    await agent.post('/prisoner/A1234BC/change-container/c1/confirm').type('form').send({}).expect(302)
+
+    expect(prisonerPropertyService.updateContainer).toHaveBeenCalledWith(
+      'c1',
+      {
+        containerType: 'EXCESS',
+        sealNumber: 'SN0001',
+        internalLocationId: undefined,
+        locationType: 'BRANSTON',
+        proposedDisposalDate: undefined,
+      },
+      user.username,
+    )
+    expect(prisonerPropertyService.getBoxLocations).not.toHaveBeenCalled()
+  })
+
+  it('lets excess property be stored in a prison location via the where-stored step', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'box1', name: 'Reception Store' })]))
+    prisonerPropertyService.updateContainer.mockResolvedValue(container({}))
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ sealNumber: 'SN0001', containerType: 'EXCESS' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/where-stored')
+
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1/where-stored')
+      .type('form')
+      .send({ storageChoice: 'internal' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/location')
+
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1/location')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/check')
+
+    await agent.post('/prisoner/A1234BC/change-container/c1/confirm').type('form').send({}).expect(302)
+
+    expect(prisonerPropertyService.updateContainer).toHaveBeenCalledWith(
+      'c1',
+      {
+        containerType: 'EXCESS',
+        sealNumber: 'SN0001',
+        internalLocationId: 'box1',
+        locationType: undefined,
+        proposedDisposalDate: undefined,
+      },
+      user.username,
+    )
+  })
+
+  it('pre-fills the where-stored choice for an excess container already held at Branston', async () => {
+    withActiveCaseload()
+    const branstonExcess = container({
+      containerType: 'EXCESS',
+      currentLocationType: 'BRANSTON',
+      locationDescription: null,
+    })
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([branstonExcess])
+    prisonerPropertyService.updateContainer.mockResolvedValue(branstonExcess)
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1') // initialises the journey from the container
+    // The where-stored radios are pre-selected with the current choice (Branston).
+    await agent
+      .get('/prisoner/A1234BC/change-container/c1/where-stored')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(/value="branston"[^>]*checked/)
+      })
+
+    // A seal-only change keeps it at Branston without picking a location.
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ sealNumber: 'SN0002', containerType: 'EXCESS' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/where-stored')
+
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1/where-stored')
+      .type('form')
+      .send({ storageChoice: 'branston' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/check')
+
+    await agent.post('/prisoner/A1234BC/change-container/c1/confirm').type('form').send({}).expect(302)
+
+    expect(prisonerPropertyService.updateContainer).toHaveBeenCalledWith(
+      'c1',
+      {
+        containerType: 'EXCESS',
+        sealNumber: 'SN0002',
+        internalLocationId: undefined,
+        locationType: 'BRANSTON',
+        proposedDisposalDate: undefined,
+      },
+      user.username,
+    )
+    expect(prisonerPropertyService.getBoxLocations).not.toHaveBeenCalled()
+  })
+
   it('redirects back to the change form with an error when the seal number is already in use (409)', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
@@ -2311,6 +2509,54 @@ describe('Admin - manage storage locations', () => {
     return request(locationAdminApp())
       .post('/admin/locations/loc-1/edit')
       .send({ localName: 'Reception Store', capacity: '2' })
+      .expect(400)
+      .expect(res => {
+        expect(res.text).toContain('Capacity cannot be less than the 3 containers currently stored here')
+        expect(prisonerPropertyService.updatePropertyLocation).not.toHaveBeenCalled()
+      })
+  })
+
+  it('rejects an add with a capacity of 0', async () => {
+    withActiveCaseload()
+
+    return request(locationAdminApp())
+      .post('/admin/locations/add')
+      .send({ localName: 'Reception Store', capacity: '0' })
+      .expect(400)
+      .expect(res => {
+        expect(res.text).toContain('Capacity must be at least 1')
+        expect(prisonerPropertyService.createPropertyLocation).not.toHaveBeenCalled()
+      })
+  })
+
+  it('allows an empty location to be set to a capacity of 0 to take it out of use', async () => {
+    withActiveCaseload()
+    const emptyLocation = { ...locations[0], containersHeld: 0, availableSpaces: 10 }
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue([emptyLocation])
+    prisonerPropertyService.updatePropertyLocation.mockResolvedValue(emptyLocation)
+
+    return request(locationAdminApp())
+      .post('/admin/locations/loc-1/edit')
+      .send({ localName: 'Reception Store', capacity: '0' })
+      .expect(302)
+      .expect('location', '/admin/locations')
+      .expect(() => {
+        expect(prisonerPropertyService.updatePropertyLocation).toHaveBeenCalledWith(
+          'loc-1',
+          { localName: 'Reception Store', capacity: 0 },
+          'user1',
+        )
+      })
+  })
+
+  it('rejects setting a capacity of 0 on a location that still holds containers', async () => {
+    withActiveCaseload()
+    // loc-1 holds 3 containers, so 0 is below-held and rejected without calling the API.
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
+
+    return request(locationAdminApp())
+      .post('/admin/locations/loc-1/edit')
+      .send({ localName: 'Reception Store', capacity: '0' })
       .expect(400)
       .expect(res => {
         expect(res.text).toContain('Capacity cannot be less than the 3 containers currently stored here')

@@ -111,12 +111,16 @@
     {% endif %}
     {% set locationItems = (locationItems.push({ value: "new", text: "a new storage location", checked: (data.locationChoice == "new") or (not hasCurrentLocation) }), locationItems) %}
 
-    {{ govukRadios({
-      idPrefix: "locationChoice",
-      name: "locationChoice",
-      fieldset: { legend: { text: "Storage location", classes: "govuk-fieldset__legend--m" } },
-      items: locationItems
-    }) }}
+    {# Excess property is stored off-site at Branston, so it is never given a storage location. Hidden for
+       excess (server-rendered for no-JS; toggled by the container-type radios via assets/js). #}
+    <div id="location-choice-group" data-qa="location-choice-group"{{ " hidden" if data.containerType == "EXCESS" }}>
+      {{ govukRadios({
+        idPrefix: "locationChoice",
+        name: "locationChoice",
+        fieldset: { legend: { text: "Storage location", classes: "govuk-fieldset__legend--m" } },
+        items: locationItems
+      }) }}
+    </div>
 
     {{ govukButton({ text: "Save and continue" }) }}
   </form>
