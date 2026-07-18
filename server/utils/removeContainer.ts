@@ -33,12 +33,15 @@ export const isRemoveReason = (value: unknown): value is RemovalOutcome =>
   typeof value === 'string' && REMOVE_REASON_VALUES.has(value as RemovalOutcome)
 
 // The status tag the container will show once removed with the given reason (shown on Check your answers).
+// COMBINED and REMOVED are not staff-selectable removal reasons (combine has its own journey; REMOVED is only
+// ever set by the NOMIS sync), but the map is keyed by every RemovalOutcome for completeness.
 const RESULT_STATUS: Record<RemovalOutcome, PropertyStatusTag> = {
   RETURNED: { text: 'Returned', classes: 'govuk-tag--green' },
   DISPOSED: { text: 'Disposed', classes: 'govuk-tag--red' },
   TRANSFERRED: { text: 'Transferred', classes: 'govuk-tag--grey' },
   CREATED_IN_ERROR: { text: 'Created in error', classes: 'govuk-tag--grey' },
   COMBINED: { text: 'Combined', classes: 'govuk-tag--grey' },
+  REMOVED: { text: 'Removed', classes: 'govuk-tag--grey' },
 }
 
 export const removeResultStatus = (outcome: RemovalOutcome): PropertyStatusTag => RESULT_STATUS[outcome]

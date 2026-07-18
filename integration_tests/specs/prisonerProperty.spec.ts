@@ -27,7 +27,6 @@ const inEstablishmentContainer: PrisonerPropertyContainer = {
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
-  archived: false,
 }
 
 // Held at Leeds, but the prisoner is now at MDI -> due to be transferred in (from MDI's perspective).

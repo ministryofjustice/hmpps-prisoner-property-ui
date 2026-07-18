@@ -34,6 +34,8 @@ describe('eventTypeLabel', () => {
     expect(eventTypeLabel('TRANSFERRED')).toBe('Removed – transferred out')
     expect(eventTypeLabel('RETURNED')).toBe('Removed – returned')
     expect(eventTypeLabel('CREATED_IN_ERROR')).toBe('Removed – created in error')
+    expect(eventTypeLabel('REMOVED')).toBe('Removed from the establishment')
+    expect(eventTypeLabel('REACTIVATED')).toBe('Reactivated')
   })
 })
 
@@ -102,5 +104,10 @@ describe('eventDescription', () => {
     expect(eventDescription(event({ eventType: 'RETURNED' }))).toBe('Returned to the person.')
     expect(eventDescription(event({ eventType: 'DISPOSED' }))).toBe('Disposed of.')
     expect(eventDescription(event({ eventType: 'COMBINED' }))).toBe('Combined into another container.')
+  })
+
+  it('describes the removed and reactivated events', () => {
+    expect(eventDescription(event({ eventType: 'REMOVED' }))).toBe('Marked as removed from the establishment.')
+    expect(eventDescription(event({ eventType: 'REACTIVATED' }))).toBe('Reactivated and returned to active storage.')
   })
 })

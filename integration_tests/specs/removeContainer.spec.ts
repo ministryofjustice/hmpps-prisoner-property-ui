@@ -25,7 +25,6 @@ const existingContainer: PrisonerPropertyContainer = {
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
-  archived: false,
 }
 
 test.describe('Remove a property container', () => {

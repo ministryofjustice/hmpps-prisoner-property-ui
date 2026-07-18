@@ -110,7 +110,6 @@ describe('GET /', () => {
               removalDate: null,
               createDateTime: '2026-06-01T10:00:00',
               createdByUserId: 'AUSER',
-              archived: false,
             },
           ],
         },
@@ -179,7 +178,6 @@ describe('GET /', () => {
               removalDate: null,
               createDateTime: '2026-06-01T10:00:00',
               createdByUserId: 'AUSER',
-              archived: false,
             },
             {
               id: 'c2',
@@ -199,7 +197,6 @@ describe('GET /', () => {
               removalDate: null,
               createDateTime: '2026-06-02T10:00:00',
               createdByUserId: 'AUSER',
-              archived: false,
             },
           ],
         },
@@ -256,7 +253,6 @@ describe('GET /', () => {
               removalDate: null,
               createDateTime: '2026-06-01T10:00:00',
               createdByUserId: 'AUSER',
-              archived: false,
             },
             {
               id: 'removed',
@@ -276,7 +272,6 @@ describe('GET /', () => {
               removalDate: '2026-06-05T10:00:00',
               createDateTime: '2026-06-02T10:00:00',
               createdByUserId: 'AUSER',
-              archived: false,
             },
           ],
         },
@@ -480,7 +475,6 @@ const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPrope
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
-  archived: false,
   ...overrides,
 })
 

@@ -16,6 +16,8 @@ const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
   DISPOSED: 'Removed – disposed',
   COMBINED: 'Combined',
   CREATED_IN_ERROR: 'Removed – created in error',
+  REMOVED: 'Removed from the establishment',
+  REACTIVATED: 'Reactivated',
 }
 
 export const eventTypeLabel = (type: PropertyEventType): string => EVENT_TYPE_LABELS[type] ?? type
@@ -67,6 +69,12 @@ export const eventDescription = (event: PropertyEvent): string => {
       return 'Combined into another container.'
     case 'CREATED_IN_ERROR':
       return 'Removed because the record was created in error.'
+    case 'REMOVED':
+      // NOMIS marked the property inactive - removed from the prison, reason unknown (returned, disposed or
+      // transferred - NOMIS does not record which).
+      return 'Marked as removed from the establishment.'
+    case 'REACTIVATED':
+      return 'Reactivated and returned to active storage.'
     default:
       return ''
   }

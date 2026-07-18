@@ -38,6 +38,7 @@ const TIMELINE_STATUS_TAGS: Record<ContainerStatus, TimelineTag> = {
   TRANSFER: { text: 'Transferred out', classes: 'govuk-tag--grey' },
   COMBINED: { text: 'Combined', classes: 'govuk-tag--grey' },
   CREATED_IN_ERROR: { text: 'Created in error', classes: 'govuk-tag--grey' },
+  REMOVED: { text: 'Removed', classes: 'govuk-tag--grey' },
 }
 
 const timelineTag = (status: ContainerStatus): TimelineTag =>
@@ -98,6 +99,10 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
       return `${container} combined into another container`
     case 'CREATED_IN_ERROR':
       return `${container} removed — created in error`
+    case 'REMOVED':
+      return `${container} marked as removed from the establishment`
+    case 'REACTIVATED':
+      return `${container} reactivated`
     default:
       return `${container} updated`
   }
@@ -116,7 +121,7 @@ const timelineByline = (item: PrisonerTimelineItem, nameByUsername: Map<string, 
 }
 
 // Events that remove the container — a removed container reports no live storage location.
-const REMOVAL_EVENTS = ['RETURNED', 'DISPOSED', 'CREATED_IN_ERROR']
+const REMOVAL_EVENTS = ['RETURNED', 'DISPOSED', 'CREATED_IN_ERROR', 'REMOVED']
 
 // The details block's location row is worded by event: a transfer names the destination establishment,
 // a removal reads "Removed", otherwise the current storage location.

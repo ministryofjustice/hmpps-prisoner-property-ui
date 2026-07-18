@@ -6,6 +6,7 @@ const REMOVAL_OUTCOME_LABELS: Record<RemovalOutcome, string> = {
   TRANSFERRED: 'Transferred',
   COMBINED: 'Combined',
   CREATED_IN_ERROR: 'Created in error',
+  REMOVED: 'Removed',
 }
 
 export const removalOutcomeLabel = (outcome: RemovalOutcome): string => REMOVAL_OUTCOME_LABELS[outcome] ?? outcome

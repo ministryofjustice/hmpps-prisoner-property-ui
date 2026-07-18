@@ -71,6 +71,8 @@ describe('buildPrisonerTimeline', () => {
     expect(titleFor('DISPOSED')).toBe('Property container SN880032 disposed of')
     expect(titleFor('COMBINED')).toBe('Property container SN880032 combined into another container')
     expect(titleFor('CREATED_IN_ERROR')).toBe('Property container SN880032 removed — created in error')
+    expect(titleFor('REMOVED')).toBe('Property container SN880032 marked as removed from the establishment')
+    expect(titleFor('REACTIVATED')).toBe('Property container SN880032 reactivated')
   })
 
   it('omits the seal from the title when it is not known', () => {
