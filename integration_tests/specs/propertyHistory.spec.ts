@@ -24,7 +24,6 @@ const container: PrisonerPropertyContainer = {
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
-  archived: false,
 }
 
 const timelineItem = (overrides: Partial<PrisonerTimelineItem> = {}): PrisonerTimelineItem => ({

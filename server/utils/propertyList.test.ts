@@ -32,6 +32,7 @@ describe('propertyList utils', () => {
       expect(statusTag('DISPOSAL_REQUIRED')).toEqual({ text: 'Due for disposal', classes: 'govuk-tag--orange' })
       expect(statusTag('DUE_FOR_TRANSFER_OUT')).toEqual({ text: 'Due for transfer out', classes: 'govuk-tag--yellow' })
       expect(statusTag('DUE_FOR_RETURN')).toEqual({ text: 'Due for return', classes: 'govuk-tag--yellow' })
+      expect(statusTag('REMOVED')).toEqual({ text: 'Removed', classes: 'govuk-tag--grey' })
     })
   })
 

@@ -25,7 +25,6 @@ const source = (id: string, seal: string): PrisonerPropertyContainer => ({
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
-  archived: false,
 })
 
 const box: BoxLocation = {

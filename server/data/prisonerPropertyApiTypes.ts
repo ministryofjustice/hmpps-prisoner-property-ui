@@ -11,12 +11,14 @@ export type ContainerStatus =
   | 'TRANSFER'
   | 'COMBINED'
   | 'CREATED_IN_ERROR'
+  // Removed from the establishment, reason unknown - what a NOMIS "inactive" container maps to. Reversible.
+  | 'REMOVED'
 
 export type ContainerType = 'STANDARD' | 'EXCESS' | 'VALUABLES' | 'CONFISCATED'
 
 export type StorageLocationType = 'INTERNAL' | 'BRANSTON'
 
-export type RemovalOutcome = 'DISPOSED' | 'RETURNED' | 'TRANSFERRED' | 'COMBINED' | 'CREATED_IN_ERROR'
+export type RemovalOutcome = 'DISPOSED' | 'RETURNED' | 'TRANSFERRED' | 'COMBINED' | 'CREATED_IN_ERROR' | 'REMOVED'
 
 // Where the prisoner is, from prisoner-search: held in an establishment, in transit between prisons, or released.
 export type PrisonerMovementStatus = 'IN_ESTABLISHMENT' | 'IN_TRANSIT' | 'RELEASED'
@@ -42,7 +44,6 @@ export interface PrisonerPropertyContainer {
   removalDate: string | null
   createDateTime: string
   createdByUserId: string
-  archived: boolean
 }
 
 // A single prisoner's property containers, grouped for the establishment-wide list. The list endpoint
@@ -80,6 +81,9 @@ export type PropertyEventType =
   | 'DISPOSED'
   | 'COMBINED'
   | 'CREATED_IN_ERROR'
+  // Removed from the establishment (a NOMIS "inactive" container), and its reversal back to active storage.
+  | 'REMOVED'
+  | 'REACTIVATED'
 
 // A single event in a container's history (GET /property-containers/{id}/events), newest first.
 // See PropertyEventDto in the API for the source of truth. Each event carries only the fields

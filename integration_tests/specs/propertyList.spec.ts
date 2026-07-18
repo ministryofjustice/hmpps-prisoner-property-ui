@@ -29,7 +29,6 @@ const group: PrisonerPropertyGroup = {
       removalDate: null,
       createDateTime: '2026-06-01T10:00:00',
       createdByUserId: 'AUSER',
-      archived: false,
     },
   ],
 }
@@ -185,9 +184,9 @@ test.describe('Establishment property list', () => {
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for return' })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer out' })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for disposal' })).toBeEnabled()
-    // Returned/disposed is wired to the API's includeRemoved flag.
+    // Removed/returned/disposed is wired to the API's includeRemoved flag.
     await expect(
-      listPage.filters.getByRole('checkbox', { name: 'Show property that has been returned or disposed of' }),
+      listPage.filters.getByRole('checkbox', { name: 'Show property that has been removed, returned or disposed of' }),
     ).toBeEnabled()
     // Person-location filters are enabled.
     await expect(
