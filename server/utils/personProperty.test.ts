@@ -1,6 +1,7 @@
 import type { PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
 import {
   buildPersonPropertyView,
+  buildReturnedOrTransferredView,
   partitionContainers,
   removalOutcomeLabel,
   resolveCurrentPrisonName,
@@ -51,6 +52,75 @@ describe('partitionContainers', () => {
 
   it('returns empty arrays for no containers', () => {
     expect(partitionContainers([])).toEqual({ active: [], past: [] })
+  })
+})
+
+describe('buildReturnedOrTransferredView', () => {
+  it('keeps only removed/returned/disposed/transferred containers, newest first, with a status tag', () => {
+    const active = container({ id: 'active', removalOutcome: null })
+    const combined = container({ id: 'combined', removalOutcome: 'COMBINED', currentStatus: 'COMBINED' })
+    const createdInError = container({
+      id: 'error',
+      removalOutcome: 'CREATED_IN_ERROR',
+      currentStatus: 'CREATED_IN_ERROR',
+    })
+    const returned = container({
+      id: 'returned',
+      removalOutcome: 'RETURNED',
+      currentStatus: 'RETURNED',
+      removalDate: '2026-06-10',
+    })
+    const transferred = container({
+      id: 'transferred',
+      removalOutcome: 'TRANSFERRED',
+      currentStatus: 'TRANSFER',
+      removalDate: '2026-06-20',
+    })
+    const disposed = container({
+      id: 'disposed',
+      removalOutcome: 'DISPOSED',
+      currentStatus: 'DISPOSED',
+      removalDate: '2026-06-15',
+    })
+    const removed = container({
+      id: 'removed',
+      removalOutcome: 'REMOVED',
+      currentStatus: 'REMOVED',
+      removalDate: '2026-06-05',
+    })
+
+    const rows = buildReturnedOrTransferredView([
+      active,
+      combined,
+      createdInError,
+      returned,
+      transferred,
+      disposed,
+      removed,
+    ])
+
+    // Active, combined and created-in-error excluded; the rest ordered by removal date descending.
+    expect(rows.map(r => r.container.id)).toEqual(['transferred', 'disposed', 'returned', 'removed'])
+    expect(rows.find(r => r.container.id === 'transferred')!.status).toEqual({
+      text: 'Transferred out',
+      classes: 'govuk-tag--grey',
+    })
+    expect(rows.find(r => r.container.id === 'returned')!.status).toEqual({
+      text: 'Returned',
+      classes: 'govuk-tag--green',
+    })
+    expect(rows.find(r => r.container.id === 'disposed')!.status).toEqual({
+      text: 'Disposed',
+      classes: 'govuk-tag--red',
+    })
+    expect(rows.find(r => r.container.id === 'removed')!.status).toEqual({
+      text: 'Removed',
+      classes: 'govuk-tag--grey',
+    })
+  })
+
+  it('returns an empty array when the person has no returned or transferred property', () => {
+    expect(buildReturnedOrTransferredView([container({ removalOutcome: null })])).toEqual([])
   })
 })
 
