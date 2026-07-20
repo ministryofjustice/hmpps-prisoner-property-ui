@@ -1,11 +1,9 @@
-import type { ContainerStatus, PrisonerTimelineItem } from '../data/prisonerPropertyApiTypes'
+import type { PrisonerTimelineItem } from '../data/prisonerPropertyApiTypes'
 import { containerTypeLabel } from './propertyList'
+import { containerStatusTag, type StatusTag } from './statusTags'
 import { formatDate } from './utils'
 
-export interface TimelineTag {
-  text: string
-  classes: string
-}
+export type TimelineTag = StatusTag
 
 export interface TimelineDetails {
   containerType: string
@@ -25,24 +23,6 @@ export interface TimelineRow {
   dateTime: string
   details: TimelineDetails | null
 }
-
-// Status tags for the timeline. Uses the person-view palette (Stored is green here, matching the
-// property tab this timeline sits alongside) rather than the establishment-list palette.
-const TIMELINE_STATUS_TAGS: Record<ContainerStatus, TimelineTag> = {
-  STORED: { text: 'Stored', classes: 'govuk-tag--green' },
-  DUE_FOR_TRANSFER_OUT: { text: 'Due for transfer out', classes: 'govuk-tag--grey' },
-  DUE_FOR_RETURN: { text: 'Due for return', classes: 'govuk-tag--yellow' },
-  DISPOSAL_REQUIRED: { text: 'Due for disposal', classes: 'govuk-tag--orange' },
-  DISPOSED: { text: 'Disposed', classes: 'govuk-tag--red' },
-  RETURNED: { text: 'Returned', classes: 'govuk-tag--green' },
-  TRANSFER: { text: 'Transferred out', classes: 'govuk-tag--grey' },
-  COMBINED: { text: 'Combined', classes: 'govuk-tag--grey' },
-  CREATED_IN_ERROR: { text: 'Created in error', classes: 'govuk-tag--grey' },
-  REMOVED: { text: 'Removed', classes: 'govuk-tag--grey' },
-}
-
-const timelineTag = (status: ContainerStatus): TimelineTag =>
-  TIMELINE_STATUS_TAGS[status] ?? { text: status, classes: 'govuk-tag--grey' }
 
 const containerPrefix = (seal: string | null): string => (seal ? `Property container ${seal}` : 'Property container')
 
@@ -142,7 +122,7 @@ const timelineDetails = (item: PrisonerTimelineItem, prisonerNumber: string): Ti
   return {
     containerType: item.containerType ? containerTypeLabel(item.containerType) : '-',
     sealNumber: item.containerSealNumber,
-    status: item.containerStatus ? timelineTag(item.containerStatus) : null,
+    status: item.containerStatus ? containerStatusTag(item.containerStatus) : null,
     ...detailsLocation(item),
     historyUrl: `/prisoner/${prisonerNumber}/container/${item.containerId}`,
   }
@@ -160,7 +140,7 @@ export const buildPrisonerTimeline = (
 ): TimelineRow[] =>
   items.map(item => ({
     title: timelineTitle(item),
-    tag: item.eventStatus ? timelineTag(item.eventStatus) : null,
+    tag: item.eventStatus ? containerStatusTag(item.eventStatus) : null,
     byline: timelineByline(item, nameByUsername),
     dateTime: item.eventDateTime,
     details: timelineDetails(item, prisonerNumber),

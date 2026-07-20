@@ -36,6 +36,8 @@ export default class PrisonerPropertyPage extends AbstractPage {
 
   readonly tabHistory: Locator
 
+  readonly tabReturned: Locator
+
   readonly breadcrumbs: Locator
 
   readonly combineButton: Locator
@@ -61,6 +63,7 @@ export default class PrisonerPropertyPage extends AbstractPage {
     this.successBanner = page.getByTestId('success-banner')
     this.tabProperty = page.getByTestId('tab-property')
     this.tabHistory = page.getByTestId('tab-history')
+    this.tabReturned = page.getByTestId('tab-returned')
     this.breadcrumbs = page.locator('.govuk-breadcrumbs')
     this.combineButton = page.getByTestId('combine-selected')
     this.selectAllHeader = page.locator('#select-all')

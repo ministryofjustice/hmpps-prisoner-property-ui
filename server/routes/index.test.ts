@@ -872,6 +872,95 @@ describe('GET /prisoner/:prisonerNumber/history', () => {
   })
 })
 
+describe('GET /prisoner/:prisonerNumber/returned', () => {
+  it('lists the returned/transferred property with tabs and status tags, and audits the view', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'active', currentSealNumber: 'ACTIVE1', removalOutcome: null }),
+      container({ id: 'combined', currentSealNumber: 'COMB1', removalOutcome: 'COMBINED', currentStatus: 'COMBINED' }),
+      container({
+        id: 'returned',
+        currentSealNumber: 'RET1',
+        prisonName: 'Leeds (HMP)',
+        containerType: 'STANDARD',
+        removalOutcome: 'RETURNED',
+        currentStatus: 'RETURNED',
+        removalDate: '2026-06-10',
+      }),
+      container({
+        id: 'transferred',
+        currentSealNumber: 'TR1',
+        removalOutcome: 'TRANSFERRED',
+        currentStatus: 'TRANSFER',
+        removalDate: '2026-06-20',
+      }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC/returned')
+      .expect('Content-Type', /html/)
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('data-qa="tab-property"')
+        expect(res.text).toContain('data-qa="tab-history"')
+        expect(res.text).toContain('data-qa="tab-returned"')
+        expect(res.text).toContain('data-qa="returned-list"')
+        // the returned and transferred containers appear with their status tags
+        expect(res.text).toContain('RET1')
+        expect(res.text).toContain('Returned')
+        expect(res.text).toContain('TR1')
+        expect(res.text).toContain('Transferred out')
+        // active and combined property are not listed here
+        expect(res.text).not.toContain('ACTIVE1')
+        expect(res.text).not.toContain('COMB1')
+        expect(prisonerPropertyService.getPropertyForPrisoner).toHaveBeenCalledWith('A1234BC', user.username)
+        expect(auditService.logPageView).toHaveBeenCalledWith(
+          Page.PRISONER_PROPERTY_RETURNED,
+          expect.objectContaining({ who: user.username, subjectId: 'A1234BC' }),
+        )
+      })
+  })
+
+  it('shows an empty state when the prisoner has no returned or transferred property', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ removalOutcome: null })])
+
+    return request(app)
+      .get('/prisoner/A1234BC/returned')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('No returned or transferred property for this person.')
+      })
+  })
+
+  it('shows the no-caseload page and calls no APIs when there is no active caseload', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: null,
+      activeCaseloadName: null,
+      caseloadIds: [],
+    })
+
+    return request(app)
+      .get('/prisoner/A1234BC/returned')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('You do not have an active caseload')
+        expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
+      })
+  })
+
+  it('returns 404 for an invalid prisoner number', async () => {
+    withActiveCaseload()
+
+    return request(app)
+      .get('/prisoner/not-a-number/returned')
+      .expect(404)
+      .expect(() => {
+        expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
+      })
+  })
+})
+
 describe('GET /prisoner/:prisonerNumber/container/:id', () => {
   it("renders the container's history timeline and audits the view", async () => {
     withActiveCaseload()

@@ -1,0 +1,56 @@
+{% extends "../partials/layout.njk" %}
+
+{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+
+{% set pageTitle = applicationName + " - Property returned or transferred" %}
+{% set mainClasses = "govuk-body app-property-page" %}
+
+{% block beforeContent %}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: "Prisoner property", href: "/" }
+  ] }) }}
+{% endblock %}
+
+{% block content %}
+  {% if successMessage %}
+    {{ govukNotificationBanner({
+      type: "success",
+      text: successMessage,
+      attributes: { "data-qa": "success-banner" }
+    }) }}
+  {% endif %}
+
+  {% set activeTab = "returned" %}
+  {% include "../partials/personHeader.njk" %}
+
+  {% if returned.length == 0 %}
+    <p class="govuk-body" data-qa="no-returned">No returned or transferred property for this person.</p>
+  {% else %}
+    {% set returnedRows = [] %}
+    {% for row in returned %}
+      {% set returnedRows = (returnedRows.push([
+        { text: row.container.currentSealNumber or "-" },
+        { text: row.container.prisonName or "-" },
+        { text: row.container.containerType | containerTypeLabel },
+        { text: (row.container.removalDate | formatShortDate) or "No date set", attributes: { "data-sort-value": row.container.removalDate or "" } },
+        { html: govukTag({ text: row.status.text, classes: row.status.classes }), attributes: { "data-sort-value": row.status.text } }
+      ]), returnedRows) %}
+    {% endfor %}
+
+    {{ govukTable({
+      attributes: { "data-qa": "returned-list", "data-module": "moj-sortable-table" },
+      head: [
+        { text: "Seal number" },
+        { text: "Establishment" },
+        { text: "Property type", attributes: { "aria-sort": "none" } },
+        { text: "Removal date", attributes: { "aria-sort": "descending" } },
+        { text: "Status", attributes: { "aria-sort": "none" } }
+      ],
+      rows: returnedRows
+    }) }}
+  {% endif %}
+{% endblock %}

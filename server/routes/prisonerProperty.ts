@@ -4,7 +4,7 @@ import createError from 'http-errors'
 import type { Services } from '../services'
 import { Page } from '../services/auditService'
 import { isPrisonerNumber } from '../utils/propertyList'
-import { buildPersonPropertyView } from '../utils/personProperty'
+import { buildPersonPropertyView, buildReturnedOrTransferredView } from '../utils/personProperty'
 import { buildPrisonerBanner, fallbackPrisonerBanner } from '../utils/prisonerBanner'
 import { buildPrisonerTimeline } from '../utils/prisonerTimeline'
 import type { Prisoner } from '../data/prisonerSearchApiTypes'
@@ -130,6 +130,52 @@ export default function prisonerPropertyRoutes({
       prisonerName: containers[0]?.prisonerName ?? null,
       banner,
       timeline: buildPrisonerTimeline(timelineItems, prisonerNumber, nameByUsername),
+      canManage: canManageProperty(res.locals.user.userRoles),
+      successMessage: req.flash('success')[0],
+      backUrl: '/',
+    })
+  })
+
+  router.get('/prisoner/:prisonerNumber/returned', async (req, res, next) => {
+    const { token, username } = res.locals.user
+    const { prisonerNumber } = req.params
+
+    const { activeCaseloadId } = await userService.getActiveCaseload(token)
+    if (!activeCaseloadId) {
+      return res.render('pages/noCaseload')
+    }
+
+    if (!isPrisonerNumber(prisonerNumber)) {
+      return next(createError(404, 'Prisoner not found'))
+    }
+
+    // The person's containers already include their removed/returned/disposed/transferred property, so
+    // one call feeds both this tab's list and the shared header (name + banner fallback). Prisoner-search
+    // feeds the banner but is not essential to the page.
+    const [containers, prisoner] = await Promise.all([
+      prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username),
+      prisonerService.getPrisonerDetails(prisonerNumber, username).catch((error: Error): Prisoner | null => {
+        logger.warn(`Failed to load prisoner-search details for ${prisonerNumber}: ${error.message}`)
+        return null
+      }),
+    ])
+
+    await auditService.logPageView(Page.PRISONER_PROPERTY_RETURNED, {
+      who: username,
+      subjectId: prisonerNumber,
+      subjectType: 'PRISONER_NUMBER',
+      correlationId: req.id,
+    })
+
+    const banner = prisoner
+      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId)
+      : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
+
+    return res.render('pages/prisonerPropertyReturned', {
+      prisonerNumber,
+      prisonerName: containers[0]?.prisonerName ?? null,
+      banner,
+      returned: buildReturnedOrTransferredView(containers),
       canManage: canManageProperty(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
       backUrl: '/',

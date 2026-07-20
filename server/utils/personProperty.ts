@@ -1,4 +1,5 @@
 import type { PrisonerPropertyContainer, RemovalOutcome } from '../data/prisonerPropertyApiTypes'
+import { containerStatusTag } from './statusTags'
 
 const REMOVAL_OUTCOME_LABELS: Record<RemovalOutcome, string> = {
   DISPOSED: 'Disposed',
@@ -10,6 +11,29 @@ const REMOVAL_OUTCOME_LABELS: Record<RemovalOutcome, string> = {
 }
 
 export const removalOutcomeLabel = (outcome: RemovalOutcome): string => REMOVAL_OUTCOME_LABELS[outcome] ?? outcome
+
+// Removal outcomes surfaced on the "Property returned or transferred" tab. COMBINED (merged into another
+// container, still tracked there) and CREATED_IN_ERROR (a mistake) are deliberately excluded — they are
+// not property the person had returned or transferred out.
+const RETURNED_OR_TRANSFERRED_OUTCOMES: RemovalOutcome[] = ['REMOVED', 'RETURNED', 'DISPOSED', 'TRANSFERRED']
+
+export interface ReturnedContainerRow {
+  container: PrisonerPropertyContainer
+  status: PropertyStatusTag
+}
+
+/**
+ * The prisoner's "old" property no longer actively managed here — containers that were removed, returned,
+ * disposed of or transferred out — newest first (by the date they left storage). Status is derived from
+ * the container's current status (REMOVED/RETURNED/DISPOSED/TRANSFER) via the shared person-view palette.
+ */
+export const buildReturnedOrTransferredView = (containers: PrisonerPropertyContainer[]): ReturnedContainerRow[] =>
+  containers
+    .filter(
+      container => container.removalOutcome && RETURNED_OR_TRANSFERRED_OUTCOMES.includes(container.removalOutcome),
+    )
+    .sort((a, b) => (b.removalDate ?? b.createDateTime).localeCompare(a.removalDate ?? a.createDateTime))
+    .map(container => ({ container, status: containerStatusTag(container.currentStatus) }))
 
 /**
  * Split a prisoner's containers into current (still held) and past (removed) property. A container is
