@@ -3,6 +3,7 @@ import type {
   ContainerStatus,
   ContainerType,
   PersonLocation,
+  PrisonerMovementStatus,
   PrisonerPropertyContainer,
   PrisonerPropertyGroup,
   PrisonPropertyListQuery,
@@ -71,15 +72,23 @@ export const containerLocation = (container: PrisonerPropertyContainer): string 
 }
 
 /**
- * The "Prisoner establishment" column label for a group. A prisoner mid-move has no resolvable
- * establishment name, so describe their movement instead: in transit -> "Transferring", released ->
- * "Released"; otherwise the current establishment name (or "Not known").
+ * A prisoner's current-establishment label that respects movement status. A prisoner mid-move has no
+ * resolvable establishment name, so describe their movement instead: in transit -> "Transferring",
+ * released -> "Released"; otherwise the current establishment name (or "Not known"). Shared by the
+ * establishment list, the prisoner banner and the remove-container pages so all three agree.
  */
-export const establishmentLabel = (group: PrisonerPropertyGroup): string => {
-  if (group.prisonerMovementStatus === 'IN_TRANSIT') return 'Transferring'
-  if (group.prisonerMovementStatus === 'RELEASED') return 'Released'
-  return group.prisonerCurrentPrisonName || 'Not known'
+export const movementEstablishmentLabel = (
+  movementStatus: PrisonerMovementStatus | null | undefined,
+  currentPrisonName: string | null | undefined,
+): string => {
+  if (movementStatus === 'IN_TRANSIT') return 'Transferring'
+  if (movementStatus === 'RELEASED') return 'Released'
+  return currentPrisonName || 'Not known'
 }
+
+/** The "Prisoner establishment" column label for a group in the establishment-wide list. */
+export const establishmentLabel = (group: PrisonerPropertyGroup): string =>
+  movementEstablishmentLabel(group.prisonerMovementStatus, group.prisonerCurrentPrisonName)
 
 const firstValue = (value: string | ParsedQs | (string | ParsedQs)[] | undefined): string | undefined =>
   (Array.isArray(value) ? value[0] : value)?.toString().trim() || undefined

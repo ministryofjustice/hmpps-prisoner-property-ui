@@ -3,7 +3,7 @@ import createError from 'http-errors'
 
 import type { Services } from '../services'
 import { Page } from '../services/auditService'
-import { isPrisonerNumber } from '../utils/propertyList'
+import { isPrisonerNumber, movementEstablishmentLabel } from '../utils/propertyList'
 import { buildPersonPropertyView, buildReturnedOrTransferredView } from '../utils/personProperty'
 import { buildPrisonerBanner, fallbackPrisonerBanner } from '../utils/prisonerBanner'
 import { buildPrisonerTimeline } from '../utils/prisonerTimeline'
@@ -60,8 +60,11 @@ export default function prisonerPropertyRoutes({
       activeCaseloadId,
     )
 
+    // Movement status is a prisoner-level attribute mirrored on every container; use it so the banner
+    // and the "Prisoner establishment" column read "Transferring"/"Released" rather than "Not known".
+    const prisonerMovementStatus = containers[0]?.prisonerMovementStatus
     const banner = prisoner
-      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId)
+      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, prisonerMovementStatus)
       : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
 
     // Edits are gated on both the manage role and the establishment being switched on in DPS; a
@@ -73,6 +76,7 @@ export default function prisonerPropertyRoutes({
       prisonerNumber,
       prisonerName: containers[0]?.prisonerName ?? null,
       prisonerCurrentPrisonName,
+      prisonerEstablishmentLabel: movementEstablishmentLabel(prisonerMovementStatus, prisonerCurrentPrisonName),
       hasLeft,
       banner,
       inEstablishment,
@@ -117,7 +121,7 @@ export default function prisonerPropertyRoutes({
     })
 
     const banner = prisoner
-      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId)
+      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, containers[0]?.prisonerMovementStatus)
       : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
 
     const nameByUsername = await userService.getUserDisplayNames(
@@ -168,7 +172,7 @@ export default function prisonerPropertyRoutes({
     })
 
     const banner = prisoner
-      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId)
+      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, containers[0]?.prisonerMovementStatus)
       : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
 
     return res.render('pages/prisonerPropertyReturned', {

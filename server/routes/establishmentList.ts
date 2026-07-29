@@ -13,6 +13,7 @@ import {
 } from '../utils/propertyList'
 import { canManageProperty } from '../middleware/requireManageRole'
 import { canAdminister } from '../middleware/requireAdminRole'
+import { canManageLocations } from '../middleware/requireLocationAdminRole'
 
 export default function establishmentListRoutes({
   auditService,
@@ -69,6 +70,7 @@ export default function establishmentListRoutes({
       canManage: hasManageRole && isActivePrison,
       showNomisBanner: hasManageRole && !isActivePrison,
       isAdmin: canAdminister(res.locals.user.userRoles),
+      isLocationAdmin: canManageLocations(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
       includeRemoved,
       summary,
