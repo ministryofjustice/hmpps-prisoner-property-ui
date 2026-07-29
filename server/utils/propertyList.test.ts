@@ -54,6 +54,31 @@ describe('propertyList utils', () => {
         classes: 'govuk-tag--grey',
       })
     })
+
+    it('tags property the sending prison has already transferred out to us as "In transit"', () => {
+      const inTransit = {
+        prisonId: 'LEI',
+        currentStatus: 'TRANSFER',
+        removalOutcome: 'TRANSFERRED',
+        receivingPrisonId: 'MDI',
+      } as PrisonerPropertyContainer
+
+      expect(establishmentListStatusTag(inTransit, 'MDI')).toEqual({ text: 'In transit', classes: 'govuk-tag--blue' })
+    })
+
+    it('does not tag a reconciled transfer as in transit', () => {
+      const reconciled = {
+        prisonId: 'LEI',
+        currentStatus: 'TRANSFER',
+        removalOutcome: 'TRANSFERRED',
+        receivingPrisonId: null,
+      } as PrisonerPropertyContainer
+
+      expect(establishmentListStatusTag(reconciled, 'MDI')).toEqual({
+        text: 'Due for transfer in',
+        classes: 'govuk-tag--turquoise',
+      })
+    })
   })
 
   describe('containerTypeLabel', () => {

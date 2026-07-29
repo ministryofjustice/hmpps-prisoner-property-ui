@@ -1,5 +1,6 @@
 import type { PrisonerPropertyContainer, RemovalOutcome } from '../data/prisonerPropertyApiTypes'
 import { containerStatusTag } from './statusTags'
+import { DUE_FOR_TRANSFER_IN_TAG, IN_TRANSIT_TAG, isInTransitTo } from './propertyList'
 
 const REMOVAL_OUTCOME_LABELS: Record<RemovalOutcome, string> = {
   DISPOSED: 'Disposed',
@@ -85,8 +86,10 @@ export interface PersonPropertyView {
  *    when a disposal is due, otherwise "Stored" if the prisoner is still here, or "Due for transfer
  *    out" if they have moved on (the property needs to follow them).
  *  - Property held elsewhere, shown only while the prisoner is in the viewed establishment ("Property
- *    due to be transferred in"): "Due for disposal" or "Due for transfer in".
- * Removed containers (disposed/returned/transferred/combined) are excluded.
+ *    due to be transferred in"): "Due for disposal" or "Due for transfer in", plus property the sending
+ *    prison has already transferred out to here but that has not been logged here yet ("In transit").
+ * Removed containers are otherwise excluded (disposed/returned/combined, and transfers already
+ * reconciled - once this prison logs the arrival, its own record takes over).
  */
 export const buildPersonPropertyView = (
   containers: PrisonerPropertyContainer[],
@@ -104,10 +107,13 @@ export const buildPersonPropertyView = (
     .filter(container => container.prisonId === viewedPrisonId)
     .map(container => ({ container, status: inEstablishmentStatus(container, prisonerHere) }))
 
+  // Incoming property, only meaningful while the prisoner is here: still held at their old prison, or
+  // already sent by it and awaiting logging here. Both are non-editable until this prison logs the arrival.
   const dueToTransferIn: PersonPropertyRow[] = prisonerHere
-    ? held
-        .filter(container => container.prisonId !== viewedPrisonId)
-        .map(container => ({ container, status: transferInStatus(container) }))
+    ? [
+        ...held.filter(container => container.prisonId !== viewedPrisonId),
+        ...containers.filter(container => isInTransitTo(container, viewedPrisonId)),
+      ].map(container => ({ container, status: transferInStatus(container, viewedPrisonId) }))
     : []
 
   return { inEstablishment, dueToTransferIn, hasLeft, prisonerCurrentPrisonName: resolveCurrentPrisonName(containers) }
@@ -120,8 +126,11 @@ const inEstablishmentStatus = (container: PrisonerPropertyContainer, prisonerHer
   return { text: 'Due for transfer out', classes: 'govuk-tag--grey' }
 }
 
-const transferInStatus = (container: PrisonerPropertyContainer): PropertyStatusTag => {
+const transferInStatus = (container: PrisonerPropertyContainer, viewedPrisonId: string): PropertyStatusTag => {
+  // An in-transit container has already left the sending prison, so its own status is a historical
+  // "Transferred" - the fact that matters here is that it is on its way and still needs storing.
+  if (isInTransitTo(container, viewedPrisonId)) return IN_TRANSIT_TAG
   if (container.currentStatus === 'DISPOSAL_REQUIRED') return { text: 'Due for disposal', classes: 'govuk-tag--orange' }
   if (container.currentStatus === 'DUE_FOR_RETURN') return { text: 'Due for return', classes: 'govuk-tag--yellow' }
-  return { text: 'Due for transfer in', classes: 'govuk-tag--turquoise' }
+  return DUE_FOR_TRANSFER_IN_TAG
 }

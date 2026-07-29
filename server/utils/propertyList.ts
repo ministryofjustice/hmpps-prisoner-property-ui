@@ -46,17 +46,34 @@ export const isPrisonerNumber = (value: string): boolean => PRISON_NUMBER_PATTER
 export const statusTag = (status: ContainerStatus): { text: string; classes: string } =>
   STATUS_TAGS[status] ?? { text: status, classes: 'govuk-tag--grey' }
 
+// Incoming-property tags, shared by the establishment list and the person view so both read the same.
+// "Due for transfer in": still held at the sending prison - its owner moved here but nobody has sent it
+// yet. "In transit": the sending prison has transferred it out, but this prison has not yet logged its
+// arrival (so it still needs storing here) - see isInTransitTo.
+export const DUE_FOR_TRANSFER_IN_TAG = { text: 'Due for transfer in', classes: 'govuk-tag--turquoise' }
+export const IN_TRANSIT_TAG = { text: 'In transit', classes: 'govuk-tag--blue' }
+
+/**
+ * Whether the container has been transferred out to [viewedPrisonId] but not yet logged there. The API
+ * clears `receivingPrisonId` once the receiving prison creates its own record (the transfer is
+ * reconciled), so a populated one on a transferred-out container means it is still in flight.
+ */
+export const isInTransitTo = (container: PrisonerPropertyContainer, viewedPrisonId: string): boolean =>
+  container.removalOutcome === 'TRANSFERRED' && container.receivingPrisonId === viewedPrisonId
+
 /**
  * The status tag for a container in the establishment list, relative to the viewed establishment. A
  * container physically held at another prison is due to be transferred *in* here (its owner was received
  * here), so it reads "Due for transfer in" rather than the API's viewer-independent "Due for transfer
- * out". Everything held here uses its own status.
+ * out" - or "In transit" once the sending prison has actually sent it. Everything held here uses its
+ * own status.
  */
 export const establishmentListStatusTag = (
   container: PrisonerPropertyContainer,
   viewedPrisonId: string,
 ): { text: string; classes: string } => {
-  if (container.prisonId !== viewedPrisonId) return { text: 'Due for transfer in', classes: 'govuk-tag--turquoise' }
+  if (isInTransitTo(container, viewedPrisonId)) return IN_TRANSIT_TAG
+  if (container.prisonId !== viewedPrisonId) return DUE_FOR_TRANSFER_IN_TAG
   return statusTag(container.currentStatus)
 }
 

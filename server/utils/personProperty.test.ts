@@ -122,6 +122,23 @@ describe('buildReturnedOrTransferredView', () => {
   it('returns an empty array when the person has no returned or transferred property', () => {
     expect(buildReturnedOrTransferredView([container({ removalOutcome: null })])).toEqual([])
   })
+
+  // A transfer still in flight has left the sending prison, so it belongs in this history too - even
+  // though it also shows as "In transit" on the destination's incoming list.
+  it('includes a transfer that the destination has not logged yet', () => {
+    const inFlight = container({
+      id: 'in-flight',
+      removalOutcome: 'TRANSFERRED',
+      currentStatus: 'TRANSFER',
+      removalDate: '2026-06-20',
+      receivingPrisonId: 'MDI',
+    })
+
+    const rows = buildReturnedOrTransferredView([inFlight])
+
+    expect(rows.map(r => r.container.id)).toEqual(['in-flight'])
+    expect(rows[0]!.status).toEqual({ text: 'Transferred out', classes: 'govuk-tag--grey' })
+  })
 })
 
 describe('resolveCurrentPrisonName', () => {
@@ -242,5 +259,59 @@ describe('buildPersonPropertyView', () => {
     const view = buildPersonPropertyView([held], 'MDI')
     expect(view.hasLeft).toBe(false)
     expect(view.inEstablishment[0]!.status.text).toBe('Stored')
+  })
+
+  // Property the sending prison has transferred out to us but that we have not logged yet: it is removed
+  // (outcome TRANSFERRED) and still carries our prison as its destination, so it shows as In transit.
+  it('shows property transferred out to this prison but not yet logged here as In transit', () => {
+    const inTransit = container({
+      id: 'in-transit',
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      prisonerCurrentPrisonId: 'MDI',
+      inPrisonersCurrentPrison: false,
+      currentStatus: 'TRANSFER',
+      removalOutcome: 'TRANSFERRED',
+      receivingPrisonId: 'MDI',
+    })
+
+    const view = buildPersonPropertyView([inTransit], 'MDI')
+
+    // never listed as held here - it has not arrived in storage yet
+    expect(view.inEstablishment).toEqual([])
+    expect(view.dueToTransferIn.map(r => r.container.id)).toEqual(['in-transit'])
+    expect(view.dueToTransferIn[0]!.status).toEqual({ text: 'In transit', classes: 'govuk-tag--blue' })
+  })
+
+  it('drops a transferred container once this prison has logged its arrival (reconciled)', () => {
+    // The API clears receivingPrisonId on reconcile; this prison's own record takes over.
+    const reconciled = container({
+      prisonId: 'LEI',
+      prisonerCurrentPrisonId: 'MDI',
+      inPrisonersCurrentPrison: false,
+      currentStatus: 'TRANSFER',
+      removalOutcome: 'TRANSFERRED',
+      receivingPrisonId: null,
+    })
+
+    const view = buildPersonPropertyView([reconciled], 'MDI')
+
+    expect(view.inEstablishment).toEqual([])
+    expect(view.dueToTransferIn).toEqual([])
+  })
+
+  it('does not show in-transit property destined for a different prison', () => {
+    const elsewhere = container({
+      prisonId: 'LEI',
+      prisonerCurrentPrisonId: 'MDI',
+      currentStatus: 'TRANSFER',
+      removalOutcome: 'TRANSFERRED',
+      receivingPrisonId: 'IWI',
+    })
+
+    const view = buildPersonPropertyView([elsewhere], 'MDI')
+
+    expect(view.inEstablishment).toEqual([])
+    expect(view.dueToTransferIn).toEqual([])
   })
 })
