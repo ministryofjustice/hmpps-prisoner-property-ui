@@ -33,6 +33,10 @@ export interface PrisonerPropertyContainer {
   prisonerCurrentPrisonName?: string | null
   prisonerMovementStatus?: PrisonerMovementStatus | null
   inPrisonersCurrentPrison: boolean
+  // The prison this container is due to arrive at, when it is incoming there: either due for transfer out
+  // (owner has moved, property still at its holding prison) or transferred out but not yet logged at the
+  // destination ("in transit"). Null once the destination has logged it, or when it is not incoming.
+  receivingPrisonId?: string | null
   containerType: ContainerType
   currentSealNumber: string | null
   currentStatus: ContainerStatus

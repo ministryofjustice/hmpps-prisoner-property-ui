@@ -537,6 +537,36 @@ describe('GET /prisoner/:prisonerNumber', () => {
       })
   })
 
+  it('shows property transferred out to here but not yet logged as In transit, and not editable', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({
+        id: 'c9',
+        prisonId: 'LEI',
+        prisonName: 'Leeds (HMP)',
+        prisonerCurrentPrisonId: 'MDI',
+        inPrisonersCurrentPrison: false,
+        currentSealNumber: 'SNTRANSIT',
+        currentStatus: 'TRANSFER',
+        removalOutcome: 'TRANSFERRED',
+        receivingPrisonId: 'MDI',
+      }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Property due to be transferred in')
+        expect(res.text).toContain('SNTRANSIT')
+        expect(res.text).toContain('In transit')
+        // it has not arrived in storage here, so it is not listed as held here and offers no actions
+        expect(res.text).not.toContain('Stored')
+        expect(res.text).not.toContain('/change-container/c9')
+        expect(res.text).not.toContain('/remove-container/c9')
+      })
+  })
+
   it('variant B (prisoner has left): warns, shows Due for transfer out and the prisoner establishment', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
