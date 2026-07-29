@@ -42,6 +42,24 @@ describe('buildPrisonerBanner', () => {
 
     expect(banner.inThisEstablishment).toBe(false)
   })
+
+  it('shows "Transferring" as the establishment while the prisoner is in transit', () => {
+    const banner = buildPrisonerBanner('A1234BC', prisoner({ prisonId: 'TRN', prisonName: null }), 'MDI', 'IN_TRANSIT')
+
+    expect(banner.establishment).toBe('Transferring')
+  })
+
+  it('shows "Released" as the establishment once the prisoner has been released', () => {
+    const banner = buildPrisonerBanner('A1234BC', prisoner({ prisonId: 'OUT', prisonName: null }), 'MDI', 'RELEASED')
+
+    expect(banner.establishment).toBe('Released')
+  })
+
+  it('shows the prison name when the prisoner is held in an establishment', () => {
+    const banner = buildPrisonerBanner('A1234BC', prisoner(), 'MDI', 'IN_ESTABLISHMENT')
+
+    expect(banner.establishment).toBe('Moorland (HMP & YOI)')
+  })
 })
 
 describe('fallbackPrisonerBanner', () => {

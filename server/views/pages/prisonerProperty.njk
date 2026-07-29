@@ -88,7 +88,7 @@
         {% endif %}
         {% set cells = (cells.push({ text: row.container.currentSealNumber or "-" }), cells) %}
         {% if hasLeft %}
-          {% set cells = (cells.push({ text: prisonerCurrentPrisonName or "Not known" }), cells) %}
+          {% set cells = (cells.push({ text: prisonerEstablishmentLabel }), cells) %}
         {% endif %}
         {% set cells = (cells.push(
           { text: row.container.containerType | containerTypeLabel },
@@ -104,19 +104,25 @@
         {% set inEstablishmentRows = (inEstablishmentRows.push(cells), inEstablishmentRows) %}
       {% endfor %}
 
-      {% if canManage %}<form method="post" action="/prisoner/{{ prisonerNumber }}/combine"><input type="hidden" name="_csrf" value="{{ csrfToken }}"><div data-module="moj-multi-select">{% endif %}
+      {% if canManage %}
+        <form method="post" action="/prisoner/{{ prisonerNumber }}/combine">
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          {{ govukButton({
+            text: "Combine selected property containers",
+            classes: "govuk-button--secondary",
+            attributes: { "data-qa": "combine-selected" }
+          }) }}
+          <div data-module="moj-multi-select">
+      {% endif %}
         {{ govukTable({
           attributes: { "data-qa": "in-establishment", "data-module": "moj-sortable-table" },
           head: inEstablishmentHead,
           rows: inEstablishmentRows
         }) }}
-      {% if canManage %}</div>
-        {{ govukButton({
-          text: "Combine selected property containers",
-          classes: "govuk-button--secondary",
-          attributes: { "data-qa": "combine-selected" }
-        }) }}
-      </form>{% endif %}
+      {% if canManage %}
+          </div>
+        </form>
+      {% endif %}
     {% endif %}
 
     {% if dueToTransferIn.length %}

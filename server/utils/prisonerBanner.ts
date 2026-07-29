@@ -1,6 +1,8 @@
 import config from '../config'
 import { convertToTitleCase } from './utils'
+import { movementEstablishmentLabel } from './propertyList'
 import type { Prisoner } from '../data/prisonerSearchApiTypes'
+import type { PrisonerMovementStatus } from '../data/prisonerPropertyApiTypes'
 
 export interface PrisonerBanner {
   prisonerNumber: string
@@ -20,17 +22,20 @@ export interface PrisonerBanner {
 /**
  * Build the prisoner banner view-model from prisoner-search details, relative to the establishment
  * being viewed (the user's active caseload). Cell number and status are only meaningful — and only
- * rendered — while the prisoner is held in the viewed establishment.
+ * rendered — while the prisoner is held in the viewed establishment. The establishment label respects
+ * the prisoner's movement status (from their property records): "Transferring" while in transit and
+ * "Released" once released, since prisoner-search reports no prison name in those states.
  */
 export const buildPrisonerBanner = (
   prisonerNumber: string,
   prisoner: Prisoner,
   viewedPrisonId: string,
+  movementStatus?: PrisonerMovementStatus | null,
 ): PrisonerBanner => ({
   prisonerNumber,
   name: convertToTitleCase([prisoner.lastName, prisoner.firstName].filter(Boolean).join(', ')),
   dateOfBirth: prisoner.dateOfBirth,
-  establishment: prisoner.prisonName,
+  establishment: movementEstablishmentLabel(movementStatus, prisoner.prisonName),
   cellLocation: prisoner.cellLocation,
   status: prisoner.status,
   inThisEstablishment: prisoner.prisonId != null && prisoner.prisonId === viewedPrisonId,

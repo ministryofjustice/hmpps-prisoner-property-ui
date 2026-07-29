@@ -1615,6 +1615,27 @@ describe('Remove container journey - steps', () => {
       })
   })
 
+  it('shows the prisoner’s current location (not the container’s prison) as the establishment', async () => {
+    withActiveCaseload()
+    // Container is stored at Moorland but the prisoner has transferred out and is in transit.
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({
+        prisonName: 'Moorland (HMP & YOI)',
+        prisonerCurrentPrisonName: null,
+        prisonerMovementStatus: 'IN_TRANSIT',
+      }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC/remove-container/c1?from=person')
+      .expect(200)
+      .expect(res => {
+        const summary = res.text.slice(res.text.indexOf('data-qa="prisoner-summary"'))
+        expect(summary).toContain('Transferring')
+        expect(summary).not.toContain('Moorland (HMP & YOI)')
+      })
+  })
+
   it('404s when the container is not found for the prisoner', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ id: 'other' })])
@@ -1781,6 +1802,20 @@ describe('Combine containers journey', () => {
       .expect(res => {
         expect(res.text).toContain('action="/prisoner/A1234BC/combine"')
         expect(res.text).toContain('Combine selected property containers')
+      })
+  })
+
+  it('renders the combine button above the property table', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(twoContainers())
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text.indexOf('data-qa="combine-selected"')).toBeLessThan(
+          res.text.indexOf('data-qa="in-establishment"'),
+        )
       })
   })
 
@@ -2672,7 +2707,7 @@ describe('Admin - manage storage locations', () => {
       })
   })
 
-  it('no longer shows a manage-storage-locations link on the main page', async () => {
+  it('shows a manage-property-locations button on the main page for a location admin', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
 
@@ -2680,8 +2715,20 @@ describe('Admin - manage storage locations', () => {
       .get('/')
       .expect(200)
       .expect(res => {
+        expect(res.text).toContain('data-qa="manage-locations-link"')
+        expect(res.text).toContain('/admin/locations')
+      })
+  })
+
+  it('does not show the manage-property-locations button without the location admin role', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
         expect(res.text).not.toContain('data-qa="manage-locations-link"')
-        expect(res.text).not.toContain('/admin/locations')
       })
   })
 

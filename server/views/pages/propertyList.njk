@@ -36,7 +36,21 @@
     }) }}
   {% endif %}
 
-  <h1 class="govuk-heading-xl govuk-!-margin-bottom-4">Prisoner property</h1>
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-two-thirds">
+      <h1 class="govuk-heading-xl govuk-!-margin-bottom-4">Prisoner property</h1>
+    </div>
+    {% if isLocationAdmin %}
+      <div class="govuk-grid-column-one-third govuk-!-text-align-right">
+        {{ govukButton({
+          text: "Manage property locations",
+          href: "/admin/locations",
+          classes: "govuk-button--secondary",
+          attributes: { "data-qa": "manage-locations-link" }
+        }) }}
+      </div>
+    {% endif %}
+  </div>
 
   {% if canManage %}
     {{ govukButton({

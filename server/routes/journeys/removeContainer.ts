@@ -3,7 +3,7 @@ import createError from 'http-errors'
 
 import type { Services } from '../../services'
 import { Page } from '../../services/auditService'
-import { statusTag } from '../../utils/propertyList'
+import { movementEstablishmentLabel, statusTag } from '../../utils/propertyList'
 import {
   isRemoveReason,
   removalDateLabel,
@@ -37,7 +37,10 @@ export default function removeContainerRoutes(
       prisonerNumber: ctx.prisonerNumber,
       container,
       prisonerName: container.prisonerName,
-      prisonerEstablishment: container.prisonerCurrentPrisonName || container.prisonName || null,
+      prisonerEstablishment: movementEstablishmentLabel(
+        container.prisonerMovementStatus,
+        container.prisonerCurrentPrisonName,
+      ),
       status: statusTag(container.currentStatus),
       reasons: REMOVE_REASONS.map(reason => ({
         value: reason.value,
@@ -156,7 +159,10 @@ export default function removeContainerRoutes(
       return res.render('pages/removeContainer/checkAnswers', {
         prisonerNumber: ctx.prisonerNumber,
         prisonerName: container.prisonerName,
-        prisonerEstablishment: container.prisonerCurrentPrisonName || container.prisonName || null,
+        prisonerEstablishment: movementEstablishmentLabel(
+          container.prisonerMovementStatus,
+          container.prisonerCurrentPrisonName,
+        ),
         container,
         outcome: journey.outcome,
         resultStatus: removeResultStatus(journey.outcome),
