@@ -30,7 +30,7 @@ describe('propertyList utils', () => {
     it('maps known statuses to label + colour', () => {
       expect(statusTag('STORED')).toEqual({ text: 'Stored', classes: 'govuk-tag--green' })
       expect(statusTag('DISPOSAL_REQUIRED')).toEqual({ text: 'Due for disposal', classes: 'govuk-tag--orange' })
-      expect(statusTag('DUE_FOR_TRANSFER_OUT')).toEqual({ text: 'Due for transfer out', classes: 'govuk-tag--yellow' })
+      expect(statusTag('DUE_FOR_TRANSFER_OUT')).toEqual({ text: 'Due for transfer out', classes: 'govuk-tag--grey' })
       expect(statusTag('DUE_FOR_RETURN')).toEqual({ text: 'Due for return', classes: 'govuk-tag--yellow' })
       expect(statusTag('REMOVED')).toEqual({ text: 'Removed', classes: 'govuk-tag--grey' })
     })
@@ -51,7 +51,7 @@ describe('propertyList utils', () => {
 
       expect(establishmentListStatusTag(heldHere, 'MDI')).toEqual({
         text: 'Due for transfer out',
-        classes: 'govuk-tag--yellow',
+        classes: 'govuk-tag--grey',
       })
     })
   })
