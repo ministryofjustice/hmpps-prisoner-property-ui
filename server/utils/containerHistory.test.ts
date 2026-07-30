@@ -47,6 +47,14 @@ describe('eventDescription', () => {
     )
   })
 
+  it('names the previous seal when the container was matched to property arriving on transfer', () => {
+    expect(
+      eventDescription(
+        event({ eventType: 'CREATED_SEALED', sealNumber: '124744/2', relatedContainerSealNumber: '124744' }),
+      ),
+    ).toBe('Added to storage with seal number 124744/2. Matched to previous seal number 124744.')
+  })
+
   it('describes a seal change', () => {
     expect(eventDescription(event({ eventType: 'SEAL_CHANGED', sealNumber: 'SN0002' }))).toBe(
       'Seal number changed to SN0002.',
@@ -90,6 +98,19 @@ describe('eventDescription', () => {
     expect(eventDescription(event({ eventType: 'TRANSFERRED', toPrisonId: null, toPrisonName: null }))).toBe(
       'Transferred to another establishment.',
     )
+  })
+
+  it('names the new seal on the sending record once the receiving prison has logged the arrival', () => {
+    expect(
+      eventDescription(
+        event({
+          eventType: 'TRANSFERRED',
+          toPrisonId: 'MDI',
+          toPrisonName: 'Moorland (HMP & YOI)',
+          relatedContainerSealNumber: '124744/2',
+        }),
+      ),
+    ).toBe('Transferred to another establishment (Moorland (HMP & YOI)). Matched to new seal number 124744/2.')
   })
 
   it('states the proposed disposal date was set, without implying it has been reached', () => {

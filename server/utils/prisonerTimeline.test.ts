@@ -83,6 +83,15 @@ describe('buildPrisonerTimeline', () => {
     expect(titleFor('CREATED_SEALED', { sealNumber: null })).toBe('Property container added to storage at Leeds (HMP)')
   })
 
+  it('names the matched seal on both sides of a transfer in', () => {
+    expect(titleFor('CREATED_SEALED', { sealNumber: '124744/2', relatedContainerSealNumber: '124744' })).toBe(
+      'Property container 124744/2 added to storage at Leeds (HMP), matched to previous seal number 124744',
+    )
+    expect(
+      titleFor('TRANSFERRED', { toPrisonName: 'Isle of Wight (HMP)', relatedContainerSealNumber: '124744/2' }),
+    ).toBe('Property container SN880032 transferred out to Isle of Wight (HMP), matched to new seal number 124744/2')
+  })
+
   it('renders a scheduled-for-release item from its release date, with no tag or details', () => {
     const [row] = buildPrisonerTimeline(
       [

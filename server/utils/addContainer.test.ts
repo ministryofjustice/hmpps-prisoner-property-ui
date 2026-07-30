@@ -1,4 +1,12 @@
-import { parseOptionalDate, validateDetails } from './addContainer'
+import {
+  errorCodeOf,
+  matchableContainers,
+  parseOptionalDate,
+  validateDetails,
+  validatePreviousSealNumbers,
+} from './addContainer'
+import type { ParsedDetails } from './addContainer'
+import type { PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
 
 describe('parseOptionalDate', () => {
   it('returns no iso when all parts are blank', () => {
@@ -75,5 +83,76 @@ describe('validateDetails', () => {
       'disposalDate-year': '2026',
     })
     expect(errors.disposalDate).toBeDefined()
+  })
+})
+
+describe('previous seal numbers', () => {
+  const held = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPropertyContainer =>
+    ({
+      id: 'c1',
+      prisonId: 'LEI',
+      currentSealNumber: '124744',
+      removalOutcome: null,
+      ...overrides,
+    }) as PrisonerPropertyContainer
+
+  const details = (previousSealNumber?: string): ParsedDetails => ({
+    sealNumber: 'NEW',
+    previousSealNumber,
+    containerType: 'STANDARD',
+  })
+
+  describe('matchableContainers', () => {
+    it('keeps property still in storage at another establishment', () => {
+      const elsewhere = held({ prisonId: 'LEI' })
+      expect(matchableContainers([elsewhere], 'MDI')).toEqual([elsewhere])
+    })
+
+    it('excludes property already here - it is not arriving on transfer', () => {
+      expect(matchableContainers([held({ prisonId: 'MDI' })], 'MDI')).toEqual([])
+    })
+
+    it('excludes property that has left storage', () => {
+      expect(matchableContainers([held({ removalOutcome: 'RETURNED' })], 'MDI')).toEqual([])
+    })
+  })
+
+  describe('validatePreviousSealNumbers', () => {
+    it('accepts a seal held elsewhere, ignoring case and surrounding whitespace', () => {
+      const matchable = [held({ currentSealNumber: 'OldSeal' })]
+      expect(validatePreviousSealNumbers([details(' oldseal ')], matchable)).toEqual([])
+    })
+
+    it('accepts a blank previous seal - it is optional', () => {
+      expect(validatePreviousSealNumbers([details(undefined), details('  ')], [])).toEqual([])
+    })
+
+    it('rejects a seal that matches nothing, anchored to the field the user typed into', () => {
+      const errors = validatePreviousSealNumbers([details('TYPO')], [held({})])
+      expect(errors).toHaveLength(1)
+      expect(errors[0]!.href).toBe('#containers-0-previousSealNumber')
+      expect(errors[0]!.text).toContain('TYPO')
+    })
+
+    it('names which container is wrong when several are being added', () => {
+      const errors = validatePreviousSealNumbers([details('124744'), details('TYPO')], [held({})])
+      expect(errors).toHaveLength(1)
+      expect(errors[0]!.text).toMatch(/^Container 2: /)
+      expect(errors[0]!.href).toBe('#containers-1-previousSealNumber')
+    })
+  })
+
+  describe('errorCodeOf', () => {
+    it('reads the API error code from the response body', () => {
+      expect(errorCodeOf({ data: { errorCode: 'PREVIOUS_SEAL_NUMBER_NOT_FOUND' } })).toBe(
+        'PREVIOUS_SEAL_NUMBER_NOT_FOUND',
+      )
+    })
+
+    it('is undefined when the error carries no code', () => {
+      expect(errorCodeOf({ data: {} })).toBeUndefined()
+      expect(errorCodeOf(new Error('boom'))).toBeUndefined()
+      expect(errorCodeOf(undefined)).toBeUndefined()
+    })
   })
 })

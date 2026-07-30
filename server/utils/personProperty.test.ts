@@ -247,6 +247,33 @@ describe('buildPersonPropertyView', () => {
     expect(view.inEstablishment[0]!.status).toEqual({ text: 'Due for return', classes: 'govuk-tag--yellow' })
   })
 
+  // The bug this closes: the status was re-derived here from the prisoner's location, and for a released
+  // person `prisonerCurrentPrisonId` is the sentinel "OUT" - never the viewed prison - so their property was
+  // tagged "Due for transfer out" while the establishment list, reading the API, called it something else.
+  // The API owns the rule now, so whatever it says is what both pages show.
+  it.each([
+    ['STORED', 'Stored'],
+    ['DUE_FOR_RETURN', 'Due for return'],
+    ['DUE_FOR_TRANSFER_OUT', 'Due for transfer out'],
+    ['DISPOSAL_REQUIRED', 'Due for disposal'],
+  ] as const)('renders the API status %s for property held here, whoever the owner is', (status, text) => {
+    const forEachOwner = ['MDI', 'IWI', 'OUT', 'TRN', null].map(prisonerCurrentPrisonId =>
+      buildPersonPropertyView([container({ prisonId: 'MDI', prisonerCurrentPrisonId, currentStatus: status })], 'MDI'),
+    )
+
+    forEachOwner.forEach(view => expect(view.inEstablishment[0]!.status.text).toBe(text))
+  })
+
+  it('still tells staff the person is no longer here when they have been released', () => {
+    const released = container({ prisonId: 'MDI', prisonerCurrentPrisonId: 'OUT', currentStatus: 'DUE_FOR_RETURN' })
+
+    const view = buildPersonPropertyView([released], 'MDI')
+
+    expect(view.hasLeft).toBe(true)
+    // Incoming property is only meaningful while they are in this establishment.
+    expect(view.dueToTransferIn).toEqual([])
+  })
+
   it('excludes removed containers', () => {
     const removed = container({ prisonId: 'MDI', prisonerCurrentPrisonId: 'MDI', removalOutcome: 'RETURNED' })
     const view = buildPersonPropertyView([removed], 'MDI')

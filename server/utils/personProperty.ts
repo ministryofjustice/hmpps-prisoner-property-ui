@@ -78,16 +78,20 @@ export interface PersonPropertyView {
 }
 
 /**
- * Build the person property view relative to the establishment being viewed (the user's active
- * caseload). The API's status is viewer-independent, so the display status for "transfer in/out" is
- * derived here from where the container is held, where the prisoner now is, and which establishment is
- * being viewed:
- *  - Property held in the viewed establishment ("Property in this establishment"): "Due for disposal"
- *    when a disposal is due, otherwise "Stored" if the prisoner is still here, or "Due for transfer
- *    out" if they have moved on (the property needs to follow them).
- *  - Property held elsewhere, shown only while the prisoner is in the viewed establishment ("Property
- *    due to be transferred in"): "Due for disposal" or "Due for transfer in", plus property the sending
- *    prison has already transferred out to here but that has not been logged here yet ("In transit").
+ * Build the person property view relative to the establishment being viewed (the user's active caseload).
+ *
+ * A container's *status* comes from the API, which owns the rule - including the parts that depend on
+ * where the owner now is. This used to be re-derived here, and the two implementations disagreed: for a
+ * released person `prisonerCurrentPrisonId` is the sentinel "OUT", which is never the viewed prison, so
+ * their property was tagged "Due for transfer out" here while the establishment list called it "Stored".
+ *
+ * What is decided here is only what is genuinely relative to the viewer - which section a container
+ * belongs in, and the incoming-property tags, which describe a container's relationship to *this* prison
+ * rather than its own state:
+ *  - Property held in the viewed establishment ("Property in this establishment") shows its own status.
+ *  - Property held elsewhere, shown only while the prisoner is in the viewed establishment ("Property due
+ *    to be transferred in"): "Due for transfer in", plus property the sending prison has already
+ *    transferred out to here but that has not been logged here yet ("In transit").
  * Removed containers are otherwise excluded (disposed/returned/combined, and transfers already
  * reconciled - once this prison logs the arrival, its own record takes over).
  */
@@ -97,7 +101,8 @@ export const buildPersonPropertyView = (
 ): PersonPropertyView => {
   const prisonerCurrentPrisonId = containers.find(c => c.prisonerCurrentPrisonId)?.prisonerCurrentPrisonId ?? null
   // When the current prison is unknown (older API responses) assume the prisoner is here, so we never
-  // wrongly claim they have left.
+  // wrongly claim they have left. The "TRN"/"OUT" sentinels need no special handling: neither equals a real
+  // prison id, so someone in transit or released correctly counts as not here and as having left.
   const prisonerHere = prisonerCurrentPrisonId == null ? true : prisonerCurrentPrisonId === viewedPrisonId
   const hasLeft = prisonerCurrentPrisonId != null && !prisonerHere
 
@@ -105,7 +110,7 @@ export const buildPersonPropertyView = (
 
   const inEstablishment: PersonPropertyRow[] = held
     .filter(container => container.prisonId === viewedPrisonId)
-    .map(container => ({ container, status: inEstablishmentStatus(container, prisonerHere) }))
+    .map(container => ({ container, status: containerStatusTag(container.currentStatus) }))
 
   // Incoming property, only meaningful while the prisoner is here: still held at their old prison, or
   // already sent by it and awaiting logging here. Both are non-editable until this prison logs the arrival.
@@ -119,18 +124,13 @@ export const buildPersonPropertyView = (
   return { inEstablishment, dueToTransferIn, hasLeft, prisonerCurrentPrisonName: resolveCurrentPrisonName(containers) }
 }
 
-const inEstablishmentStatus = (container: PrisonerPropertyContainer, prisonerHere: boolean): PropertyStatusTag => {
-  if (container.currentStatus === 'DISPOSAL_REQUIRED') return { text: 'Due for disposal', classes: 'govuk-tag--orange' }
-  if (container.currentStatus === 'DUE_FOR_RETURN') return { text: 'Due for return', classes: 'govuk-tag--yellow' }
-  if (prisonerHere) return { text: 'Stored', classes: 'govuk-tag--green' }
-  return { text: 'Due for transfer out', classes: 'govuk-tag--grey' }
-}
-
 const transferInStatus = (container: PrisonerPropertyContainer, viewedPrisonId: string): PropertyStatusTag => {
   // An in-transit container has already left the sending prison, so its own status is a historical
-  // "Transferred" - the fact that matters here is that it is on its way and still needs storing.
+  // "Transferred out" - the fact that matters here is that it is on its way and still needs storing.
   if (isInTransitTo(container, viewedPrisonId)) return IN_TRANSIT_TAG
-  if (container.currentStatus === 'DISPOSAL_REQUIRED') return { text: 'Due for disposal', classes: 'govuk-tag--orange' }
-  if (container.currentStatus === 'DUE_FOR_RETURN') return { text: 'Due for return', classes: 'govuk-tag--yellow' }
+  // Disposal and return are instructions about the property itself, so they outrank "it is coming here".
+  if (container.currentStatus === 'DISPOSAL_REQUIRED' || container.currentStatus === 'DUE_FOR_RETURN') {
+    return containerStatusTag(container.currentStatus)
+  }
   return DUE_FOR_TRANSFER_IN_TAG
 }

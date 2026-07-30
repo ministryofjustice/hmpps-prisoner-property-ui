@@ -8,22 +8,10 @@ import type {
   PrisonerPropertyGroup,
   PrisonPropertyListQuery,
 } from '../data/prisonerPropertyApiTypes'
+import { ALL_CONTAINER_STATUSES, containerStatusTag } from './statusTags'
 
 export const DEFAULT_PAGE_SIZE = 50
 const PRISON_NUMBER_PATTERN = /^[A-Za-z]\d{4}[A-Za-z]{2}$/
-
-const STATUS_TAGS: Record<ContainerStatus, { text: string; classes: string }> = {
-  STORED: { text: 'Stored', classes: 'govuk-tag--green' },
-  DUE_FOR_TRANSFER_OUT: { text: 'Due for transfer out', classes: 'govuk-tag--grey' },
-  DUE_FOR_RETURN: { text: 'Due for return', classes: 'govuk-tag--yellow' },
-  DISPOSAL_REQUIRED: { text: 'Due for disposal', classes: 'govuk-tag--orange' },
-  DISPOSED: { text: 'Disposed', classes: 'govuk-tag--red' },
-  RETURNED: { text: 'Returned', classes: 'govuk-tag--green' },
-  TRANSFER: { text: 'Transferred', classes: 'govuk-tag--grey' },
-  COMBINED: { text: 'Combined', classes: 'govuk-tag--grey' },
-  CREATED_IN_ERROR: { text: 'Created in error', classes: 'govuk-tag--grey' },
-  REMOVED: { text: 'Removed', classes: 'govuk-tag--grey' },
-}
 
 const CONTAINER_TYPE_LABELS: Record<ContainerType, string> = {
   STANDARD: 'Standard',
@@ -32,7 +20,7 @@ const CONTAINER_TYPE_LABELS: Record<ContainerType, string> = {
   CONFISCATED: 'Confiscated',
 }
 
-export const ALL_STATUSES = Object.keys(STATUS_TAGS) as ContainerStatus[]
+export const ALL_STATUSES = ALL_CONTAINER_STATUSES
 export const ALL_CONTAINER_TYPES = Object.keys(CONTAINER_TYPE_LABELS) as ContainerType[]
 const ALL_PERSON_LOCATIONS: PersonLocation[] = ['IN_ESTABLISHMENT', 'LEFT_ESTABLISHMENT']
 
@@ -43,8 +31,7 @@ export const TRANSFER_IN_FILTER_VALUE = 'DUE_FOR_TRANSFER_IN'
 
 export const isPrisonerNumber = (value: string): boolean => PRISON_NUMBER_PATTERN.test(value)
 
-export const statusTag = (status: ContainerStatus): { text: string; classes: string } =>
-  STATUS_TAGS[status] ?? { text: status, classes: 'govuk-tag--grey' }
+export const statusTag = containerStatusTag
 
 // Incoming-property tags, shared by the establishment list and the person view so both read the same.
 // "Due for transfer in": still held at the sending prison - its owner moved here but nobody has sent it

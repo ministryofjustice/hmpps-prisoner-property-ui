@@ -29,8 +29,14 @@ export const eventTypeLabel = (type: PropertyEventType): string => EVENT_TYPE_LA
  */
 export const eventDescription = (event: PropertyEvent): string => {
   switch (event.eventType) {
-    case 'CREATED_SEALED':
-      return event.sealNumber ? `Added to storage with seal number ${event.sealNumber}.` : 'Added to storage.'
+    case 'CREATED_SEALED': {
+      const added = event.sealNumber ? `Added to storage with seal number ${event.sealNumber}.` : 'Added to storage.'
+      // Set when the container was logged as property arriving on transfer and matched to the record it was
+      // held under at the sending prison - so the history shows the two records were joined up.
+      return event.relatedContainerSealNumber
+        ? `${added} Matched to previous seal number ${event.relatedContainerSealNumber}.`
+        : added
+    }
     case 'SEAL_CHANGED':
       return event.sealNumber ? `Seal number changed to ${event.sealNumber}.` : 'Seal number changed.'
     case 'CONTAINER_TYPE_CHANGE':
@@ -51,9 +57,14 @@ export const eventDescription = (event: PropertyEvent): string => {
     case 'TRANSFERRED': {
       // Prefer the resolved prison name; fall back to the id if the API hasn't resolved it yet.
       const destination = event.toPrisonName ?? event.toPrisonId
-      return destination
+      const transferred = destination
         ? `Transferred to another establishment (${destination}).`
         : 'Transferred to another establishment.'
+      // The seal it was re-recorded under once the receiving prison logged its arrival, so both records'
+      // histories name the other's seal.
+      return event.relatedContainerSealNumber
+        ? `${transferred} Matched to new seal number ${event.relatedContainerSealNumber}.`
+        : transferred
     }
     case 'RETURNED':
       return 'Returned to the person.'
