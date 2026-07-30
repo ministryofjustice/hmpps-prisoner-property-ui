@@ -49,7 +49,11 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
 
   switch (item.eventType) {
     case 'CREATED_SEALED':
-      return `${container} added to storage at ${establishment}`
+      // A related seal here means the container was logged as property arriving on transfer and matched to
+      // the record it was held under at the sending prison.
+      return item.relatedContainerSealNumber
+        ? `${container} added to storage at ${establishment}, matched to previous seal number ${item.relatedContainerSealNumber}`
+        : `${container} added to storage at ${establishment}`
     case 'SEAL_CHANGED':
       // The container is identified by its (new) seal, so avoid repeating it as a prefix.
       return item.sealNumber
@@ -68,7 +72,9 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     case 'DIED_IN_CUSTODY':
       return `${container} due for return following death in custody`
     case 'TRANSFERRED':
-      return `${container} transferred out to ${toPrison}`
+      return item.relatedContainerSealNumber
+        ? `${container} transferred out to ${toPrison}, matched to new seal number ${item.relatedContainerSealNumber}`
+        : `${container} transferred out to ${toPrison}`
     case 'RETURNED':
       return `${container} returned to the person`
     case 'DISPOSAL_REQUIRED':

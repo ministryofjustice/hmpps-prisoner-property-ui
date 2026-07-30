@@ -3,7 +3,13 @@ import { Router, type Request, type RequestHandler, type Response } from 'expres
 import type { Services } from '../../services'
 import { Page } from '../../services/auditService'
 import { ALL_CONTAINER_TYPES, buildPagination, containerTypeLabel, DEFAULT_PAGE_SIZE } from '../../utils/propertyList'
-import { toContainerBlocks, validateContainers } from '../../utils/addContainer'
+import {
+  errorCodeOf,
+  matchableContainers,
+  toContainerBlocks,
+  validateContainers,
+  validatePreviousSealNumbers,
+} from '../../utils/addContainer'
 import requireManageRole from '../../middleware/requireManageRole'
 import {
   BOX_PAGE_SIZE,
@@ -177,6 +183,17 @@ export default function addContainerRoutes(
       const { values, errors } = validateContainers(blocks)
       if (!values) {
         return renderAddDetails(req, res, ctx, journey.origin, blocks, errors)
+      }
+
+      // A previous seal number must name property the person actually holds elsewhere, or the two records
+      // never get matched and the same box ends up recorded twice. Checked here, against the person's own
+      // property, so the error lands on the field rather than after the whole journey is submitted.
+      if (values.some(v => v.previousSealNumber)) {
+        const held = await prisonerPropertyService.getPropertyForPrisoner(ctx.prisonerNumber, res.locals.user.username)
+        const sealErrors = validatePreviousSealNumbers(values, matchableContainers(held, ctx.activeCaseloadId))
+        if (sealErrors.length) {
+          return renderAddDetails(req, res, ctx, journey.origin, blocks, sealErrors)
+        }
       }
 
       // Keep the storage decision already made for a container at the same index (editing from Check your
@@ -373,6 +390,9 @@ export default function addContainerRoutes(
         containers: journey.containers.map((c, index) => ({
           index,
           sealNumber: c.sealNumber,
+          // Shown only when entered - it decides whether this record gets matched to the property's record
+          // at the establishment it came from, so staff should see it before confirming.
+          previousSealNumber: c.previousSealNumber,
           containerType: c.containerType,
           proposedDisposalDate: c.proposedDisposalDate,
           // Excess sent off-site reads "Branston (offsite)"; excess in a prison location (or any other type)
@@ -428,7 +448,16 @@ export default function addContainerRoutes(
           return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
         }
         if (status === 400) {
-          req.flash('error', 'A storage location could not be used. Check the containers and try again.')
+          // The previous seal is checked on the details step against the person's own property, so getting
+          // here means it stopped matching in between - the sending prison logged the transfer itself, say.
+          // Distinguished by errorCode rather than message text so the wording can change independently.
+          const failedToMatch = errorCodeOf(error) === 'PREVIOUS_SEAL_NUMBER_NOT_FOUND'
+          req.flash(
+            'error',
+            failedToMatch
+              ? 'The previous seal number no longer matches property held for this person at another establishment. Check the number, or leave it blank if this is new property.'
+              : 'A storage location could not be used. Check the containers and try again.',
+          )
           return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
         }
         return next(error)

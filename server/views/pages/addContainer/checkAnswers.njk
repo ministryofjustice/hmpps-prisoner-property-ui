@@ -35,15 +35,27 @@
       </span>
     </h2>
 
+    {# The previous seal is only shown when one was entered - it decides whether this record gets matched to
+       the property's record at the establishment it came from, so staff need to see it before confirming. #}
+    {% set sealRows = [
+      { key: { text: "Seal number" }, value: { text: container.sealNumber } }
+    ] %}
+    {% if container.previousSealNumber %}
+      {% set sealRows = (sealRows.push({
+        key: { text: "Previous seal number" },
+        value: { text: container.previousSealNumber },
+        actions: { items: [{ href: detailsUrl + "#containers-" + container.index + "-previousSealNumber", text: "Change", visuallyHiddenText: "previous seal number" }] }
+      }), sealRows) %}
+    {% endif %}
+
     {{ govukSummaryList({
       attributes: { "data-qa": "container-summary" },
-      rows: [
-        { key: { text: "Seal number" }, value: { text: container.sealNumber } },
+      rows: sealRows.concat([
         { key: { text: "Property type" }, value: { text: container.containerType | containerTypeLabel } },
         { key: { text: "Disposal date" }, value: { text: (container.proposedDisposalDate | formatDate) if container.proposedDisposalDate else "No date set" } },
         { key: { text: "Storage location" }, value: { text: container.storageLocation or "Not set" } },
         { key: { text: "Property status" }, value: { html: govukTag({ text: "Stored", classes: "govuk-tag--green" }) } }
-      ]
+      ])
     }) }}
   {% endfor %}
 

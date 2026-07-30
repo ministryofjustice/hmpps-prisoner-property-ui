@@ -1,5 +1,5 @@
 import { ALL_CONTAINER_TYPES } from './propertyList'
-import type { ContainerType } from '../data/prisonerPropertyApiTypes'
+import type { ContainerType, PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
 
 export interface DetailsForm {
   sealNumber?: string
@@ -140,4 +140,44 @@ export const validateContainers = (blocks: ContainerBlock[]): { values?: ParsedD
     })
   })
   return errors.length ? { errors } : { values, errors: [] }
+}
+
+/**
+ * The API's machine-readable error code, when it sent one. Errors carry the parsed response body on
+ * `data`, so this reads the code rather than matching on the message text, which is free to change.
+ */
+export const errorCodeOf = (error: unknown): string | undefined =>
+  (error as { data?: { errorCode?: string } })?.data?.errorCode
+
+/**
+ * The property this person still has in storage at other establishments - the records a previous seal
+ * number can be matched against when logging property that has arrived on transfer.
+ */
+export const matchableContainers = (
+  containers: PrisonerPropertyContainer[],
+  viewedPrisonId: string,
+): PrisonerPropertyContainer[] =>
+  containers.filter(container => !container.removalOutcome && container.prisonId !== viewedPrisonId)
+
+/**
+ * Check each previous seal number names property the person actually holds at another establishment.
+ *
+ * The API enforces this too and is the authority; doing it here as well is what puts the error next to the
+ * field the user typed into, and - because the confirm step creates each container in its own request with
+ * no transaction around them - stops a bad seal in the third container after the first two are already
+ * created. Matching mirrors the API: any container still in storage elsewhere, ignoring case and
+ * surrounding whitespace.
+ */
+export const validatePreviousSealNumbers = (
+  values: ParsedDetails[],
+  matchable: PrisonerPropertyContainer[],
+): FieldError[] => {
+  const seals = new Set(matchable.map(container => trim(container.currentSealNumber ?? '').toLowerCase()))
+  const many = values.length > 1
+  return values.flatMap((value, index) => {
+    const previousSeal = trim(value.previousSealNumber)
+    if (!previousSeal || seals.has(previousSeal.toLowerCase())) return []
+    const text = `There is no property with seal number ${previousSeal} held for this person at another establishment. Check the number, or leave it blank if this is new property`
+    return [{ text: many ? `Container ${index + 1}: ${text}` : text, href: `#containers-${index}-previousSealNumber` }]
+  })
 }
