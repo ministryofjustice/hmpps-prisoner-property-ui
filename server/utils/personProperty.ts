@@ -106,23 +106,33 @@ export const buildPersonPropertyView = (
   const prisonerHere = prisonerCurrentPrisonId == null ? true : prisonerCurrentPrisonId === viewedPrisonId
   const hasLeft = prisonerCurrentPrisonId != null && !prisonerHere
 
-  const held = containers.filter(container => !container.removalOutcome)
-
-  const inEstablishment: PersonPropertyRow[] = held
-    .filter(container => container.prisonId === viewedPrisonId)
+  const inEstablishment: PersonPropertyRow[] = containers
+    .filter(container => !container.removalOutcome && container.prisonId === viewedPrisonId)
     .map(container => ({ container, status: containerStatusTag(container.currentStatus) }))
 
-  // Incoming property, only meaningful while the prisoner is here: still held at their old prison, or
-  // already sent by it and awaiting logging here. Both are non-editable until this prison logs the arrival.
+  // Incoming property, only meaningful while the prisoner is here. Non-editable until this prison logs the
+  // arrival, at which point its own record takes over.
   const dueToTransferIn: PersonPropertyRow[] = prisonerHere
-    ? [
-        ...held.filter(container => container.prisonId !== viewedPrisonId),
-        ...containers.filter(container => isInTransitTo(container, viewedPrisonId)),
-      ].map(container => ({ container, status: transferInStatus(container, viewedPrisonId) }))
+    ? containers
+        .filter(container => isIncomingTo(container, viewedPrisonId))
+        .map(container => ({ container, status: transferInStatus(container, viewedPrisonId) }))
     : []
 
   return { inEstablishment, dueToTransferIn, hasLeft, prisonerCurrentPrisonName: resolveCurrentPrisonName(containers) }
 }
+
+/**
+ * Whether a container is property coming *in* to [viewedPrisonId]: either still held at the prison the person
+ * has moved on from, or already sent by it and awaiting logging here.
+ *
+ * The single definition of what belongs in the "Property due to be transferred in" section - and of what a
+ * previous seal number can be matched against when logging an arrival (see `matchableContainers`). Sharing it
+ * is what guarantees that anything staff can see in that list can actually be quoted: an in-transit container
+ * carries `removalOutcome: 'TRANSFERRED'`, so a rule written as "not removed" silently excludes exactly the
+ * property most obviously on its way here.
+ */
+export const isIncomingTo = (container: PrisonerPropertyContainer, viewedPrisonId: string): boolean =>
+  (!container.removalOutcome && container.prisonId !== viewedPrisonId) || isInTransitTo(container, viewedPrisonId)
 
 const transferInStatus = (container: PrisonerPropertyContainer, viewedPrisonId: string): PropertyStatusTag => {
   // An in-transit container has already left the sending prison, so its own status is a historical

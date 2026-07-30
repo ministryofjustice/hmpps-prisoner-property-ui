@@ -1,4 +1,5 @@
 import { ALL_CONTAINER_TYPES } from './propertyList'
+import { isIncomingTo } from './personProperty'
 import type { ContainerType, PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
 
 export interface DetailsForm {
@@ -150,14 +151,16 @@ export const errorCodeOf = (error: unknown): string | undefined =>
   (error as { data?: { errorCode?: string } })?.data?.errorCode
 
 /**
- * The property this person still has in storage at other establishments - the records a previous seal
- * number can be matched against when logging property that has arrived on transfer.
+ * The records a previous seal number can be matched against when logging property that has arrived on
+ * transfer: exactly the property shown under "Property due to be transferred in", so anything staff can see
+ * in that list can be quoted. Shares [isIncomingTo] with the person view rather than restating the rule -
+ * restating it is how in-transit property (which carries a removal outcome of TRANSFERRED) came to be
+ * rejected while property still awaiting transfer out was accepted.
  */
 export const matchableContainers = (
   containers: PrisonerPropertyContainer[],
   viewedPrisonId: string,
-): PrisonerPropertyContainer[] =>
-  containers.filter(container => !container.removalOutcome && container.prisonId !== viewedPrisonId)
+): PrisonerPropertyContainer[] => containers.filter(container => isIncomingTo(container, viewedPrisonId))
 
 /**
  * Check each previous seal number names property the person actually holds at another establishment.

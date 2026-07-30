@@ -6,6 +6,7 @@ import {
   validatePreviousSealNumbers,
 } from './addContainer'
 import type { ParsedDetails } from './addContainer'
+import { buildPersonPropertyView } from './personProperty'
 import type { PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
 
 describe('parseOptionalDate', () => {
@@ -108,12 +109,46 @@ describe('previous seal numbers', () => {
       expect(matchableContainers([elsewhere], 'MDI')).toEqual([elsewhere])
     })
 
+    // The reported bug: matching worked for "Due for transfer out" property but not for "In transit". An
+    // in-transit container carries removalOutcome TRANSFERRED, so a "not removed" rule excluded exactly the
+    // property most obviously on its way here - and staff could see it listed while being told it did not exist.
+    it('keeps in-transit property, which the sending prison has already transferred out to here', () => {
+      const inTransit = held({ prisonId: 'LEI', removalOutcome: 'TRANSFERRED', receivingPrisonId: 'MDI' })
+      expect(matchableContainers([inTransit], 'MDI')).toEqual([inTransit])
+    })
+
+    it('excludes a transfer heading somewhere else', () => {
+      expect(
+        matchableContainers(
+          [held({ prisonId: 'LEI', removalOutcome: 'TRANSFERRED', receivingPrisonId: 'IWI' })],
+          'MDI',
+        ),
+      ).toEqual([])
+    })
+
     it('excludes property already here - it is not arriving on transfer', () => {
       expect(matchableContainers([held({ prisonId: 'MDI' })], 'MDI')).toEqual([])
     })
 
-    it('excludes property that has left storage', () => {
-      expect(matchableContainers([held({ removalOutcome: 'RETURNED' })], 'MDI')).toEqual([])
+    it.each(['RETURNED', 'DISPOSED', 'COMBINED'] as const)('excludes property that has left storage (%s)', outcome => {
+      expect(matchableContainers([held({ removalOutcome: outcome })], 'MDI')).toEqual([])
+    })
+
+    // The guarantee that stops the two drifting again: if staff can see it under "Property due to be
+    // transferred in", they can quote its seal.
+    it('is exactly the property shown as due to be transferred in', () => {
+      const containers = [
+        held({ id: 'awaiting', prisonId: 'LEI' }),
+        held({ id: 'in-transit', prisonId: 'LEI', removalOutcome: 'TRANSFERRED', receivingPrisonId: 'MDI' }),
+        held({ id: 'here', prisonId: 'MDI' }),
+        held({ id: 'returned', prisonId: 'LEI', removalOutcome: 'RETURNED' }),
+        held({ id: 'elsewhere-bound', prisonId: 'LEI', removalOutcome: 'TRANSFERRED', receivingPrisonId: 'IWI' }),
+      ].map(c => ({ ...c, prisonerCurrentPrisonId: 'MDI' }) as PrisonerPropertyContainer)
+
+      const shown = buildPersonPropertyView(containers, 'MDI').dueToTransferIn.map(r => r.container.id)
+
+      expect(matchableContainers(containers, 'MDI').map(c => c.id)).toEqual(shown)
+      expect(shown).toEqual(['awaiting', 'in-transit'])
     })
   })
 
