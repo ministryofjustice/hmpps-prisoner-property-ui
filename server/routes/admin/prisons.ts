@@ -14,7 +14,6 @@ export default function adminPrisonsRoutes({
   auditService,
   prisonerPropertyService,
   prisonerService,
-  activeAgenciesService,
 }: Services): Router {
   const router = Router()
 
@@ -61,10 +60,9 @@ export default function adminPrisonsRoutes({
     const active = req.body.active === 'true'
     const name = typeof req.body.name === 'string' && req.body.name ? req.body.name : agencyId
 
+    // No cache to clear: ActiveAgenciesService reads the active set live, so every pod picks the toggle
+    // up on its next request rather than only the one that served this POST.
     await prisonerPropertyService.setAgencyActive(agencyId, active, username)
-    // Drop the cached active-prison set so this pod reflects the toggle immediately (other pods
-    // converge on the TTL). Keeps the read-only gate in step with what the admin just changed.
-    activeAgenciesService.invalidate()
     req.flash('success', `Property is now switched ${active ? 'on' : 'off'} for ${name}.`)
 
     const params = new URLSearchParams()

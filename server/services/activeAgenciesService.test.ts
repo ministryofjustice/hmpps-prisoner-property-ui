@@ -34,45 +34,51 @@ describe('ActiveAgenciesService', () => {
     expect(prisonerPropertyApiClient.getActiveAgencyIds).not.toHaveBeenCalled()
   })
 
-  it('serves from cache within the TTL, making a single HTTP call', async () => {
+  it('reads the API on every lookup rather than caching', async () => {
     prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValue(['MDI'])
 
     await service.isPrisonActive('MDI')
     await service.isPrisonActive('MDI')
 
-    expect(prisonerPropertyApiClient.getActiveAgencyIds).toHaveBeenCalledTimes(1)
-  })
-
-  it('refreshes from the API once the TTL expires', async () => {
-    jest.useFakeTimers()
-    prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValue(['MDI'])
-
-    await service.getActiveAgencyIds()
-    jest.advanceTimersByTime(5 * 60 * 1000 + 1)
-    await service.getActiveAgencyIds()
-
     expect(prisonerPropertyApiClient.getActiveAgencyIds).toHaveBeenCalledTimes(2)
   })
 
-  it('refreshes from the API after invalidate()', async () => {
-    prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValue(['MDI'])
+  // The bug this replaced: a per-pod cache could not be invalidated from the pod that served the admin's
+  // toggle, so other pods refused writes for a prison that was switched on until their TTL expired.
+  it('sees a prison switched on by another pod immediately', async () => {
+    prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValueOnce([])
+    expect(await service.isPrisonActive('MDI')).toBe(false)
 
-    await service.getActiveAgencyIds()
-    service.invalidate()
-    await service.getActiveAgencyIds()
-
-    expect(prisonerPropertyApiClient.getActiveAgencyIds).toHaveBeenCalledTimes(2)
+    prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValueOnce(['MDI'])
+    expect(await service.isPrisonActive('MDI')).toBe(true)
   })
 
-  it('never throws: falls back to the last-known set when a refresh fails', async () => {
-    jest.useFakeTimers()
+  it('sees a prison switched off by another pod immediately', async () => {
+    prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValueOnce(['MDI'])
+    expect(await service.isPrisonActive('MDI')).toBe(true)
+
+    prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValueOnce([])
+    expect(await service.isPrisonActive('MDI')).toBe(false)
+  })
+
+  it('never throws: falls back to the last-known set when a read fails', async () => {
     prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValueOnce(['MDI'])
     await service.getActiveAgencyIds()
 
-    jest.advanceTimersByTime(5 * 60 * 1000 + 1)
     prisonerPropertyApiClient.getActiveAgencyIds.mockRejectedValueOnce(new Error('503'))
 
     expect(await service.isPrisonActive('MDI')).toBe(true)
+  })
+
+  it('stops using the fallback as soon as the API answers again', async () => {
+    prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValueOnce(['MDI'])
+    await service.getActiveAgencyIds()
+
+    prisonerPropertyApiClient.getActiveAgencyIds.mockRejectedValueOnce(new Error('503'))
+    expect(await service.isPrisonActive('MDI')).toBe(true)
+
+    prisonerPropertyApiClient.getActiveAgencyIds.mockResolvedValueOnce([])
+    expect(await service.isPrisonActive('MDI')).toBe(false)
   })
 
   it('never throws: returns an empty set when the very first load fails', async () => {

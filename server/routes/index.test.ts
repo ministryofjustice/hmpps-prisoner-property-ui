@@ -2528,7 +2528,6 @@ describe('Admin - manage enabled prisons', () => {
       .expect(() => {
         expect(prisonerPropertyService.setAgencyActive).toHaveBeenCalledWith('MDI', false, 'user1')
         expect(flashProvider).toHaveBeenCalledWith('success', 'Property is now switched off for Moorland (HMP & YOI).')
-        expect(activeAgenciesService.invalidate).toHaveBeenCalled()
       })
   })
 
