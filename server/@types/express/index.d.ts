@@ -76,7 +76,17 @@ export declare module 'express-session' {
     changeContainerJourney?: ChangeContainerJourney
     // Where to return to (a "Select a storage location" page) after managing storage locations.
     manageLocationsReturnTo?: string
+    // The establishment list's last search and filters, so coming back to it restores what the user was
+    // looking at rather than resetting to an unfiltered page 1. Scoped to the prison it was set for, so
+    // switching caseload does not inherit another establishment's filters.
+    propertyListQuery?: PropertyListQuery
   }
+}
+
+export interface PropertyListQuery {
+  prisonId: string
+  /** The canonical query string, e.g. `q=A1234BC&status=DUE_FOR_RETURN&page=2`. */
+  query: string
 }
 
 export declare global {

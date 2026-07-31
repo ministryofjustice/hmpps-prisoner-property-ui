@@ -22,6 +22,10 @@ export default class PropertyListPage extends AbstractPage {
 
   readonly clearSearch: Locator
 
+  readonly clearFilters: Locator
+
+  readonly applyFilters: Locator
+
   readonly filters: Locator
 
   readonly pagination: Locator
@@ -39,7 +43,9 @@ export default class PropertyListPage extends AbstractPage {
     this.noResults = page.getByTestId('no-results')
     this.breadcrumbs = page.locator('.govuk-breadcrumbs')
     this.addButton = page.getByTestId('add-container')
-    this.clearSearch = page.getByRole('link', { name: 'Clear search' })
+    this.clearSearch = page.getByTestId('clear-search')
+    this.clearFilters = page.getByTestId('clear-filters')
+    this.applyFilters = page.getByTestId('apply-filters')
     this.filters = page.getByTestId('filters')
     this.pagination = page.locator('.moj-pagination')
     this.table = page.getByTestId('property-list')

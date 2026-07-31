@@ -153,6 +153,41 @@ test.describe('Establishment property list', () => {
     await expect(listPage.noResults).toBeVisible()
   })
 
+  // The reported problem: staff filter the list, open a prisoner from it, come back, and have to set the
+  // filters up again - on every row they work through.
+  test('keeps the search and filters when opening a prisoner and coming back', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/?q=A1234BC&status=DUE_FOR_RETURN')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await listPage.prisonerHeadings.first().getByRole('link').click()
+    await page.goBack()
+    // Back through the breadcrumb, not the browser history - that is the path staff actually take.
+    await page.goto('/')
+
+    await expect(page).toHaveURL(/q=A1234BC/)
+    await expect(page).toHaveURL(/status=DUE_FOR_RETURN/)
+    await expect(listPage.searchInput).toHaveValue('A1234BC')
+    await listPage.filters.locator('summary').click()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Due for return' })).toBeChecked()
+  })
+
+  test('clears the remembered search and filters when Clear filters is used', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/?q=A1234BC&status=DUE_FOR_RETURN')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await listPage.filters.locator('summary').click()
+    await listPage.clearFilters.click()
+
+    // Returning to a bare list must now stay unfiltered - the clear has to beat the remembering.
+    await page.goto('/')
+    await expect(page).toHaveURL(/\/$/)
+    await expect(listPage.searchInput).toHaveValue('')
+  })
+
   test('shows a breadcrumb back to Digital Prison Services', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })

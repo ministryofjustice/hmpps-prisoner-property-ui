@@ -455,6 +455,84 @@ describe('GET /', () => {
         expect(res.text).toContain('Transferring')
       })
   })
+
+  // Staff working through a filtered list open a prisoner from it on every row, so the filters have to
+  // survive the round trip. These need request.agent, which carries the session cookie - a bare request()
+  // gets a fresh jar each call and would never see anything remembered.
+  describe('remembering the search and filters', () => {
+    beforeEach(() => {
+      withActiveCaseload()
+      prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+    })
+
+    it('restores the last search and filters when returning to a bare list URL', async () => {
+      const agent = request.agent(app)
+      await agent.get('/?q=A1234BC&status=DUE_FOR_RETURN&includeRemoved=true').expect(200)
+
+      return agent.get('/').expect(302).expect('Location', '/?q=A1234BC&status=DUE_FOR_RETURN&includeRemoved=true')
+    })
+
+    it('restores the page, so returning does not lose your place in a long list', async () => {
+      const agent = request.agent(app)
+      await agent.get('/?q=A1234BC&page=3').expect(200)
+
+      return agent.get('/').expect(302).expect('Location', '/?q=A1234BC&page=3')
+    })
+
+    it('renders normally when there is nothing remembered', async () => {
+      const agent = request.agent(app)
+
+      return agent.get('/').expect(200)
+    })
+
+    it('lets an explicit query win over what was remembered', async () => {
+      const agent = request.agent(app)
+      await agent.get('/?q=A1234BC').expect(200)
+
+      // A bookmarked or shared link must show what it says, not what this user last looked at.
+      return agent
+        .get('/?q=B5678CD')
+        .expect(200)
+        .expect(() => {
+          expect(prisonerPropertyService.getPrisonProperty).toHaveBeenLastCalledWith(
+            'MDI',
+            expect.objectContaining({ query: 'B5678CD' }),
+            user.username,
+          )
+        })
+    })
+
+    it('forgets everything when the clear links are followed', async () => {
+      const agent = request.agent(app)
+      await agent.get('/?q=A1234BC&status=DUE_FOR_RETURN').expect(200)
+
+      await agent.get('/?clear=1').expect(302).expect('Location', '/')
+
+      // The clear links point at ?clear=1 precisely because a bare "/" now means "restore what I had".
+      return agent.get('/').expect(200)
+    })
+
+    it('forgets everything when the filters are re-applied with nothing ticked', async () => {
+      const agent = request.agent(app)
+      await agent.get('/?q=A1234BC').expect(200)
+      await agent.get('/?q=').expect(200)
+
+      return agent.get('/').expect(200)
+    })
+
+    it('does not apply one establishment’s filters after switching caseload', async () => {
+      const agent = request.agent(app)
+      await agent.get('/?q=A1234BC').expect(200)
+
+      userService.getActiveCaseload.mockResolvedValue({
+        activeCaseloadId: 'LEI',
+        activeCaseloadName: 'Leeds (HMP)',
+        caseloadIds: ['LEI'],
+      })
+
+      return agent.get('/').expect(200)
+    })
+  })
 })
 
 const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPropertyContainer => ({

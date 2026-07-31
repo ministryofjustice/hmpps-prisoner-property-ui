@@ -149,6 +149,34 @@ export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_S
   return { search, containerTypes, statuses, includeRemoved, personLocations, dueForTransferIn, page, apiQuery }
 }
 
+/**
+ * Rebuild the canonical query string for a parsed list query - the inverse of [parsePropertyListQuery], and
+ * built from the whitelisted values rather than the raw request, so anything unrecognised is dropped.
+ *
+ * Used for two things: the base of the pagination links (each of which appends its own page, hence the
+ * default of leaving `page` out), and the value remembered in session so returning to the list restores what
+ * the user was looking at (which does want the page). Keeping it in one place means the two cannot disagree
+ * about the parameter names.
+ *
+ * Returns an empty string when nothing is filtered, which callers read as "nothing worth remembering".
+ */
+export const listQueryString = (
+  parsed: ParsedPropertyListQuery,
+  { includePage = false }: { includePage?: boolean } = {},
+): string => {
+  const params = new URLSearchParams()
+  if (parsed.search) params.set('q', parsed.search)
+  parsed.containerTypes.forEach(type => params.append('containerType', type))
+  parsed.statuses.forEach(status => params.append('status', status))
+  // "Due for transfer in" shares the status checkbox group, so it round-trips as a status value.
+  if (parsed.dueForTransferIn) params.append('status', TRANSFER_IN_FILTER_VALUE)
+  parsed.personLocations.forEach(location => params.append('personLocation', location))
+  if (parsed.includeRemoved) params.set('includeRemoved', 'true')
+  // Page 1 is the default, so recording it would only make the remembered query look filtered when it is not.
+  if (includePage && parsed.page > 1) params.set('page', parsed.page.toString())
+  return params.toString()
+}
+
 export interface PaginationItem {
   text?: number
   href?: string

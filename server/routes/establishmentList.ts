@@ -7,6 +7,7 @@ import {
   buildPagination,
   containerTypeLabel,
   DEFAULT_PAGE_SIZE,
+  listQueryString,
   parsePropertyListQuery,
   statusTag,
   TRANSFER_IN_FILTER_VALUE,
@@ -35,8 +36,35 @@ export default function establishmentListRoutes({
       return res.render('pages/noCaseload')
     }
 
+    // Clearing has to be an explicit signal, because a bare "/" now means "restore what I had" - the
+    // "Clear search" and "Clear filters" links would otherwise re-apply the very filters they remove.
+    if (req.query.clear) {
+      req.session.propertyListQuery = undefined
+      return res.redirect('/')
+    }
+
+    // Coming back from a prisoner, a completed journey or a breadcrumb: restore what the user was looking at.
+    // Only on a bare "/" - any explicit query wins, so a bookmarked or shared filtered link still works and
+    // the back button behaves. Both redirects happen before the flash message is read below, or a success
+    // banner would be consumed by the request that redirects and never shown.
+    const remembered = req.session.propertyListQuery
+    if (!Object.keys(req.query).length && remembered?.prisonId === activeCaseloadId && remembered.query) {
+      return res.redirect(`/?${remembered.query}`)
+    }
+
+    const parsed = parsePropertyListQuery(req.query, DEFAULT_PAGE_SIZE)
     const { search, containerTypes, statuses, includeRemoved, personLocations, dueForTransferIn, page, apiQuery } =
-      parsePropertyListQuery(req.query, DEFAULT_PAGE_SIZE)
+      parsed
+
+    // Remember this view for next time, scoped to the establishment so switching caseload does not inherit
+    // another prison's filters. An unfiltered view stores nothing, which also makes "apply filters with
+    // nothing ticked" behave as a clear - and avoids creating a session for read-only users who never filter.
+    const rememberedQuery = listQueryString(parsed, { includePage: true })
+    if (rememberedQuery) {
+      req.session.propertyListQuery = { prisonId: activeCaseloadId, query: rememberedQuery }
+    } else if (req.session.propertyListQuery) {
+      req.session.propertyListQuery = undefined
+    }
 
     // The summary counts come from a separate endpoint. Fetch it alongside the list, but degrade
     // gracefully: if it fails (e.g. the endpoint isn't deployed yet) render the list without the bar.
@@ -50,15 +78,6 @@ export default function establishmentListRoutes({
       correlationId: req.id,
       details: { prisonId: activeCaseloadId },
     })
-
-    const baseQueryParams = new URLSearchParams()
-    if (search) baseQueryParams.set('q', search)
-    containerTypes.forEach(type => baseQueryParams.append('containerType', type))
-    statuses.forEach(status => baseQueryParams.append('status', status))
-    // "Due for transfer in" shares the status checkbox group, so it round-trips as a status value.
-    if (dueForTransferIn) baseQueryParams.append('status', TRANSFER_IN_FILTER_VALUE)
-    personLocations.forEach(location => baseQueryParams.append('personLocation', location))
-    if (includeRemoved) baseQueryParams.set('includeRemoved', 'true')
 
     // Writes are allowed only when the user holds the manage role AND the establishment is switched on
     // in DPS. When they hold the role but the prison is still managed in NOMIS, show an explanatory
@@ -81,7 +100,8 @@ export default function establishmentListRoutes({
         result.totalPages,
         result.totalElements,
         result.size,
-        baseQueryParams.toString(),
+        // Each pagination link appends its own page, so the base deliberately leaves it out.
+        listQueryString(parsed),
       ),
       search,
       containerTypeItems: ALL_CONTAINER_TYPES.map(type => ({

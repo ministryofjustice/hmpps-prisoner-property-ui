@@ -7,6 +7,7 @@ import {
   establishmentLabel,
   establishmentListStatusTag,
   isPrisonerNumber,
+  listQueryString,
   parsePropertyListQuery,
   statusTag,
 } from './propertyList'
@@ -245,6 +246,71 @@ describe('propertyList utils', () => {
       expect(result.apiQuery.status).toBeUndefined()
       expect(result.apiQuery.includeRemoved).toBeUndefined()
       expect(result.apiQuery.page).toBe(0)
+    })
+  })
+
+  describe('listQueryString', () => {
+    const parse = (query: Record<string, unknown>) => parsePropertyListQuery(query as unknown as ParsedQs)
+
+    /** A query string read back the way express would: repeated params become arrays. */
+    const asRequestQuery = (queryString: string): ParsedQs => {
+      const query: Record<string, string | string[]> = {}
+      new URLSearchParams(queryString).forEach((value, key) => {
+        const existing = query[key]
+        if (existing === undefined) query[key] = value
+        else query[key] = Array.isArray(existing) ? [...existing, value] : [existing, value]
+      })
+      return query as ParsedQs
+    }
+
+    it('rebuilds a query string that parses back to the same filters', () => {
+      const original = {
+        q: 'A1234BC',
+        containerType: ['STANDARD', 'VALUABLES'],
+        status: ['STORED', 'DUE_FOR_TRANSFER_IN'],
+        personLocation: ['IN_ESTABLISHMENT'],
+        includeRemoved: 'true',
+        page: '3',
+      }
+      const parsed = parse(original)
+
+      // Round-trip: rebuild the string, read it back as a request would, and expect the same view of the
+      // world. This is what lets the remembered query be stored as a plain string with no second
+      // representation to drift from the parser.
+      const rebuilt = parsePropertyListQuery(asRequestQuery(listQueryString(parsed, { includePage: true })))
+
+      expect(rebuilt.search).toBe(parsed.search)
+      expect(rebuilt.containerTypes).toEqual(parsed.containerTypes)
+      expect(rebuilt.statuses).toEqual(parsed.statuses)
+      expect(rebuilt.dueForTransferIn).toBe(parsed.dueForTransferIn)
+      expect(rebuilt.personLocations).toEqual(parsed.personLocations)
+      expect(rebuilt.includeRemoved).toBe(parsed.includeRemoved)
+      expect(rebuilt.page).toBe(parsed.page)
+    })
+
+    it('drops values the parser did not recognise', () => {
+      const query = listQueryString(parse({ q: 'A1234BC', containerType: ['STANDARD', 'BOGUS'], status: ['NOPE'] }))
+
+      expect(query).toBe('q=A1234BC&containerType=STANDARD')
+    })
+
+    it('round-trips the "Due for transfer in" pseudo-status as a status value', () => {
+      expect(listQueryString(parse({ status: ['DUE_FOR_TRANSFER_IN'] }))).toBe('status=DUE_FOR_TRANSFER_IN')
+    })
+
+    it('leaves the page out unless asked, and never records page 1', () => {
+      const parsed = parse({ q: 'A1234BC', page: '3' })
+
+      // Pagination links append their own page, so the base must not carry one.
+      expect(listQueryString(parsed)).toBe('q=A1234BC')
+      expect(listQueryString(parsed, { includePage: true })).toBe('q=A1234BC&page=3')
+      // Page 1 is the default; recording it would make an unfiltered view look like a filtered one.
+      expect(listQueryString(parse({ page: '1' }), { includePage: true })).toBe('')
+    })
+
+    it('is empty when nothing is filtered, so there is nothing to remember', () => {
+      expect(listQueryString(parse({}), { includePage: true })).toBe('')
+      expect(listQueryString(parse({ q: '  ' }), { includePage: true })).toBe('')
     })
   })
 
