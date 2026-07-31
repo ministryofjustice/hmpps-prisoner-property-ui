@@ -1326,6 +1326,67 @@ describe('Active-prison write gate', () => {
       })
   })
 
+  // The Add property button is rendered by the header partial shared by all three person tabs, so each
+  // has to gate on the active prison. The history and returned tabs once gated on the role alone, which
+  // put a button on the page that the write journey then rejected with the autherror page (MAPB-738).
+  it.each([
+    ['history', '/prisoner/A1234BC/history'],
+    ['returned', '/prisoner/A1234BC/returned'],
+  ])(
+    'hides the Add property button and shows the NOMIS banner on the %s tab when the prison is not active',
+    async (_tab, url) => {
+      withActiveCaseload()
+      activeAgenciesService.isPrisonActive.mockResolvedValue(false)
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+      prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([])
+
+      return request(manageApp())
+        .get(url)
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('currently managed in NOMIS')
+          expect(res.text).not.toContain('/prisoner/A1234BC/add-container')
+        })
+    },
+  )
+
+  it.each([
+    ['property', '/prisoner/A1234BC'],
+    ['history', '/prisoner/A1234BC/history'],
+    ['returned', '/prisoner/A1234BC/returned'],
+  ])('shows the Add property button and no banner on the %s tab when the prison is active', async (_tab, url) => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([])
+
+    return request(manageApp())
+      .get(url)
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('/prisoner/A1234BC/add-container')
+        expect(res.text).not.toContain('currently managed in NOMIS')
+      })
+  })
+
+  it.each([
+    ['property', '/prisoner/A1234BC'],
+    ['history', '/prisoner/A1234BC/history'],
+    ['returned', '/prisoner/A1234BC/returned'],
+  ])('shows neither the button nor the banner on the %s tab without the manage role', async (_tab, url) => {
+    withActiveCaseload()
+    activeAgenciesService.isPrisonActive.mockResolvedValue(false)
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([])
+
+    return request(app)
+      .get(url)
+      .expect(200)
+      .expect(res => {
+        expect(res.text).not.toContain('/prisoner/A1234BC/add-container')
+        expect(res.text).not.toContain('currently managed in NOMIS')
+      })
+  })
+
   it('forbids a GET write journey when the prison is not active, even with the manage role', async () => {
     withActiveCaseload()
     activeAgenciesService.isPrisonActive.mockResolvedValue(false)
