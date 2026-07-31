@@ -68,6 +68,58 @@ describe('propertyList utils', () => {
       expect(establishmentListStatusTag(inTransit, 'MDI')).toEqual({ text: 'In transit', classes: 'govuk-tag--blue' })
     })
 
+    it('tags a transfer addressed elsewhere as in transit when its owner is here', () => {
+      // Sent to the Isle of Wight, but the person was redirected to Moorland - so Moorland is where it needs
+      // logging, and was previously the one prison that could not see it.
+      const redirected = {
+        prisonId: 'LEI',
+        currentStatus: 'TRANSFER',
+        removalOutcome: 'TRANSFERRED',
+        receivingPrisonId: 'IWI',
+        prisonerCurrentPrisonId: 'MDI',
+      } as PrisonerPropertyContainer
+
+      expect(establishmentListStatusTag(redirected, 'MDI')).toEqual({ text: 'In transit', classes: 'govuk-tag--blue' })
+    })
+
+    it('does not tag a transfer as in transit at a prison its owner has left', () => {
+      const goneElsewhere = {
+        prisonId: 'LEI',
+        currentStatus: 'TRANSFER',
+        removalOutcome: 'TRANSFERRED',
+        receivingPrisonId: 'MDI',
+        prisonerCurrentPrisonId: 'BXI',
+      } as PrisonerPropertyContainer
+
+      // Still addressed to Moorland, so Moorland keeps showing it - the API decides whether it is listed at
+      // all; this only picks the tag once it is.
+      expect(establishmentListStatusTag(goneElsewhere, 'MDI')).toEqual({
+        text: 'In transit',
+        classes: 'govuk-tag--blue',
+      })
+      // But Belmarsh, where the person now is, reads it as incoming too rather than as someone else's.
+      expect(establishmentListStatusTag(goneElsewhere, 'BXI')).toEqual({
+        text: 'In transit',
+        classes: 'govuk-tag--blue',
+      })
+    })
+
+    it('does not treat someone in transit or released as being at a prison', () => {
+      const ownerInTransit = {
+        prisonId: 'LEI',
+        currentStatus: 'TRANSFER',
+        removalOutcome: 'TRANSFERRED',
+        receivingPrisonId: 'MDI',
+        prisonerCurrentPrisonId: 'TRN',
+      } as PrisonerPropertyContainer
+
+      // "TRN" is a sentinel, not an establishment, so it must never match a viewed prison.
+      expect(establishmentListStatusTag(ownerInTransit, 'TRN')).toEqual({
+        text: 'Due for transfer in',
+        classes: 'govuk-tag--turquoise',
+      })
+    })
+
     it('does not tag a reconciled transfer as in transit', () => {
       const reconciled = {
         prisonId: 'LEI',

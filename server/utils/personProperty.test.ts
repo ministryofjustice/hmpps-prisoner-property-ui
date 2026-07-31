@@ -327,8 +327,10 @@ describe('buildPersonPropertyView', () => {
     expect(view.dueToTransferIn).toEqual([])
   })
 
-  it('does not show in-transit property destined for a different prison', () => {
-    const elsewhere = container({
+  // Leeds sent it to Isle of Wight, but the person was redirected here. The address records where they were
+  // expected to go; the box belongs where they actually are, and this is the only prison that can receive it.
+  it('shows in-transit property addressed elsewhere when its owner is here', () => {
+    const redirected = container({
       prisonId: 'LEI',
       prisonerCurrentPrisonId: 'MDI',
       currentStatus: 'TRANSFER',
@@ -336,9 +338,34 @@ describe('buildPersonPropertyView', () => {
       receivingPrisonId: 'IWI',
     })
 
-    const view = buildPersonPropertyView([elsewhere], 'MDI')
+    const view = buildPersonPropertyView([redirected], 'MDI')
 
-    expect(view.inEstablishment).toEqual([])
-    expect(view.dueToTransferIn).toEqual([])
+    expect(view.dueToTransferIn.map(row => row.status)).toEqual([{ text: 'In transit', classes: 'govuk-tag--blue' }])
+  })
+
+  it('does not show in-transit property when its owner is neither here nor coming here', () => {
+    const elsewhere = container({
+      prisonId: 'LEI',
+      prisonerCurrentPrisonId: 'BXI',
+      currentStatus: 'TRANSFER',
+      removalOutcome: 'TRANSFERRED',
+      receivingPrisonId: 'IWI',
+    })
+
+    // Viewed from MDI: the person is at Belmarsh and the box is addressed to the Isle of Wight, so it is no
+    // business of ours. (The section is hidden anyway once the person is not here - this guards the rule.)
+    expect(buildPersonPropertyView([elsewhere], 'MDI').dueToTransferIn).toEqual([])
+  })
+
+  it('does not treat a reconciled transfer as in transit, wherever its owner is', () => {
+    const reconciled = container({
+      prisonId: 'LEI',
+      prisonerCurrentPrisonId: 'MDI',
+      currentStatus: 'TRANSFER',
+      removalOutcome: 'TRANSFERRED',
+      receivingPrisonId: null,
+    })
+
+    expect(buildPersonPropertyView([reconciled], 'MDI').dueToTransferIn).toEqual([])
   })
 })

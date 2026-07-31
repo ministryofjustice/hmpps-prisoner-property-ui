@@ -142,13 +142,15 @@ describe('previous seal numbers', () => {
         held({ id: 'in-transit', prisonId: 'LEI', removalOutcome: 'TRANSFERRED', receivingPrisonId: 'MDI' }),
         held({ id: 'here', prisonId: 'MDI' }),
         held({ id: 'returned', prisonId: 'LEI', removalOutcome: 'RETURNED' }),
-        held({ id: 'elsewhere-bound', prisonId: 'LEI', removalOutcome: 'TRANSFERRED', receivingPrisonId: 'IWI' }),
+        held({ id: 'reconciled', prisonId: 'LEI', removalOutcome: 'TRANSFERRED', receivingPrisonId: null }),
+        // Addressed to the Isle of Wight, but its owner ended up here - so it is coming here after all.
+        held({ id: 'redirected', prisonId: 'LEI', removalOutcome: 'TRANSFERRED', receivingPrisonId: 'IWI' }),
       ].map(c => ({ ...c, prisonerCurrentPrisonId: 'MDI' }) as PrisonerPropertyContainer)
 
       const shown = buildPersonPropertyView(containers, 'MDI').dueToTransferIn.map(r => r.container.id)
 
       expect(matchableContainers(containers, 'MDI').map(c => c.id)).toEqual(shown)
-      expect(shown).toEqual(['awaiting', 'in-transit'])
+      expect(shown).toEqual(['awaiting', 'in-transit', 'redirected'])
     })
   })
 
