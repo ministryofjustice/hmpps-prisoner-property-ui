@@ -24,6 +24,10 @@ export default class PropertyListPage extends AbstractPage {
 
   readonly clearFilters: Locator
 
+  readonly selectedFilters: Locator
+
+  readonly selectedFilterTags: Locator
+
   readonly applyFilters: Locator
 
   readonly filters: Locator
@@ -45,6 +49,8 @@ export default class PropertyListPage extends AbstractPage {
     this.addButton = page.getByTestId('add-container')
     this.clearSearch = page.getByTestId('clear-search')
     this.clearFilters = page.getByTestId('clear-filters')
+    this.selectedFilters = page.getByTestId('selected-filters')
+    this.selectedFilterTags = page.getByTestId('selected-filter')
     this.applyFilters = page.getByTestId('apply-filters')
     this.filters = page.getByTestId('filters')
     this.pagination = page.locator('.moj-pagination')

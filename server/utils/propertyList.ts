@@ -29,6 +29,18 @@ const ALL_PERSON_LOCATIONS: PersonLocation[] = ['IN_ESTABLISHMENT', 'LEFT_ESTABL
 // to the API as dueForTransferIn rather than as a status.
 export const TRANSFER_IN_FILTER_VALUE = 'DUE_FOR_TRANSFER_IN'
 
+/**
+ * Clears the search, the filters and what was remembered of them. Not a bare `/`, which means "restore what I
+ * had" - see the establishment list route.
+ */
+export const CLEAR_FILTERS_HREF = '/?clear=1'
+
+/** Short forms of the person-location labels: the checkbox wording is too long to sit in a tag. */
+const PERSON_LOCATION_TAG_LABELS: Record<PersonLocation, string> = {
+  IN_ESTABLISHMENT: 'In this establishment',
+  LEFT_ESTABLISHMENT: 'No longer in this establishment',
+}
+
 export const isPrisonerNumber = (value: string): boolean => PRISON_NUMBER_PATTERN.test(value)
 
 export const statusTag = containerStatusTag
@@ -175,6 +187,58 @@ export const listQueryString = (
   // Page 1 is the default, so recording it would only make the remembered query look filtered when it is not.
   if (includePage && parsed.page > 1) params.set('page', parsed.page.toString())
   return params.toString()
+}
+
+export interface AppliedFilterTag {
+  text: string
+  href: string
+}
+
+/**
+ * The filters currently narrowing the list, as removable tags.
+ *
+ * The filters themselves sit inside a collapsed section, so without this nothing on screen says the list is
+ * filtered at all - and since the filters now persist between visits, staff can arrive at a filtered list they
+ * did not set up in this sitting and cannot see. The obvious failure is concluding property is missing when it
+ * is only filtered out.
+ *
+ * Each label names its group, because the values do not speak for themselves out of context: "Standard" says
+ * nothing about what it filters. Each href is the same list minus that one value, built from
+ * [listQueryString] so the tags, the pagination links and the remembered query all agree about the parameter
+ * names. The search term is deliberately absent - the search box is right above, already shows it, and has its
+ * own clear link.
+ *
+ * Dropping the last filter links to the explicit clear, not to a bare list: a bare list means "restore what I
+ * had", which would put back the filter just removed.
+ */
+export const appliedFilterTags = (parsed: ParsedPropertyListQuery): AppliedFilterTag[] => {
+  const withoutIt = (without: Partial<ParsedPropertyListQuery>): string => {
+    const query = listQueryString({ ...parsed, ...without, page: 1 })
+    return query ? `/?${query}` : CLEAR_FILTERS_HREF
+  }
+
+  return [
+    ...parsed.containerTypes.map(type => ({
+      text: `Type: ${containerTypeLabel(type)}`,
+      href: withoutIt({ containerTypes: parsed.containerTypes.filter(other => other !== type) }),
+    })),
+    ...parsed.statuses.map(status => ({
+      text: `Status: ${statusTag(status).text}`,
+      href: withoutIt({ statuses: parsed.statuses.filter(other => other !== status) }),
+    })),
+    // Not a real status - it rides along in the same parameter but is parsed out into its own flag, so
+    // removing it means clearing the flag rather than filtering the status list.
+    ...(parsed.dueForTransferIn
+      ? [{ text: 'Status: Due for transfer in', href: withoutIt({ dueForTransferIn: false }) }]
+      : []),
+    ...parsed.personLocations.map(location => ({
+      text: `People: ${PERSON_LOCATION_TAG_LABELS[location]}`,
+      href: withoutIt({ personLocations: parsed.personLocations.filter(other => other !== location) }),
+    })),
+    ...(parsed.includeRemoved
+      ? [{ text: 'Including removed property', href: withoutIt({ includeRemoved: false }) }]
+      : []),
+  ]
 }
 
 export interface PaginationItem {

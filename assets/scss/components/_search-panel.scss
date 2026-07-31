@@ -33,6 +33,25 @@
     margin-bottom: govuk-spacing(2);
   }
 
+  // What the list is currently filtered on, above the collapsed filters. The tags themselves are the MoJ
+  // Design System's (.moj-filter-tags / .moj-filter__tag) - only the surrounding layout is ours.
+  &__selected {
+    @include govuk-responsive-margin(4, 'top');
+
+    // Heading on the left, "Clear filters" opposite it, sharing a baseline.
+    &-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: govuk-spacing(3);
+    }
+
+    .moj-filter-tags {
+      margin-bottom: 0;
+    }
+  }
+
   &__filters {
     @include govuk-responsive-margin(4, 'top');
     margin-bottom: 0;

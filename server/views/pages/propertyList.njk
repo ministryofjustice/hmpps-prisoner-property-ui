@@ -102,6 +102,26 @@
         <a class="govuk-link app-search-panel__clear" href="/?clear=1" data-qa="clear-search">Clear search</a>
       </div>
 
+      {% if appliedFilters | length %}
+        {# The filters below are collapsed by default and persist between visits, so without this nothing on
+           screen says the list is filtered - or what it is filtered on. #}
+        <div class="app-search-panel__selected" data-qa="selected-filters">
+          <div class="app-search-panel__selected-header">
+            <h3 class="govuk-heading-s govuk-!-margin-bottom-1">Selected filters</h3>
+            <a class="govuk-link" href="{{ clearFiltersHref }}" data-qa="clear-all-filters">Clear filters</a>
+          </div>
+          <ul class="moj-filter-tags">
+            {% for filter in appliedFilters %}
+              <li>
+                <a class="moj-filter__tag" href="{{ filter.href }}" data-qa="selected-filter">
+                  <span class="govuk-visually-hidden">Remove this filter:</span> {{ filter.text }}
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
       <details class="govuk-details app-search-panel__filters" data-qa="filters">
         <summary class="govuk-details__summary">
           <span class="govuk-details__summary-text">Filters</span>

@@ -173,6 +173,47 @@ test.describe('Establishment property list', () => {
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for return' })).toBeChecked()
   })
 
+  // The filters are collapsed by default and now persist between visits, so without this the page gives no
+  // sign it is filtered at all - or what it is filtered on.
+  test('names the applied filters without the filter section being opened', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/?containerType=STANDARD&status=DUE_FOR_RETURN')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await expect(listPage.selectedFilters).toBeVisible()
+    await expect(listPage.selectedFilterTags).toHaveText([/Type: Standard/, /Status: Due for return/])
+    // The filter section is still collapsed - that is the point.
+    await expect(listPage.filters.locator('.govuk-details__text')).toBeHidden()
+  })
+
+  test('removes a single filter when its tag is clicked, leaving the others', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/?containerType=STANDARD&status=DUE_FOR_RETURN')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await listPage.selectedFilterTags.filter({ hasText: 'Type: Standard' }).click()
+
+    await expect(page).toHaveURL(/status=DUE_FOR_RETURN/)
+    await expect(page).not.toHaveURL(/containerType/)
+    await expect(listPage.selectedFilterTags).toHaveText([/Status: Due for return/])
+  })
+
+  test('leaves the list unfiltered when the last tag is removed, and keeps it that way', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/?status=DUE_FOR_RETURN')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await listPage.selectedFilterTags.first().click()
+
+    await expect(listPage.selectedFilters).toBeHidden()
+    // Removing the last one must not leave it remembered, or the next visit would restore it.
+    await page.goto('/')
+    await expect(listPage.selectedFilters).toBeHidden()
+  })
+
   test('clears the remembered search and filters when Clear filters is used', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
