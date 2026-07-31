@@ -4,7 +4,9 @@ import type { Services } from '../services'
 import { Page } from '../services/auditService'
 import {
   ALL_CONTAINER_TYPES,
+  appliedFilterTags,
   buildPagination,
+  CLEAR_FILTERS_HREF,
   containerTypeLabel,
   DEFAULT_PAGE_SIZE,
   listQueryString,
@@ -92,6 +94,10 @@ export default function establishmentListRoutes({
       isLocationAdmin: canManageLocations(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
       includeRemoved,
+      // What is currently narrowing the list, shown above the collapsed filters so it is visible without
+      // opening them - the filters persist between visits, so they are not always ones set in this sitting.
+      appliedFilters: appliedFilterTags(parsed),
+      clearFiltersHref: CLEAR_FILTERS_HREF,
       summary,
       viewedPrisonId: activeCaseloadId,
       groups: result.content,
