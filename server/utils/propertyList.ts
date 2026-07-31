@@ -35,6 +35,16 @@ export const TRANSFER_IN_FILTER_VALUE = 'DUE_FOR_TRANSFER_IN'
  */
 export const CLEAR_FILTERS_HREF = '/?clear=1'
 
+/**
+ * prisoner-search reports these instead of a prison when someone is between places: TRN in transit, OUT once
+ * released. Neither is an establishment, so neither can hold property.
+ */
+const NOT_AN_ESTABLISHMENT = ['TRN', 'OUT']
+
+/** The prisoner's actual establishment, or null when they are not in one. */
+const realPrisonId = (prisonId: string | null | undefined): string | null =>
+  prisonId && !NOT_AN_ESTABLISHMENT.includes(prisonId) ? prisonId : null
+
 /** Short forms of the person-location labels: the checkbox wording is too long to sit in a tag. */
 const PERSON_LOCATION_TAG_LABELS: Record<PersonLocation, string> = {
   IN_ESTABLISHMENT: 'In this establishment',
@@ -53,12 +63,21 @@ export const DUE_FOR_TRANSFER_IN_TAG = { text: 'Due for transfer in', classes: '
 export const IN_TRANSIT_TAG = { text: 'In transit', classes: 'govuk-tag--blue' }
 
 /**
- * Whether the container has been transferred out to [viewedPrisonId] but not yet logged there. The API
- * clears `receivingPrisonId` once the receiving prison creates its own record (the transfer is
+ * Whether the container has been transferred out and is on its way to [viewedPrisonId] but not yet logged
+ * there. The API clears `receivingPrisonId` once the receiving prison creates its own record (the transfer is
  * reconciled), so a populated one on a transferred-out container means it is still in flight.
+ *
+ * Being *addressed* here is not the only way it can be coming here. The address records where the sending
+ * prison expected the person to go; if they were redirected, the box belongs wherever they actually are. So an
+ * unreconciled transfer is also in transit to the prison now holding its owner - otherwise it is invisible at
+ * the one prison that can receive it, while the prison named on the transfer lists it indefinitely.
  */
-export const isInTransitTo = (container: PrisonerPropertyContainer, viewedPrisonId: string): boolean =>
-  container.removalOutcome === 'TRANSFERRED' && container.receivingPrisonId === viewedPrisonId
+export const isInTransitTo = (container: PrisonerPropertyContainer, viewedPrisonId: string): boolean => {
+  if (container.removalOutcome !== 'TRANSFERRED' || !container.receivingPrisonId) return false
+  return (
+    container.receivingPrisonId === viewedPrisonId || realPrisonId(container.prisonerCurrentPrisonId) === viewedPrisonId
+  )
+}
 
 /**
  * The status tag for a container in the establishment list, relative to the viewed establishment. A
