@@ -217,7 +217,7 @@ describe('GET /', () => {
       })
   })
 
-  it('hides the Change/Remove links for removed containers but still renders the row (MAPB-642)', async () => {
+  it('hides the Manage link for removed containers but still renders the row (MAPB-642)', async () => {
     userService.getActiveCaseload.mockResolvedValue({
       activeCaseloadId: 'MDI',
       activeCaseloadName: 'Moorland (HMP & YOI)',
@@ -282,12 +282,12 @@ describe('GET /', () => {
       .get('/')
       .expect(200)
       .expect(res => {
-        // Only the held container gets action links; the removed one must not (the routes 404 on it).
-        expect(res.text.match(/data-qa="change-link"/g)).toHaveLength(1)
-        expect(res.text.match(/data-qa="remove-link"/g)).toHaveLength(1)
+        // Only the held container gets an action; the removed one must not (the routes 404 on it).
+        expect(res.text.match(/data-qa="manage-link"/g)).toHaveLength(1)
         expect(res.text).toContain('change-container/held')
         expect(res.text).not.toContain('change-container/removed')
-        expect(res.text).not.toContain('remove-container/removed')
+        // Removal is reached from the manage screen now, never straight from the list.
+        expect(res.text).not.toContain('remove-container/')
         // The removed row itself still renders, with its Disposed status tag.
         expect(res.text).toContain('SN0002')
         expect(res.text).toContain('Disposed')
@@ -1728,7 +1728,9 @@ describe('Add container journey - steps', () => {
 })
 
 describe('Remove container journey - access control', () => {
-  it('renders a Remove link on the person view for a user with the manage role', async () => {
+  // The person view offers one action, Manage; the remove journey is entered from that screen, which the
+  // change-form test above proves still links to '/remove-container/c1?from=person'.
+  it('reaches the journey through the Manage link on the person view, not a link of its own', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
 
@@ -1736,7 +1738,9 @@ describe('Remove container journey - access control', () => {
       .get('/prisoner/A1234BC')
       .expect(200)
       .expect(res => {
-        expect(res.text).toContain('/prisoner/A1234BC/remove-container/c1?from=person')
+        expect(res.text).toContain('/prisoner/A1234BC/change-container/c1?from=person')
+        expect(res.text).toContain('data-qa="manage-link"')
+        expect(res.text).not.toContain('/remove-container/')
       })
   })
 
@@ -2168,7 +2172,7 @@ describe('Change container journey', () => {
       .get('/prisoner/A1234BC/change-container/c1')
       .expect(200)
       .expect(res => {
-        expect(res.text).toContain('Change property container SN0001')
+        expect(res.text).toContain('Manage property container SN0001')
         expect(res.text).toContain('value="SN0001"')
         expect(res.text).toContain('Remove container')
         expect(res.text).toContain('/prisoner/A1234BC/remove-container/c1?from=person')

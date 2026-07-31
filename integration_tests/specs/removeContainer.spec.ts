@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { login, resetStubs } from '../testUtils'
 import prisonerPropertyApi from '../mockApis/prisonerPropertyApi'
 import PrisonerPropertyPage from '../pages/prisonerPropertyPage'
+import ChangeContainerDetailsPage from '../pages/changeContainerDetailsPage'
 import RemoveContainerReasonPage from '../pages/removeContainerReasonPage'
 import RemoveContainerInterruptionPage from '../pages/removeContainerInterruptionPage'
 import RemoveContainerCheckAnswersPage from '../pages/removeContainerCheckAnswersPage'
@@ -43,7 +44,10 @@ test.describe('Remove a property container', () => {
 
     await page.goto('/prisoner/A1234BC')
     const personPage = await PrisonerPropertyPage.verifyOnPage(page)
-    await personPage.inEstablishment.getByTestId('remove-link').first().click()
+    // Removal is only reachable through Manage now, so the spec takes the route staff will.
+    await personPage.inEstablishment.getByTestId('manage-link').first().click()
+    const managePage = await ChangeContainerDetailsPage.verifyOnPage(page)
+    await managePage.removeButton.click()
 
     const reasonPage = await RemoveContainerReasonPage.verifyOnPage(page)
     await expect(reasonPage.heading).toContainText('SN0001')

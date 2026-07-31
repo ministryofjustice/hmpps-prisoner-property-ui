@@ -42,7 +42,7 @@ test.describe('Change a property container', () => {
 
     await page.goto('/prisoner/A1234BC')
     const personPage = await PrisonerPropertyPage.verifyOnPage(page)
-    await personPage.inEstablishment.getByTestId('change-link').first().click()
+    await personPage.inEstablishment.getByTestId('manage-link').first().click()
 
     const detailsPage = await ChangeContainerDetailsPage.verifyOnPage(page)
     await expect(detailsPage.heading).toContainText('SN8842K1')

@@ -325,8 +325,9 @@ test.describe('Establishment property list', () => {
     const listPage = await PropertyListPage.verifyOnPage(page)
     await expect(listPage.addButton).toBeVisible()
     await expect(listPage.table.getByRole('columnheader', { name: 'Actions' })).toBeVisible()
-    await expect(listPage.table.getByRole('link', { name: 'Change' })).toBeVisible()
-    await expect(listPage.table.getByRole('link', { name: 'Remove' })).toBeVisible()
+    // One action, not two: removal is reached from the manage screen.
+    await expect(listPage.table.getByRole('link', { name: 'Manage' })).toBeVisible()
+    await expect(listPage.table.getByRole('link', { name: 'Remove' })).toHaveCount(0)
   })
 
   test('hides the Add button and actions from a user without the manage role', async ({ page }) => {

@@ -210,7 +210,7 @@
           {% if container.removalOutcome %}
             {% set cells = (cells.push({ text: "" }), cells) %}
           {% else %}
-            {% set actionsHtml %}<a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}/change-container/{{ container.id }}?from=list" data-qa="change-link">Change<span class="govuk-visually-hidden"> {{ container.currentSealNumber }}</span></a> | <a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}/remove-container/{{ container.id }}?from=list" data-qa="remove-link">Remove<span class="govuk-visually-hidden"> {{ container.currentSealNumber }}</span></a>{% endset %}
+            {% set actionsHtml %}<a class="govuk-link" href="/prisoner/{{ group.prisonerNumber }}/change-container/{{ container.id }}?from=list" data-qa="manage-link">Manage<span class="govuk-visually-hidden"> {{ container.currentSealNumber }}</span></a>{% endset %}
             {% set cells = (cells.push({ html: actionsHtml }), cells) %}
           {% endif %}
         {% endif %}

@@ -10,7 +10,7 @@
 {% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
 
-{% set pageTitle = applicationName + " - Change a property container" %}
+{% set pageTitle = applicationName + " - Manage a property container" %}
 {% set mainClasses = "govuk-body" %}
 
 {% block beforeContent %}
@@ -28,7 +28,7 @@
 
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-two-thirds">
-      <h1 class="govuk-heading-xl" data-qa="change-container-heading">Change property container {{ container.currentSealNumber }}</h1>
+      <h1 class="govuk-heading-xl" data-qa="change-container-heading">Manage property container {{ container.currentSealNumber }}</h1>
     </div>
     <div class="govuk-grid-column-one-third govuk-!-text-align-right">
       {{ govukButton({ text: "Remove container", href: removeUrl, classes: "govuk-button--warning", attributes: { "data-qa": "remove-container-button" } }) }}
