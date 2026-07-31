@@ -140,8 +140,9 @@ test.describe('Person property view', () => {
     // MOJ multi-select injects a "Select all" toggle into the header, plus a per-row checkbox.
     await expect(prisonerPage.inEstablishment.getByRole('checkbox', { name: 'Select all' })).toBeVisible()
     await expect(prisonerPage.inEstablishment.getByRole('checkbox', { name: 'Select SN0001' })).toBeVisible()
-    await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Change' })).toBeVisible()
-    await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Remove' })).toBeVisible()
+    // One action, not two: removal is reached from the manage screen.
+    await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Manage' })).toBeVisible()
+    await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Remove' })).toHaveCount(0)
     await expect(prisonerPage.combineButton).toBeVisible()
   })
 
