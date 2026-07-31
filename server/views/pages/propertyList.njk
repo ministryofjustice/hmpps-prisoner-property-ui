@@ -99,7 +99,7 @@
           formGroup: { classes: "app-search-panel__input" }
         }) }}
         {{ govukButton({ text: "Search", classes: "app-search-panel__button" }) }}
-        <a class="govuk-link app-search-panel__clear" href="/">Clear search</a>
+        <a class="govuk-link app-search-panel__clear" href="/?clear=1" data-qa="clear-search">Clear search</a>
       </div>
 
       <details class="govuk-details app-search-panel__filters" data-qa="filters">
@@ -141,8 +141,8 @@
             ]
           }) }}
 
-          {{ govukButton({ text: "Apply filters" }) }}
-          <a class="govuk-link govuk-!-margin-left-2" href="/">Clear filters</a>
+          {{ govukButton({ text: "Apply filters", attributes: { "data-qa": "apply-filters" } }) }}
+          <a class="govuk-link govuk-!-margin-left-2" href="/?clear=1" data-qa="clear-filters">Clear filters</a>
         </div>
       </details>
     </form>
