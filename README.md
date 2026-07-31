@@ -52,7 +52,7 @@ As part of the automation to create the new service, various parts of the codeba
 
 ## Oauth2 Credentials
 
-The template project is set up to run with two sets of credentials, each one support a different oauth2 flows.
+This service runs with two sets of credentials, each supporting a different oauth2 flow.
 These need to be requested from the auth team by filling in
 this [template](https://dsdmoj.atlassian.net/browse/HAAR-140) and raising on their slack channel.
 
@@ -100,9 +100,9 @@ across a variety of services is very difficult.
 
 When deployed to an environment with multiple pods we run applications with an instance of REDIS/Elasticache to provide
 a distributed cache of sessions.
-The template app is, by default, configured not to use REDIS when running locally.
+The app is, by default, configured not to use Redis when running locally.
 
-## Developing against the template project
+## Running the app locally
 
 ### Running the app via docker-compose
 
@@ -116,7 +116,7 @@ The production image now uses the `hmpps-node:24-alpine-runtime` base image and 
 
 ### Running the app for development
 
-To start the main services excluding the example typescript template app:
+To start the dependencies without the app itself (so you can run it from your IDE):
 
 `docker compose up --scale=app=0`
 
@@ -164,7 +164,8 @@ The secret scanner hook can also be configured as described [here](https://githu
 
 ### Run linter
 
-- `npm run lint` runs `eslint`.
+- `npm run lint` runs `eslint` with `--max-warnings 0`, so a warning fails the build.
+- `npm run lint-fix` applies the fixes it can, including prettier formatting. Run this before pushing.
 - `npm run typecheck` runs the TypeScript compiler `tsc`.
 
 ### Run unit tests
@@ -179,7 +180,9 @@ For local running, start a wiremock instance by:
 
 Then run the server in test mode by:
 
-`npm run start-feature` (or `npm run start-feature:dev` to run with auto-restart on changes)
+`npm run build && npm run start-feature` — `start-feature` runs the built output, so a clean checkout
+needs the build first. (Or `npm run start-feature:dev`, which compiles as it goes and restarts on
+changes.)
 
 After first install ensure playwright is initialised:
 
@@ -199,7 +202,7 @@ While there are multiple ways to keep your project up-to-date this [method](http
 
 In your service, add the template as a remote:
 
-`git remote add template https://github.com/ministryofjustice/hmpps-prisoner-property-ui`
+`git remote add template https://github.com/ministryofjustice/hmpps-template-typescript`
 
 Create a branch and switch to it, eg:
 
@@ -217,4 +220,6 @@ You'll need to manually handle the merge of the changes, but if you do it early,
 
 ## Change log
 
-A changelog for the service is available [here](./CHANGELOG.md)
+There isn't one — the git history is the record. A `CHANGELOG.md` was inherited from the template and
+never edited by this project, so every entry and every PR link in it belonged to a different repo. It was
+removed rather than left to look authoritative.

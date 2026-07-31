@@ -55,7 +55,7 @@ The two gates in the middle are the interesting part: **role** answers "may this
 
 | Path | What's in it |
 | --- | --- |
-| `server/routes/` | Every route. See the note below — it's one file. |
+| `server/routes/` | Every route, one file per group. `index.ts` only composes them; `journeys/` holds the four write journeys, `admin/` the two admin areas, and `journeyHelpers.ts` the context guard they share. |
 | `server/services/` | Orchestration between routes and data clients. Some hold small caches. |
 | `server/data/` | REST clients, one per external API, plus the Redis client and audit client. |
 | `server/utils/` | View-model builders and Nunjucks filters — where API shapes become template shapes. |
@@ -67,26 +67,47 @@ The two gates in the middle are the interesting part: **role** answers "may this
 
 ## Routes
 
-> **All routes live in a single `server/routes/index.ts`.** It is large. This doc describes route groups
-> by *responsibility* rather than by location in the file, so it stays true if the router is ever split —
-> which would be a reasonable post-beta cleanup.
+`server/routes/index.ts` is 32 lines: it builds the two shared gates and mounts eight routers. Each group
+below is its own file.
 
-| Group | What it does | Gated by |
-| --- | --- | --- |
-| **Establishment property list** (`/`) | The landing page: all property in the user's active caseload prison, searchable, filterable and paginated, with the summary tiles. Renders a "no caseload" page if the user has none. | — |
-| **Prisoner property** (`/prisoner/:prisonerNumber`) | One person's property: held in this establishment, plus property still elsewhere that's due to transfer in. | — |
-| **Property history** (`/prisoner/:prisonerNumber/history`) | The timeline tab — property events interleaved with the person's arrivals and transfers. | — |
-| **Container history** (`/prisoner/:prisonerNumber/container/:id`) | Everything that ever happened to one container. | — |
-| **Prisoner photo** (`/prisoner/:prisonerNumber/image`) | Proxies the photo from Prison API so the browser never holds a token. | — |
-| **Add container** | Search → details → location → check answers → confirm. | manage + active prison |
-| **Change container** | Details → location → check → confirm. | manage + active prison |
-| **Remove container** | Reason → (transfer interruption) → check → confirm. | manage + active prison |
-| **Combine containers** | Select → details → location → check → confirm. | manage + active prison |
-| **Admin: prisons** (`/admin/prisons`) | The rollout console: switch prisons onto DPS, and control the warning staff see on the NOMIS property screen. | admin |
-| **Admin: locations** (`/admin/locations`) | Add, edit and remove a prison's storage locations. | location admin |
+| Group | File | What it does | Gated by |
+| --- | --- | --- | --- |
+| **Establishment property list** (`/`) | `establishmentList.ts` | The landing page: all property in the user's active caseload prison, searchable, filterable and paginated, with the summary tiles. Renders a "no caseload" page if the user has none. | — |
+| **Prisoner property** (`/prisoner/:prisonerNumber`) | `prisonerProperty.ts` | One person's property: held in this establishment, plus property still elsewhere that's due to transfer in. | — |
+| **Property history** (`/prisoner/:prisonerNumber/history`) | `prisonerProperty.ts` | The timeline tab — property events interleaved with the person's arrivals and transfers. | — |
+| **Property returned or transferred** (`/prisoner/:prisonerNumber/returned`) | `prisonerProperty.ts` | The third tab: a plain table of the person's property that has left storage — removed, returned, disposed or transferred out. | — |
+| **Container history** (`/prisoner/:prisonerNumber/container/:id`) | `prisonerProperty.ts` | Everything that ever happened to one container. | — |
+| **Prisoner photo** (`/prisoner/:prisonerNumber/image`) | `prisonerProperty.ts` | Proxies the photo from Prison API so the browser never holds a token. | — |
+| **Add container** | `journeys/addContainer.ts` | Search → details → where stored → location → check answers → confirm. | manage + active prison |
+| **Change container** | `journeys/changeContainer.ts` | Details → where stored → location → check → confirm. | manage + active prison |
+| **Remove container** | `journeys/removeContainer.ts` | Reason → (transfer interruption) → check → confirm. | manage + active prison |
+| **Combine containers** | `journeys/combineContainer.ts` | Select → details → location → check → confirm. | manage + active prison |
+| **Admin: prisons** (`/admin/prisons`) | `admin/prisons.ts` | The rollout console: switch prisons onto DPS, and control the warning staff see on the NOMIS property screen. | admin |
+| **Admin: locations** (`/admin/locations`) | `admin/locations.ts` | Add, edit and remove a prison's storage locations. | location admin |
+
+All three person tabs share `partials/personHeader.njk`, which is where the *Add property* button lives.
+Any handler rendering one of them has to compute `canManage` the same way, or the button appears on a tab
+where the write gate will then refuse it (MAPB-738).
 
 The four write journeys share a shape: each step validates and stashes state in the session, `check`
-renders a summary, and only `confirm` calls the API.
+renders a summary, and only `confirm` calls the API. `journeyHelpers.ts` holds the `resolveContext` guard
+every step runs first. **Combine is the exception to how you enter one**: its entry point is a POST from
+the person page (it carries the selected containers), so it is the one journey you cannot reach by typing
+a URL.
+
+### The establishment list
+
+Two behaviours on that page are worth knowing before changing it:
+
+- **Search and filters persist.** The resolved query string is kept in the session and reapplied when the
+  user comes back from a journey, so returning from a container doesn't silently drop their filters.
+  `/?clear=1` is the explicit reset.
+- **Applied filters render as removable tags**, with a clear-all link — because the filter panel is
+  collapsed by default, and without the tags nothing on screen says the list is filtered, or on what.
+
+One oddity: "Due for transfer in" is a *pseudo-status*. It shares the status checkbox group in the UI but
+is a separate concern in the API, so it is mapped in and out via `TRANSFER_IN_FILTER_VALUE` rather than
+being a `ContainerStatus`.
 
 ---
 
@@ -99,11 +120,22 @@ Thin by design — most are a pass-through to a data client. The exceptions earn
 | `prisonerPropertyService` | Everything property. A direct wrapper over the property API client. |
 | `prisonerService` | Prisoner detail and photo, plus the NOMIS splash-screen read/write logic (idempotent add/update/remove of the caseload condition). |
 | `userService` | The signed-in user's active caseload — which scopes the whole app — and staff display-name lookups. **Caches names in memory for 1 hour.** |
-| `activeAgenciesService` | Is this prison live on DPS? **Caches for 5 minutes**, invalidated when an admin toggles a prison. |
+| `activeAgenciesService` | Is this prison live on DPS? **Read live, not cached** — see below. |
 | `auditService` | Records page views to HMPPS Audit over SQS. |
 
-Both caches are process-local and deliberately so — they're small, cheap to rebuild, and tolerate being
-a few minutes stale. Neither needs Redis.
+`userService`'s name cache is process-local and deliberately so: names are cheap to rebuild and tolerate
+being an hour stale.
+
+**`activeAgenciesService` deliberately has no cache**, and it must stay that way. It had a five-minute TTL,
+invalidated on an admin toggle — but the invalidation only reached the pod that served that POST, so every
+other pod carried on refusing writes for a prison that had just been switched on. Staff saw roughly every
+other request fail with the "not authorised" page (MAPB-739). A per-pod cache cannot be invalidated from
+another pod, so there is no version of that design that works. The read is the property API's `/info`,
+itself actuator-cached for two seconds over a table with a few hundred rows, and the set changes a handful
+of times across the whole rollout. The last successful read is kept only as a fallback for when that call
+fails, so a blip leaves edits blocked rather than opening them up.
+
+The API removed its own copy of this cache for exactly the same reason. Don't reintroduce it here.
 
 ---
 
@@ -142,20 +174,26 @@ makes it unit-testable without an Express app.
 
 | Module | In → out |
 | --- | --- |
+| `statusTags.ts` | Container status → the one tag palette. Everything below defers to it. |
 | `prisonerTimeline.ts` | Timeline items → titles, bylines, expandable detail, status tags. |
-| `propertyList.ts` | Establishment list + query params → rows, status tags, pagination, parsed filters. |
-| `personProperty.ts` | A person's containers → split into held-here vs due-to-transfer-in, with viewer-relative tags. |
+| `propertyList.ts` | Establishment list + query params → rows, status tags, pagination, parsed filters, applied-filter tags. |
+| `personProperty.ts` | A person's containers → split into held-here vs due-to-transfer-in, with viewer-relative tags; and the returned/transferred tab's rows. |
 | `prisonerBanner.ts` | Prisoner detail → the banner, with a fallback when Prisoner Search is unavailable. |
 | `containerHistory.ts` | Container events → labels and descriptions. |
 | `nomisSplash.ts` | Splash-screen conditions → `NORMAL` / `WARNING` / `BLOCKED`, and back. |
 | `addContainer.ts`, `changeContainer.ts`, `removeContainer.ts` | Form parsing, validation and journey state. |
 | `utils.ts` | Date and name formatting. |
 
-> **Careful: there are three status-tag palettes, and they disagree on purpose.** The timeline
-> (`prisonerTimeline.ts`) shows *Stored* as green; the establishment list (`propertyList.ts`) shows
-> *Due for transfer out* as yellow where the timeline shows grey; `personProperty.ts` adds a
-> viewer-relative turquoise *Due for transfer in*. They are not a mistake to be unified — each answers a
-> different question. Check which one you're in before changing a colour.
+> **There is one status palette: `statusTags.ts`.** There used to be more than one, and they had drifted
+> apart — the same container read as a different colour depending on which screen you were looking at.
+> `containerStatusTag` is now the single source, imported by the timeline, the establishment list and the
+> person view alike, so a colour change lands everywhere at once. Change it there, not at a call site.
+
+The one genuinely screen-specific tag is *Due for transfer in* (`DUE_FOR_TRANSFER_IN_TAG` in
+`propertyList.ts`). It is **viewer-relative** rather than a property of the container: the same box is
+"due for transfer in" to the prison expecting it and something else entirely to the prison still holding
+it. `isIncomingTo` in `personProperty.ts` decides which, and previous-seal matching keys off the same
+judgement — so if you change what counts as incoming, check `matchableContainers` too.
 
 Most of these are registered as Nunjucks filters in `server/utils/nunjucksSetup.ts`.
 
@@ -209,4 +247,6 @@ Commands are in the [README](../README.md).
 
 - **Contributor conventions aren't written down** anywhere in this repo — they live in this doc and in
   code comments only.
-- **`server/routes/index.ts` is one large file.** Splitting it per journey is the obvious next tidy-up.
+- **`server/routes/index.test.ts` is one ~2,500-line file**, even though the routes themselves were split
+  into one file per group. If you go looking for `establishmentList.test.ts`, it isn't there. Splitting it
+  to mirror the routes is the obvious next tidy-up.
