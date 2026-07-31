@@ -1,6 +1,7 @@
 import type { ParsedQs } from 'qs'
 import type { PrisonerPropertyContainer, PrisonerPropertyGroup } from '../data/prisonerPropertyApiTypes'
 import {
+  appliedFilterTags,
   buildPagination,
   containerLocation,
   containerTypeLabel,
@@ -311,6 +312,68 @@ describe('propertyList utils', () => {
     it('is empty when nothing is filtered, so there is nothing to remember', () => {
       expect(listQueryString(parse({}), { includePage: true })).toBe('')
       expect(listQueryString(parse({ q: '  ' }), { includePage: true })).toBe('')
+    })
+  })
+
+  describe('appliedFilterTags', () => {
+    const tagsFor = (query: Record<string, unknown>) =>
+      appliedFilterTags(parsePropertyListQuery(query as unknown as ParsedQs))
+
+    it('shows nothing when the list is not filtered', () => {
+      expect(tagsFor({})).toEqual([])
+      // The search term is not a tag: the search box is right above and already shows it.
+      expect(tagsFor({ q: 'A1234BC' })).toEqual([])
+    })
+
+    it('names the group in each label, since the values do not speak for themselves', () => {
+      const tags = tagsFor({
+        containerType: 'STANDARD',
+        status: 'DUE_FOR_RETURN',
+        personLocation: 'IN_ESTABLISHMENT',
+        includeRemoved: 'true',
+      })
+
+      expect(tags.map(tag => tag.text)).toEqual([
+        'Type: Standard',
+        'Status: Due for return',
+        'People: In this establishment',
+        'Including removed property',
+      ])
+    })
+
+    it('links each tag to the same list without that one filter', () => {
+      const tags = tagsFor({ containerType: ['STANDARD', 'VALUABLES'], status: 'DUE_FOR_RETURN' })
+
+      expect(tags[0]).toEqual({ text: 'Type: Standard', href: '/?containerType=VALUABLES&status=DUE_FOR_RETURN' })
+      expect(tags[1]).toEqual({ text: 'Type: Valuables', href: '/?containerType=STANDARD&status=DUE_FOR_RETURN' })
+      expect(tags[2]).toEqual({
+        text: 'Status: Due for return',
+        href: '/?containerType=STANDARD&containerType=VALUABLES',
+      })
+    })
+
+    it('keeps the search term when a filter is removed', () => {
+      expect(tagsFor({ q: 'A1234BC', status: 'DUE_FOR_RETURN' })[0]!.href).toBe('/?q=A1234BC')
+    })
+
+    it('removes "Due for transfer in" by clearing its flag, not by filtering the statuses', () => {
+      // It rides along in the status parameter but is not a real container status.
+      const tags = tagsFor({ status: ['DUE_FOR_TRANSFER_IN', 'DUE_FOR_RETURN'] })
+
+      expect(tags.map(tag => tag.text)).toEqual(['Status: Due for return', 'Status: Due for transfer in'])
+      expect(tags[1]!.href).toBe('/?status=DUE_FOR_RETURN')
+    })
+
+    it('sends you back to page 1 when a filter is removed', () => {
+      // The page you were on described a different, larger result set.
+      expect(tagsFor({ status: 'DUE_FOR_RETURN', containerType: 'STANDARD', page: '4' })[0]!.href).toBe(
+        '/?status=DUE_FOR_RETURN',
+      )
+    })
+
+    it('clears explicitly when the last filter is removed, so it is not restored', () => {
+      // A bare "/" means "restore what I had", which would put back the filter just removed.
+      expect(tagsFor({ status: 'DUE_FOR_RETURN' })[0]!.href).toBe('/?clear=1')
     })
   })
 

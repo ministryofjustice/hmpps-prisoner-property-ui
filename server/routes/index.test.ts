@@ -456,6 +456,54 @@ describe('GET /', () => {
       })
   })
 
+  describe('showing which filters are applied', () => {
+    beforeEach(() => {
+      withActiveCaseload()
+      prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+    })
+
+    it('names the applied filters above the collapsed filter section, each removable', async () => {
+      // Without this the page gives no sign it is filtered - the filters are collapsed, and since they
+      // persist between visits they are not always ones the user set in this sitting.
+      return request(app)
+        .get('/?containerType=STANDARD&status=DUE_FOR_RETURN')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('Selected filters')
+          expect(res.text).toContain('Type: Standard')
+          expect(res.text).toContain('Status: Due for return')
+          // Each tag drops just its own filter.
+          expect(res.text).toContain('href="/?status=DUE_FOR_RETURN"')
+          expect(res.text).toContain('href="/?containerType=STANDARD"')
+        })
+    })
+
+    it('says nothing when the list is not filtered', async () => {
+      return request(app)
+        .get('/')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).not.toContain('Selected filters')
+        })
+    })
+
+    it('shows filters restored from a previous visit, which is the case it exists for', async () => {
+      const agent = request.agent(app)
+      await agent.get('/?status=DUE_FOR_RETURN').expect(200)
+
+      return agent
+        .get('/')
+        .expect(302)
+        .expect('Location', '/?status=DUE_FOR_RETURN')
+        .then(() =>
+          agent
+            .get('/?status=DUE_FOR_RETURN')
+            .expect(200)
+            .expect(res => expect(res.text).toContain('Status: Due for return')),
+        )
+    })
+  })
+
   // Staff working through a filtered list open a prisoner from it on every row, so the filters have to
   // survive the round trip. These need request.agent, which carries the session cookie - a bare request()
   // gets a fresh jar each call and would never see anything remembered.
