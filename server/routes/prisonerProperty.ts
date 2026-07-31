@@ -23,6 +23,16 @@ export default function prisonerPropertyRoutes({
 }: Services): Router {
   const router = Router()
 
+  // Edits are gated on both the manage role and the establishment being switched on in DPS; a role-holder
+  // on a NOMIS-managed prison sees the property read-only with a "view only" banner. Every person tab needs
+  // this — the "Add property" button lives in the shared header partial, so a tab that computes canManage
+  // from the role alone puts a button on the page that the server-side gate then rejects.
+  const manageFlags = async (userRoles: string[], activeCaseloadId: string) => {
+    const hasManageRole = canManageProperty(userRoles)
+    const isActivePrison = await activeAgenciesService.isPrisonActive(activeCaseloadId)
+    return { canManage: hasManageRole && isActivePrison, showNomisBanner: hasManageRole && !isActivePrison }
+  }
+
   router.get('/prisoner/:prisonerNumber', async (req, res, next) => {
     const { token, username } = res.locals.user
     const { prisonerNumber } = req.params
@@ -67,11 +77,6 @@ export default function prisonerPropertyRoutes({
       ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, prisonerMovementStatus)
       : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
 
-    // Edits are gated on both the manage role and the establishment being switched on in DPS; a
-    // role-holder on a NOMIS-managed prison sees the property read-only with a "view only" banner.
-    const hasManageRole = canManageProperty(res.locals.user.userRoles)
-    const isActivePrison = await activeAgenciesService.isPrisonActive(activeCaseloadId)
-
     return res.render('pages/prisonerProperty', {
       prisonerNumber,
       prisonerName: containers[0]?.prisonerName ?? null,
@@ -81,8 +86,7 @@ export default function prisonerPropertyRoutes({
       banner,
       inEstablishment,
       dueToTransferIn,
-      canManage: hasManageRole && isActivePrison,
-      showNomisBanner: hasManageRole && !isActivePrison,
+      ...(await manageFlags(res.locals.user.userRoles, activeCaseloadId)),
       successMessage: req.flash('success')[0],
       errorMessage: req.flash('error')[0],
       backUrl: '/',
@@ -134,7 +138,7 @@ export default function prisonerPropertyRoutes({
       prisonerName: containers[0]?.prisonerName ?? null,
       banner,
       timeline: buildPrisonerTimeline(timelineItems, prisonerNumber, nameByUsername),
-      canManage: canManageProperty(res.locals.user.userRoles),
+      ...(await manageFlags(res.locals.user.userRoles, activeCaseloadId)),
       successMessage: req.flash('success')[0],
       backUrl: '/',
     })
@@ -180,7 +184,7 @@ export default function prisonerPropertyRoutes({
       prisonerName: containers[0]?.prisonerName ?? null,
       banner,
       returned: buildReturnedOrTransferredView(containers),
-      canManage: canManageProperty(res.locals.user.userRoles),
+      ...(await manageFlags(res.locals.user.userRoles, activeCaseloadId)),
       successMessage: req.flash('success')[0],
       backUrl: '/',
     })

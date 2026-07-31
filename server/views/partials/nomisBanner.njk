@@ -1,0 +1,12 @@
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+
+{# Shown to a role-holder whose establishment is not switched on in DPS, explaining why the page offers
+   no actions. Every page that can hide actions on `canManage` should include this, or the read-only
+   state looks like a fault. #}
+{% if showNomisBanner %}
+  {{ govukNotificationBanner({
+    titleText: "View only",
+    text: "This establishment's property is currently managed in NOMIS. You can view records here but cannot change them.",
+    attributes: { "data-qa": "nomis-banner" }
+  }) }}
+{% endif %}

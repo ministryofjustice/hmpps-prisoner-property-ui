@@ -28,13 +28,7 @@
     }) }}
   {% endif %}
 
-  {% if showNomisBanner %}
-    {{ govukNotificationBanner({
-      titleText: "View only",
-      text: "This establishment's property is currently managed in NOMIS. You can view records here but cannot change them.",
-      attributes: { "data-qa": "nomis-banner" }
-    }) }}
-  {% endif %}
+  {% include "../partials/nomisBanner.njk" %}
 
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-two-thirds">
