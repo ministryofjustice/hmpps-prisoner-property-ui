@@ -35,6 +35,7 @@ const baseEvent = {
   toPrisonId: null,
   toPrisonName: null,
   containerType: 'STANDARD' as const,
+  previousContainerType: null,
   eventDate: null,
   relatedContainerId: null,
   relatedContainerSealNumber: null,

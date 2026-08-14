@@ -107,6 +107,10 @@ export interface PropertyEvent {
   toPrisonName: string | null
   // The container's type as at this event (snapshotted for the durable history).
   containerType: ContainerType
+  // The type immediately before this event, so a type change reads "changed from X to Y". Null when there is
+  // no earlier event, and null for events predating the snapshot column (whose backfill left every event
+  // carrying the same type) - so callers must fall back to naming only the new type.
+  previousContainerType: ContainerType | null
   eventDate: string | null
   relatedContainerId: string | null
   // For a COMBINED event, the seal number of the container the sources were combined into.
@@ -148,7 +152,11 @@ export interface PrisonerTimelineItem {
   // For a COMBINED event, the seal number of the container the sources were combined into.
   relatedContainerSealNumber: string | null
   containerId: string | null
+  // The container* fields below are the values as at this event, not the container's current state, so an
+  // entry that predates a later change still reads correctly.
   containerType: ContainerType | null
+  // See PropertyEvent.previousContainerType.
+  previousContainerType: ContainerType | null
   containerSealNumber: string | null
   containerStatus: ContainerStatus | null
   containerLocationDescription: string | null

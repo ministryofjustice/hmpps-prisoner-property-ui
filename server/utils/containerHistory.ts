@@ -1,4 +1,4 @@
-import type { PropertyEvent, PropertyEventType } from '../data/prisonerPropertyApiTypes'
+import type { ContainerType, PropertyEvent, PropertyEventType } from '../data/prisonerPropertyApiTypes'
 import { containerTypeLabel } from './propertyList'
 import { formatDate } from './utils'
 
@@ -23,6 +23,23 @@ const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
 export const eventTypeLabel = (type: PropertyEventType): string => EVENT_TYPE_LABELS[type] ?? type
 
 /**
+ * Names a property type change, saying what it was changed from when the API could determine it. The
+ * previous type is unavailable for the oldest event and for events predating the API's type snapshot, so
+ * this falls back to naming only the new type rather than leaving a gap. Returned without trailing
+ * punctuation so callers can use it as a sentence or a heading.
+ */
+export const propertyTypeChange = (
+  containerType: ContainerType | null,
+  previousContainerType: ContainerType | null,
+): string => {
+  if (!containerType) return 'Property type changed'
+  const to = containerTypeLabel(containerType)
+  return previousContainerType
+    ? `Property type changed from ${containerTypeLabel(previousContainerType)} to ${to}`
+    : `Property type changed to ${to}`
+}
+
+/**
  * A human-readable description of a single history event. Only fields relevant to the event type are
  * populated by the API, so we describe what we know. Internal storage-location ids are not resolved to
  * names yet (deferred to a follow-up), so a move to an internal location is described generically.
@@ -40,10 +57,9 @@ export const eventDescription = (event: PropertyEvent): string => {
     case 'SEAL_CHANGED':
       return event.sealNumber ? `Seal number changed to ${event.sealNumber}.` : 'Seal number changed.'
     case 'CONTAINER_TYPE_CHANGE':
-      // containerType is snapshotted as at this event, so it names what the type was changed to.
-      return event.containerType
-        ? `Property type changed to ${containerTypeLabel(event.containerType)}.`
-        : 'Property type changed.'
+      // containerType is snapshotted as at this event, so it names what the type was changed to; the API
+      // derives what it was changed from where it can.
+      return `${propertyTypeChange(event.containerType, event.previousContainerType)}.`
     case 'MOVED':
       return event.toStorageLocationType === 'BRANSTON'
         ? 'Moved to Branston (offsite).'

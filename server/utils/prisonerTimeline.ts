@@ -59,8 +59,13 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
       return item.sealNumber
         ? `Property container details changed — seal number now ${item.sealNumber}`
         : 'Property container details changed — seal number'
-    case 'CONTAINER_TYPE_CHANGE':
-      return `${container} details changed — property type`
+    case 'CONTAINER_TYPE_CHANGE': {
+      // Mirrors the "seal number now X" idiom above. The API supplies what the type was changed from where
+      // it can determine it; where it cannot, the title just names the new type.
+      if (!item.containerType) return `${container} details changed — property type`
+      const now = `${container} details changed — property type now ${containerTypeLabel(item.containerType)}`
+      return item.previousContainerType ? `${now} (was ${containerTypeLabel(item.previousContainerType)})` : now
+    }
     case 'MOVED':
       return item.toStorageLocationType === 'BRANSTON'
         ? `${container} moved to Branston (offsite)`

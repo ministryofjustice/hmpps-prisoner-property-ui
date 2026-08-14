@@ -15,6 +15,7 @@ const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
   toPrisonId: null,
   toPrisonName: null,
   containerType: 'STANDARD',
+  previousContainerType: null,
   eventDate: null,
   relatedContainerId: null,
   relatedContainerSealNumber: null,
@@ -82,7 +83,16 @@ describe('eventDescription', () => {
     )
   })
 
-  it('names the container type on a type change', () => {
+  it('names what the container type was changed from as well as to', () => {
+    expect(
+      eventDescription(
+        event({ eventType: 'CONTAINER_TYPE_CHANGE', containerType: 'EXCESS', previousContainerType: 'STANDARD' }),
+      ),
+    ).toBe('Property type changed from Standard to Excess.')
+  })
+
+  it('names only the new container type when the previous one is not known', () => {
+    // The oldest event has no predecessor, and events predating the API's type snapshot cannot supply one.
     expect(eventDescription(event({ eventType: 'CONTAINER_TYPE_CHANGE', containerType: 'VALUABLES' }))).toBe(
       'Property type changed to Valuables.',
     )
