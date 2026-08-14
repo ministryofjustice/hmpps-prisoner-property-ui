@@ -22,6 +22,7 @@ const containerEvent = (overrides: Partial<PrisonerTimelineItem> = {}): Prisoner
   relatedContainerSealNumber: null,
   containerId: 'c1',
   containerType: 'VALUABLES',
+  previousContainerType: null,
   containerSealNumber: 'SN880032',
   containerStatus: 'STORED',
   containerLocationDescription: 'Reception A1',
@@ -54,7 +55,9 @@ describe('buildPrisonerTimeline', () => {
   it('builds a title sentence per event type using the resolved names and seal', () => {
     expect(titleFor('CREATED_SEALED')).toBe('Property container SN880032 added to storage at Leeds (HMP)')
     expect(titleFor('SEAL_CHANGED')).toBe('Property container details changed — seal number now SN880032')
-    expect(titleFor('CONTAINER_TYPE_CHANGE')).toBe('Property container SN880032 details changed — property type')
+    expect(titleFor('CONTAINER_TYPE_CHANGE')).toBe(
+      'Property container SN880032 details changed — property type now Valuables',
+    )
     expect(titleFor('MOVED')).toBe('Property container SN880032 storage location changed')
     expect(titleFor('MOVED', { toStorageLocationType: 'BRANSTON' })).toBe(
       'Property container SN880032 moved to Branston (offsite)',
@@ -81,6 +84,44 @@ describe('buildPrisonerTimeline', () => {
 
   it('omits the seal from the title when it is not known', () => {
     expect(titleFor('CREATED_SEALED', { sealNumber: null })).toBe('Property container added to storage at Leeds (HMP)')
+  })
+
+  it('names what a property type was changed from when the API could determine it', () => {
+    expect(titleFor('CONTAINER_TYPE_CHANGE', { containerType: 'EXCESS', previousContainerType: 'STANDARD' })).toBe(
+      'Property container SN880032 details changed — property type now Excess (was Standard)',
+    )
+  })
+
+  it('names only the new property type when there is nothing to have changed from', () => {
+    expect(titleFor('CONTAINER_TYPE_CHANGE', { containerType: 'EXCESS', previousContainerType: null })).toBe(
+      'Property container SN880032 details changed — property type now Excess',
+    )
+  })
+
+  it('shows each entry the container details as at that event, not the container as it is now', () => {
+    // The API sends the values as at the event; a later change must not rewrite the earlier entry.
+    // Newest first, so the type change leads and the creation that predates it follows.
+    const [retyped, created] = buildPrisonerTimeline(
+      [
+        containerEvent({
+          eventId: 'e2',
+          eventType: 'CONTAINER_TYPE_CHANGE',
+          containerType: 'EXCESS',
+          previousContainerType: 'STANDARD',
+          containerLocationDescription: 'Property Box 1',
+        }),
+        containerEvent({
+          eventId: 'e1',
+          eventType: 'CREATED_SEALED',
+          containerType: 'STANDARD',
+          containerLocationDescription: 'Property Box 1',
+        }),
+      ],
+      'A1234BC',
+    )
+
+    expect(retyped.details?.containerType).toBe('Excess')
+    expect(created.details?.containerType).toBe('Standard')
   })
 
   it('names the matched seal on both sides of a transfer in', () => {
