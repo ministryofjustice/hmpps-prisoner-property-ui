@@ -39,7 +39,7 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
         {{ govukInput({
-          label: { text: "Name", classes: "govuk-label--s" },
+          label: { text: "Storage location name", classes: "govuk-label--s" },
           hint: { text: "The name staff will see when choosing where to store property, for example “Reception property store”." },
           id: "localName",
           name: "localName",
@@ -50,7 +50,7 @@
 
         {{ govukInput({
           label: { text: "Capacity", classes: "govuk-label--s" },
-          hint: { text: "How many containers can be stored here." },
+          hint: { text: "Enter the maximum number of property containers this location can hold." },
           id: "capacity",
           name: "capacity",
           value: values.capacity,

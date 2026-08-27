@@ -44,7 +44,7 @@ test.describe('Manage property storage locations', () => {
     const managePage = await ManagePropertyLocationsPage.verifyOnPage(page)
     await managePage.addLocationLink.click()
 
-    await page.getByLabel('Name').fill('Property Store B')
+    await page.getByLabel('Storage location name').fill('Property Store B')
     await page.getByLabel('Capacity').fill('12')
 
     // After the successful create the list is re-read - stub it to include the new location.
