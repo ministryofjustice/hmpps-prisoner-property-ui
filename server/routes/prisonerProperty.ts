@@ -25,7 +25,7 @@ export default function prisonerPropertyRoutes({
 
   // Edits are gated on both the manage role and the establishment being switched on in DPS; a role-holder
   // on a NOMIS-managed prison sees the property read-only with a "view only" banner. Every person tab needs
-  // this — the "Add property" button lives in the shared header partial, so a tab that computes canManage
+  // this — the "Add a property container" button lives in the shared header partial, so a tab that computes canManage
   // from the role alone puts a button on the page that the server-side gate then rejects.
   const manageFlags = async (userRoles: string[], activeCaseloadId: string) => {
     const hasManageRole = canManageProperty(userRoles)

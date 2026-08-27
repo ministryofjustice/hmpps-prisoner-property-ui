@@ -213,7 +213,8 @@ test.describe('Person property view', () => {
     await expect(prisonerPage.banner).toBeVisible()
     await expect(prisonerPage.bannerName).toContainText('Smith, John')
     await expect(prisonerPage.bannerPrisonerNumber).toContainText('A1234BC')
-    await expect(prisonerPage.bannerDob).toContainText('1/1/2001')
+    // dates of birth are written in full, per MOJ guidance
+    await expect(prisonerPage.bannerDob).toContainText('1 January 2001')
     await expect(prisonerPage.bannerEstablishment).toContainText('Moorland (HMP & YOI)')
     await expect(prisonerPage.bannerCell).toContainText('F-3-042')
     await expect(prisonerPage.bannerStatus).toContainText('ACTIVE IN')

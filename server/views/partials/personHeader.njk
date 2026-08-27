@@ -9,7 +9,7 @@
 
 {% if canManage %}
   {{ govukButton({
-    text: "Add property",
+    text: "Add a property container",
     href: "/prisoner/" + prisonerNumber + "/add-container?from=person",
     attributes: { "data-qa": "add-property" }
   }) }}
@@ -32,7 +32,7 @@
         attributes: { "data-qa": "tab-history" }
       },
       {
-        text: "Property returned or transferred",
+        text: "Returned or transferred property",
         href: "/prisoner/" + prisonerNumber + "/returned",
         active: activeTab == "returned",
         attributes: { "data-qa": "tab-returned" }
