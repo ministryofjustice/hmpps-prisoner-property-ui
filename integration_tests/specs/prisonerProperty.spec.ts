@@ -128,9 +128,10 @@ test.describe('Person property view', () => {
 
   test('shows selection, per-row actions and the combine button for a user with the manage role', async ({ page }) => {
     await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    // two containers, because the selection controls only appear when combining is possible
     await prisonerPropertyApi.stubGetPropertyForPrisoner({
       prisonerNumber: 'A1234BC',
-      containers: [inEstablishmentContainer],
+      containers: [inEstablishmentContainer, { ...inEstablishmentContainer, id: 'c2', currentSealNumber: 'SN0002' }],
       priority: 1,
     })
     await page.goto('/prisoner/A1234BC')
@@ -141,9 +142,27 @@ test.describe('Person property view', () => {
     await expect(prisonerPage.inEstablishment.getByRole('checkbox', { name: 'Select all' })).toBeVisible()
     await expect(prisonerPage.inEstablishment.getByRole('checkbox', { name: 'Select SN0001' })).toBeVisible()
     // One action, not two: removal is reached from the manage screen.
-    await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Manage' })).toBeVisible()
+    await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Manage' }).first()).toBeVisible()
     await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Remove' })).toHaveCount(0)
     await expect(prisonerPage.combineButton).toBeVisible()
+  })
+
+  test('hides selection and the combine button when the person has only one container', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [inEstablishmentContainer],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC')
+
+    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
+    // combining needs two, so the controls would start a journey that cannot finish
+    await expect(prisonerPage.selectAllHeader).toBeHidden()
+    await expect(prisonerPage.inEstablishment.getByRole('checkbox')).toBeHidden()
+    await expect(prisonerPage.combineButton).toBeHidden()
+    // the per-container Manage link is unaffected
+    await expect(prisonerPage.inEstablishment.getByRole('link', { name: 'Manage' })).toBeVisible()
   })
 
   test('hides selection, actions and the combine button from a user without the manage role', async ({ page }) => {

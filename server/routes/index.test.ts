@@ -2048,6 +2048,25 @@ describe('Combine containers journey', () => {
       })
   })
 
+  it('hides the combine button and checkboxes when the person has only one container', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'c1', currentSealNumber: 'SN0001' }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        // combining needs two, so offering it for one would start a journey that cannot finish
+        expect(res.text).not.toContain('Combine selected property containers')
+        expect(res.text).not.toContain('name="containerIds"')
+        expect(res.text).not.toContain('id="select-all"')
+        // the per-container Manage link is unaffected
+        expect(res.text).toContain('data-qa="manage-link"')
+      })
+  })
+
   it('forbids the journey for a user without the manage role', async () => {
     withActiveCaseload()
 

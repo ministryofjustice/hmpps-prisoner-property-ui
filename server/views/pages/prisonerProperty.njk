@@ -53,8 +53,11 @@
     {% if inEstablishment.length == 0 %}
       <p class="govuk-body" data-qa="no-in-establishment">No property is being held in this establishment for this person.</p>
     {% else %}
+      {# Combining needs at least two containers, so the selection controls are hidden below that -
+         unlike the Manage links, which apply to a single container. #}
+      {% set canCombine = canManage and inEstablishment.length > 1 %}
       {% set inEstablishmentHead = [] %}
-      {% if canManage %}
+      {% if canCombine %}
         {% set inEstablishmentHead = (inEstablishmentHead.push({ html: "", attributes: { id: "select-all" } }), inEstablishmentHead) %}
       {% endif %}
       {% set inEstablishmentHead = (inEstablishmentHead.push({ text: "Seal number" }), inEstablishmentHead) %}
@@ -75,7 +78,7 @@
       {% set inEstablishmentRows = [] %}
       {% for row in inEstablishment %}
         {% set cells = [] %}
-        {% if canManage %}
+        {% if canCombine %}
           {% set checkboxId = "select-" + row.container.id %}
           {% set checkboxHtml %}<div class="govuk-checkboxes govuk-checkboxes--small"><div class="govuk-checkboxes__item"><input type="checkbox" class="govuk-checkboxes__input" id="{{ checkboxId }}" name="containerIds" value="{{ row.container.id }}"><label class="govuk-label govuk-checkboxes__label" for="{{ checkboxId }}"><span class="govuk-visually-hidden">Select {{ row.container.currentSealNumber or "container" }}</span></label></div></div>{% endset %}
           {% set cells = (cells.push({ html: checkboxHtml }), cells) %}
@@ -98,7 +101,7 @@
         {% set inEstablishmentRows = (inEstablishmentRows.push(cells), inEstablishmentRows) %}
       {% endfor %}
 
-      {% if canManage %}
+      {% if canCombine %}
         <form method="post" action="/prisoner/{{ prisonerNumber }}/combine">
           <input type="hidden" name="_csrf" value="{{ csrfToken }}">
           {{ govukButton({
@@ -113,7 +116,7 @@
           head: inEstablishmentHead,
           rows: inEstablishmentRows
         }) }}
-      {% if canManage %}
+      {% if canCombine %}
           </div>
         </form>
       {% endif %}
