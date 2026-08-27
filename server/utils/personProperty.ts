@@ -13,7 +13,7 @@ const REMOVAL_OUTCOME_LABELS: Record<RemovalOutcome, string> = {
 
 export const removalOutcomeLabel = (outcome: RemovalOutcome): string => REMOVAL_OUTCOME_LABELS[outcome] ?? outcome
 
-// Removal outcomes surfaced on the "Property returned or transferred" tab. COMBINED (merged into another
+// Removal outcomes surfaced on the "Returned or transferred property" tab. COMBINED (merged into another
 // container, still tracked there) and CREATED_IN_ERROR (a mistake) are deliberately excluded — they are
 // not property the person had returned or transferred out.
 const RETURNED_OR_TRANSFERRED_OUTCOMES: RemovalOutcome[] = ['REMOVED', 'RETURNED', 'DISPOSED', 'TRANSFERRED']

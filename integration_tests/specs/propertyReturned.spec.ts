@@ -45,7 +45,7 @@ const containers: PrisonerPropertyContainer[] = [
   }),
 ]
 
-test.describe('Property returned or transferred', () => {
+test.describe('Returned or transferred property', () => {
   test.afterEach(async () => {
     await resetStubs()
   })

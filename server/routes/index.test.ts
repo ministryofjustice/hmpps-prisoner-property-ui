@@ -794,7 +794,8 @@ describe('GET /prisoner/:prisonerNumber', () => {
         // name in "Lastname, Firstname" order, linking to the DPS profile
         expect(res.text).toContain('Smith, John')
         expect(res.text).toContain('/prisoner/A1234BC"')
-        expect(res.text).toContain('1/1/2001')
+        // dates of birth are written in full, per MOJ guidance
+        expect(res.text).toContain('1 January 2001')
         expect(res.text).toContain('Cell number')
         expect(res.text).toContain('F-3-042')
         expect(res.text).toContain('ACTIVE IN')
@@ -1272,7 +1273,7 @@ describe('Add container journey - access control', () => {
       .get('/prisoner/A1234BC')
       .expect(200)
       .expect(res => {
-        expect(res.text).toContain('Add property')
+        expect(res.text).toContain('Add a property container')
         expect(res.text).toContain('/prisoner/A1234BC/add-container')
       })
   })
