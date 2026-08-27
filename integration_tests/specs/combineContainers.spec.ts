@@ -70,6 +70,8 @@ test.describe('Combine property containers', () => {
     await locationPage.selectFirstLocation()
 
     const checkPage = await CombineCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.heading).toHaveText('Check your answers before combining the property containers')
+    await expect(checkPage.confirm).toHaveText('Combine property containers')
     await expect(checkPage.containerSummary).toContainText('BOX442')
     await expect(checkPage.containerSummary).toContainText('Reception Store')
     await checkPage.confirm.click()

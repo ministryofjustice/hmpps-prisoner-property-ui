@@ -75,8 +75,8 @@
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
     {{ govukInput({
-      label: { text: "Property container’s seal number", classes: "govuk-label--m" },
-      hint: { text: "The seal number fitted to the container now." },
+      label: { text: "Seal number", classes: "govuk-label--m" },
+      hint: { text: "The number on the seal currently fitted to the container." },
       id: "sealNumber",
       name: "sealNumber",
       value: data.sealNumber,
@@ -87,7 +87,7 @@
     {{ govukRadios({
       idPrefix: "containerType",
       name: "containerType",
-      fieldset: { legend: { text: "Type of property", classes: "govuk-fieldset__legend--m" } },
+      fieldset: { legend: { text: "Property type", classes: "govuk-fieldset__legend--m" } },
       items: containerTypes,
       errorMessage: { text: errors.containerType.text } if errors.containerType else undefined
     }) }}
@@ -95,7 +95,7 @@
     {{ govukDateInput({
       id: "disposalDate",
       namePrefix: "disposalDate",
-      fieldset: { legend: { text: "Enter or select a date the property must be destroyed or disposed of (optional)", classes: "govuk-fieldset__legend--m" } },
+      fieldset: { legend: { text: "Date the property must be destroyed or disposed of (optional)", classes: "govuk-fieldset__legend--m" } },
       hint: { text: "For example, 17 1 2026." },
       errorMessage: { text: errors.disposalDate.text } if errors.disposalDate else undefined,
       items: [
@@ -109,7 +109,7 @@
     {% if hasCurrentLocation %}
       {% set locationItems = (locationItems.push({ value: "current", text: currentLocationName, checked: data.locationChoice != "new" }), locationItems) %}
     {% endif %}
-    {% set locationItems = (locationItems.push({ value: "new", text: "a new storage location", checked: (data.locationChoice == "new") or (not hasCurrentLocation) }), locationItems) %}
+    {% set locationItems = (locationItems.push({ value: "new", text: "A new storage location", checked: (data.locationChoice == "new") or (not hasCurrentLocation) }), locationItems) %}
 
     {# Excess property is stored off-site at Branston, so it is never given a storage location. Hidden for
        excess (server-rendered for no-JS; toggled by the container-type radios via assets/js). #}
