@@ -268,7 +268,8 @@ export interface PaginationItem {
 }
 
 export interface Pagination {
-  results: { from: number; to: number; count: number }
+  /** `text` is the noun the pagination component appends to the count, so it has to agree with it. */
+  results: { from: number; to: number; count: number; text: string }
   previous?: { text: string; href: string }
   next?: { text: string; href: string }
   items: PaginationItem[]
@@ -309,7 +310,7 @@ export const buildPagination = (
   const to = Math.min(page * size, totalElements)
 
   return {
-    results: { from, to, count: totalElements },
+    results: { from, to, count: totalElements, text: totalElements === 1 ? 'result' : 'results' },
     previous: page > 1 ? { text: 'Previous', href: href(page - 1) } : undefined,
     next: page < totalPages ? { text: 'Next', href: href(page + 1) } : undefined,
     items,
