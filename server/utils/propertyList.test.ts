@@ -433,7 +433,7 @@ describe('propertyList utils', () => {
     it('builds results range, prev/next and item links', () => {
       const pagination = buildPagination(2, 3, 55, 20, 'q=A1234BC')
 
-      expect(pagination.results).toEqual({ from: 21, to: 40, count: 55 })
+      expect(pagination.results).toEqual({ from: 21, to: 40, count: 55, text: 'results' })
       expect(pagination.previous?.href).toBe('?q=A1234BC&page=1')
       expect(pagination.next?.href).toBe('?q=A1234BC&page=3')
       expect(pagination.items.map(item => item.text)).toEqual([1, 2, 3])
@@ -444,12 +444,16 @@ describe('propertyList utils', () => {
       const single = buildPagination(1, 1, 5, 20, '')
       expect(single.previous).toBeUndefined()
       expect(single.next).toBeUndefined()
-      expect(single.results).toEqual({ from: 1, to: 5, count: 5 })
+      expect(single.results).toEqual({ from: 1, to: 5, count: 5, text: 'results' })
     })
 
     it('reports a zero range when there are no results', () => {
       const empty = buildPagination(1, 0, 0, 20, '')
-      expect(empty.results).toEqual({ from: 0, to: 0, count: 0 })
+      expect(empty.results).toEqual({ from: 0, to: 0, count: 0, text: 'results' })
+    })
+
+    it('makes the results noun singular for a single result', () => {
+      expect(buildPagination(1, 1, 1, 20, '').results.text).toBe('result')
     })
   })
 })
