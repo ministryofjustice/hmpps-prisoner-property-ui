@@ -68,7 +68,6 @@
 
     {{ govukInput({
       label: { text: "Enter the property container’s current seal number", classes: "govuk-label--m" },
-      hint: { text: "The seal number fitted to the container now." },
       id: "sealNumber",
       name: "sealNumber",
       value: data.sealNumber,
@@ -79,7 +78,7 @@
     {{ govukRadios({
       idPrefix: "containerType",
       name: "containerType",
-      fieldset: { legend: { text: "What is the type of property?", classes: "govuk-fieldset__legend--m" } },
+      fieldset: { legend: { text: "Property type", classes: "govuk-fieldset__legend--m" } },
       items: containerTypes,
       errorMessage: { text: errors.containerType.text } if errors.containerType else undefined
     }) }}
@@ -87,7 +86,7 @@
     {{ govukDateInput({
       id: "disposalDate",
       namePrefix: "disposalDate",
-      fieldset: { legend: { text: "Enter or select a date the property must be destroyed or disposed of (optional)", classes: "govuk-fieldset__legend--m" } },
+      fieldset: { legend: { text: "Date the property must be destroyed or disposed of (optional)", classes: "govuk-fieldset__legend--m" } },
       hint: { text: "For example, 17 1 2026." },
       errorMessage: { text: errors.disposalDate.text } if errors.disposalDate else undefined,
       items: [

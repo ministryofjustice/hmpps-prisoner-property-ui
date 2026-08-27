@@ -51,6 +51,8 @@ test.describe('Change a property container', () => {
     await detailsPage.keepLocationAndContinue({ seal: 'SN8842K1', type: 'Valuables' })
 
     const checkPage = await ChangeContainerCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.heading).toHaveText('Check your answers before updating the property container')
+    await expect(checkPage.confirm).toHaveText('Update property container')
     await expect(checkPage.containerSummary).toContainText('Valuables')
     await expect(checkPage.containerSummary).toContainText('PB4599')
     await checkPage.confirm.click()
