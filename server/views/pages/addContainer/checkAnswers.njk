@@ -4,7 +4,7 @@
 {% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/button/macro.njk" import govukButton %}
-{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "../../partials/paperPropertyCards.njk" import paperPropertyCards %}
 
 {% set pageTitle = applicationName + " - Check your answers" %}
 {% set mainClasses = "govuk-body" %}
@@ -23,7 +23,7 @@
     rows: [
       { key: { text: "Name" }, value: { text: (prisonerName | convertToTitleCase) or "Unknown" } },
       { key: { text: "Prison number" }, value: { text: prisonerNumber } },
-      { key: { text: "Prisoner establishment" }, value: { text: establishmentName or "Not known" } }
+      { key: { text: "Establishment" }, value: { text: establishmentName or "Not known" } }
     ]
   }) }}
 
@@ -52,16 +52,14 @@
       attributes: { "data-qa": "container-summary" },
       rows: sealRows.concat([
         { key: { text: "Property type" }, value: { text: container.containerType | containerTypeLabel } },
-        { key: { text: "Disposal date" }, value: { text: (container.proposedDisposalDate | formatDate) if container.proposedDisposalDate else "No date set" } },
+        { key: { text: "Disposal date" }, value: { text: (container.proposedDisposalDate | formatDate) if container.proposedDisposalDate else "Not provided" } },
         { key: { text: "Storage location" }, value: { text: container.storageLocation or "Not set" } },
         { key: { text: "Property status" }, value: { html: govukTag({ text: "Stored", classes: "govuk-tag--green" }) } }
       ])
     }) }}
   {% endfor %}
 
-  {{ govukInsetText({
-    html: "<strong>You may also need to update paper property cards.</strong><br>If any details have changed, for example the seal number, make sure these are updated on any paper records."
-  }) }}
+  {{ paperPropertyCards() }}
 
   <form method="post" action="/prisoner/{{ prisonerNumber }}/add-container/confirm">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">

@@ -59,7 +59,7 @@
       {% endif %}
       {% set inEstablishmentHead = (inEstablishmentHead.push({ text: "Seal number" }), inEstablishmentHead) %}
       {% if hasLeft %}
-        {% set inEstablishmentHead = (inEstablishmentHead.push({ text: "Prisoner establishment" }), inEstablishmentHead) %}
+        {% set inEstablishmentHead = (inEstablishmentHead.push({ text: "Establishment" }), inEstablishmentHead) %}
       {% endif %}
       {% set inEstablishmentHead = (inEstablishmentHead.push(
         { text: "Property type", attributes: { "aria-sort": "none" } },

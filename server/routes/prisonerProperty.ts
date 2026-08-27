@@ -71,7 +71,7 @@ export default function prisonerPropertyRoutes({
     )
 
     // Movement status is a prisoner-level attribute mirrored on every container; use it so the banner
-    // and the "Prisoner establishment" column read "Transferring"/"Released" rather than "Not known".
+    // and the "Establishment" column read "Transferring"/"Released" rather than "Not known".
     const prisonerMovementStatus = containers[0]?.prisonerMovementStatus
     const banner = prisoner
       ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, prisonerMovementStatus)

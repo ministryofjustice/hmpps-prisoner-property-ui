@@ -4,7 +4,7 @@
 {% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/button/macro.njk" import govukButton %}
-{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "../../partials/paperPropertyCards.njk" import paperPropertyCards %}
 
 {% set pageTitle = applicationName + " - Check your answers" %}
 {% set mainClasses = "govuk-body" %}
@@ -39,15 +39,13 @@
     rows: [
       { key: { text: "Seal number" }, value: { text: container.currentSealNumber or "-" } },
       { key: { text: "Property type" }, value: { text: container.containerType | containerTypeLabel } },
-      { key: { text: "Disposal date" }, value: { text: (container.proposedDisposalDate | formatDate) if container.proposedDisposalDate else "No date set" } },
+      { key: { text: "Disposal date" }, value: { text: (container.proposedDisposalDate | formatDate) if container.proposedDisposalDate else "Not provided" } },
       { key: { text: removalDateLabel }, value: { text: removalDate | formatDate } },
       { key: { text: "Property status" }, value: { html: govukTag({ text: resultStatus.text, classes: resultStatus.classes }) } }
     ]
   }) }}
 
-  {{ govukInsetText({
-    html: "<strong>You may also need to update paper property cards.</strong><br>Make sure this change is also recorded on any paper records used in this establishment."
-  }) }}
+  {{ paperPropertyCards() }}
 
   <form method="post" action="/prisoner/{{ prisonerNumber }}/remove-container/{{ container.id }}/confirm">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">

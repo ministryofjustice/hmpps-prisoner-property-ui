@@ -121,7 +121,7 @@ export const movementEstablishmentLabel = (
   return currentPrisonName || 'Not known'
 }
 
-/** The "Prisoner establishment" column label for a group in the establishment-wide list. */
+/** The "Establishment" column label for a group in the establishment-wide list. */
 export const establishmentLabel = (group: PrisonerPropertyGroup): string =>
   movementEstablishmentLabel(group.prisonerMovementStatus, group.prisonerCurrentPrisonName)
 

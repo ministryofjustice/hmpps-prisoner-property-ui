@@ -5,7 +5,7 @@
 {% from "govuk/components/table/macro.njk" import govukTable %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/button/macro.njk" import govukButton %}
-{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "../../partials/paperPropertyCards.njk" import paperPropertyCards %}
 
 {% set pageTitle = applicationName + " - Check your answers" %}
 {% set mainClasses = "govuk-body" %}
@@ -24,7 +24,7 @@
     rows: [
       { key: { text: "Name" }, value: { text: (prisonerName | convertToTitleCase) or "Unknown" } },
       { key: { text: "Prison number" }, value: { text: prisonerNumber } },
-      { key: { text: "Prisoner establishment" }, value: { text: establishmentName or "Not known" } }
+      { key: { text: "Establishment" }, value: { text: establishmentName or "Not known" } }
     ]
   }) }}
 
@@ -63,15 +63,13 @@
     rows: [
       { key: { text: "Seal number" }, value: { text: journey.sealNumber } },
       { key: { text: "Property type" }, value: { text: journey.containerType | containerTypeLabel } },
-      { key: { text: "Disposal date" }, value: { text: (journey.proposedDisposalDate | formatDate) if journey.proposedDisposalDate else "No date set" } },
+      { key: { text: "Disposal date" }, value: { text: (journey.proposedDisposalDate | formatDate) if journey.proposedDisposalDate else "Not provided" } },
       { key: { text: "Storage location" }, value: { text: storageLocation } },
       { key: { text: "Property status" }, value: { html: govukTag({ text: "Stored", classes: "govuk-tag--green" }) } }
     ]
   }) }}
 
-  {{ govukInsetText({
-    html: "<strong>You may also need to update paper property cards.</strong><br>Make sure this new property container is also recorded on any paper records used in this establishment."
-  }) }}
+  {{ paperPropertyCards() }}
 
   <form method="post" action="/prisoner/{{ prisonerNumber }}/combine/confirm">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">

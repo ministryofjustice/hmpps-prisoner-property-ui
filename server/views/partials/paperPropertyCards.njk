@@ -1,0 +1,11 @@
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+
+{#
+  The reminder to keep paper property cards in step with the service, shown on every check answers
+  page. Kept in one place so the four journeys cannot drift apart again.
+#}
+{% macro paperPropertyCards() %}
+  {{ govukInsetText({
+    html: "<strong>You may also need to update the paper property cards.</strong><br>If any details have changed, such as the seal number, update them on the paper property cards."
+  }) }}
+{% endmacro %}
