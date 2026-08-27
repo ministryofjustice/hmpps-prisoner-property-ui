@@ -33,7 +33,7 @@
     rows: [
       { key: { text: "Name" }, value: { text: (prisonerName | convertToTitleCase) or "Unknown" } },
       { key: { text: "Prison number" }, value: { text: prisonerNumber } },
-      { key: { text: "Prisoner establishment" }, value: { text: prisonerEstablishment or "Not known" } }
+      { key: { text: "Prison" }, value: { text: prisonerEstablishment or "Not known" } }
     ]
   }) }}
 
@@ -59,7 +59,7 @@
       errorMessage: { text: errorList[0].text } if errorList.length else undefined
     }) }}
 
-    {{ govukButton({ text: "Remove container", attributes: { "data-qa": "remove-container" } }) }}
+    {{ govukButton({ text: "Save and continue", attributes: { "data-qa": "remove-container" } }) }}
   </form>
 
   <p class="govuk-body"><a class="govuk-link" href="{{ backUrl }}" data-qa="cancel">Cancel</a></p>

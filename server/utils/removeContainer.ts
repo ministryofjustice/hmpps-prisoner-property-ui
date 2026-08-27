@@ -5,26 +5,13 @@ import type { PropertyStatusTag } from './personProperty'
 export interface RemoveReason {
   value: RemovalOutcome
   text: string
-  hint: string
 }
 
 export const REMOVE_REASONS: RemoveReason[] = [
-  {
-    value: 'RETURNED',
-    text: 'The property has been returned',
-    hint: 'For example, the person was released or items were posted out',
-  },
-  { value: 'DISPOSED', text: 'The property has been disposed', hint: 'For example, items were destroyed' },
-  {
-    value: 'TRANSFERRED',
-    text: 'The property was transferred to another establishment',
-    hint: 'Use when the person has transferred to another establishment',
-  },
-  {
-    value: 'CREATED_IN_ERROR',
-    text: 'This record was created in error',
-    hint: 'For example, duplicate container or details were incorrect',
-  },
+  { value: 'RETURNED', text: 'The property was returned' },
+  { value: 'DISPOSED', text: 'The property was disposed of' },
+  { value: 'TRANSFERRED', text: 'The property was transferred to another establishment' },
+  { value: 'CREATED_IN_ERROR', text: 'The record was created in error' },
 ]
 
 const REMOVE_REASON_VALUES = new Set<RemovalOutcome>(REMOVE_REASONS.map(reason => reason.value))

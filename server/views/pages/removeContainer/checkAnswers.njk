@@ -16,14 +16,14 @@
 {% endblock %}
 
 {% block content %}
-  <h1 class="govuk-heading-xl" data-qa="check-answers-heading">Check your answers</h1>
+  <h1 class="govuk-heading-xl" data-qa="check-answers-heading">Check your answers before removing the property container record</h1>
 
   {{ govukSummaryList({
     attributes: { "data-qa": "prisoner-summary" },
     rows: [
       { key: { text: "Name" }, value: { text: (prisonerName | convertToTitleCase) or "Unknown" } },
       { key: { text: "Prison number" }, value: { text: prisonerNumber } },
-      { key: { text: "Prisoner establishment" }, value: { text: prisonerEstablishment or "Not known" } }
+      { key: { text: "Prison" }, value: { text: prisonerEstablishment or "Not known" } }
     ]
   }) }}
 
@@ -49,7 +49,7 @@
 
   <form method="post" action="/prisoner/{{ prisonerNumber }}/remove-container/{{ container.id }}/confirm">
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
-    {{ govukButton({ text: "Confirm", attributes: { "data-qa": "confirm" } }) }}
+    {{ govukButton({ text: "Remove property container record", classes: "govuk-button--warning", attributes: { "data-qa": "confirm" } }) }}
   </form>
 
   <p class="govuk-body"><a class="govuk-link" href="{{ backUrl }}" data-qa="cancel">Cancel</a></p>
