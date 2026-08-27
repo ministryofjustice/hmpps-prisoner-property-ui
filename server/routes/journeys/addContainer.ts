@@ -472,8 +472,10 @@ export default function addContainerRoutes(
       })
 
       const { origin } = journey
+      const added = journey.containers.length
       req.session.addContainerJourney = undefined
-      req.flash('success', 'Property container(s) added')
+      // One container is named, several are counted - "Property container added", "3 property containers added"
+      req.flash('success', added === 1 ? 'Property container added' : `${added} property containers added`)
       return res.redirect(origin === 'list' ? '/' : `/prisoner/${ctx.prisonerNumber}`)
     },
   )
