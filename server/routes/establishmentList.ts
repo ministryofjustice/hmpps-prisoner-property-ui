@@ -11,6 +11,7 @@ import {
   DEFAULT_PAGE_SIZE,
   listQueryString,
   parsePropertyListQuery,
+  PERSON_LOCATION_LABELS,
   statusTag,
   TRANSFER_IN_FILTER_VALUE,
 } from '../utils/propertyList'
@@ -141,12 +142,12 @@ export default function establishmentListRoutes({
       personLocationItems: [
         {
           value: 'IN_ESTABLISHMENT',
-          text: 'Property for people in this establishment',
+          text: PERSON_LOCATION_LABELS.IN_ESTABLISHMENT,
           checked: personLocations.includes('IN_ESTABLISHMENT'),
         },
         {
           value: 'LEFT_ESTABLISHMENT',
-          text: 'Property for people no longer in this establishment',
+          text: PERSON_LOCATION_LABELS.LEFT_ESTABLISHMENT,
           checked: personLocations.includes('LEFT_ESTABLISHMENT'),
         },
       ],

@@ -57,7 +57,8 @@ test.describe('Establishment property list', () => {
     const listPage = await PropertyListPage.verifyOnPage(page)
     await expect(listPage.summary).toBeVisible()
     await expect(listPage.summaryValue('summary-available-spaces')).toHaveText('150')
-    await expect(listPage.summaryValue('summary-stored')).toHaveText('3000')
+    // counts over 999 take a comma separator, per GOV.UK style
+    await expect(listPage.summaryValue('summary-stored')).toHaveText('3,000')
     await expect(listPage.summaryValue('summary-transfer-out')).toHaveText('80')
     await expect(listPage.summaryValue('summary-returned')).toHaveText('70')
     await expect(listPage.summaryValue('summary-disposed')).toHaveText('40')
@@ -236,7 +237,8 @@ test.describe('Establishment property list', () => {
 
     const listPage = await PropertyListPage.verifyOnPage(page)
     await expect(listPage.breadcrumbs.getByRole('link', { name: 'Digital Prison Services' })).toBeVisible()
-    await expect(listPage.breadcrumbs).toContainText('Prisoner property')
+    // the current page is not a breadcrumb, per the MOJ standard
+    await expect(listPage.breadcrumbs).not.toContainText('Prisoner property')
   })
 
   test('renders pagination above and below the table', async ({ page }) => {
@@ -261,16 +263,10 @@ test.describe('Establishment property list', () => {
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer out' })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for disposal' })).toBeEnabled()
     // Removed/returned/disposed is wired to the API's includeRemoved flag.
-    await expect(
-      listPage.filters.getByRole('checkbox', { name: 'Show property that has been removed, returned or disposed of' }),
-    ).toBeEnabled()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Removed, returned or disposed of' })).toBeEnabled()
     // Person-location filters are enabled.
-    await expect(
-      listPage.filters.getByRole('checkbox', { name: 'Property for people in this establishment' }),
-    ).toBeEnabled()
-    await expect(
-      listPage.filters.getByRole('checkbox', { name: 'Property for people no longer in this establishment' }),
-    ).toBeEnabled()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'In this establishment', exact: true })).toBeEnabled()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'No longer in this establishment' })).toBeEnabled()
     // "Due for transfer in" is now backed by the API's receiving-prison view.
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeEnabled()
   })
@@ -309,12 +305,8 @@ test.describe('Establishment property list', () => {
 
     const listPage = await PropertyListPage.verifyOnPage(page)
     await listPage.filters.locator('summary').click() // expand the collapsed filters
-    await expect(
-      listPage.filters.getByRole('checkbox', { name: 'Property for people in this establishment' }),
-    ).toBeChecked()
-    await expect(
-      listPage.filters.getByRole('checkbox', { name: 'Property for people no longer in this establishment' }),
-    ).not.toBeChecked()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'In this establishment', exact: true })).toBeChecked()
+    await expect(listPage.filters.getByRole('checkbox', { name: 'No longer in this establishment' })).not.toBeChecked()
   })
 
   test('shows the Add button and per-row actions for a user with the manage role', async ({ page }) => {
