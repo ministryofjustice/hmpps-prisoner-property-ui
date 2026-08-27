@@ -141,12 +141,12 @@ export default function establishmentListRoutes({
       personLocationItems: [
         {
           value: 'IN_ESTABLISHMENT',
-          text: 'Property for people in this establishment',
+          text: 'In this establishment',
           checked: personLocations.includes('IN_ESTABLISHMENT'),
         },
         {
           value: 'LEFT_ESTABLISHMENT',
-          text: 'Property for people no longer in this establishment',
+          text: 'No longer in this establishment',
           checked: personLocations.includes('LEFT_ESTABLISHMENT'),
         },
       ],

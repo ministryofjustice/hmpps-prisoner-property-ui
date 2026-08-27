@@ -3,14 +3,7 @@ import path from 'path'
 import nunjucks from 'nunjucks'
 import express from 'express'
 import fs from 'fs'
-import {
-  initialiseName,
-  formatDate,
-  formatShortDate,
-  formatDateTime,
-  convertToTitleCase,
-  formatNumber,
-} from './utils'
+import { initialiseName, formatDate, formatShortDate, formatDateTime, convertToTitleCase, formatNumber } from './utils'
 import {
   statusTag,
   establishmentListStatusTag,
