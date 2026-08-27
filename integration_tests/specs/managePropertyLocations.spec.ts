@@ -60,16 +60,40 @@ test.describe('Manage property storage locations', () => {
     await expect(backPage.table).toContainText('Property Store B')
   })
 
-  test('shows an error when removing a location that still holds property', async ({ page }) => {
+  test('blocks removal of a location that still holds property, offering only a way back', async ({ page }) => {
     await login(page, { roles: ['ROLE_PRISONERPROP__LOCATION_ADMIN'] })
+    // loc-1 holds 3 containers, so removal is impossible and must not be offered.
     await prisonerPropertyApi.stubGetPropertyLocations({ prisonId: 'MDI', locations: [location], priority: 2 })
-    await prisonerPropertyApi.stubRemovePropertyLocation({ id: 'loc-1' }, 409)
 
     await page.goto('/admin/locations/loc-1/remove')
+
+    await expect(page.getByRole('heading', { name: 'You cannot remove Reception Store' })).toBeVisible()
+    await expect(page.getByTestId('in-use-warning')).toContainText(
+      'Reception Store contains 3 property containers. You must move or remove the containers before you can remove this storage location.',
+    )
+    await expect(page.getByRole('button', { name: 'Remove storage location' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Cancel' })).toHaveCount(0)
+
+    await page.getByTestId('back-to-locations').click()
+    await ManagePropertyLocationsPage.verifyOnPage(page)
+  })
+
+  test('confirms removal of an empty location, then removes it', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__LOCATION_ADMIN'] })
+    await prisonerPropertyApi.stubGetPropertyLocations({
+      prisonId: 'MDI',
+      locations: [{ ...location, containersHeld: 0, availableSpaces: 10 }],
+      priority: 2,
+    })
+    await prisonerPropertyApi.stubRemovePropertyLocation({ id: 'loc-1' })
+
+    await page.goto('/admin/locations/loc-1/remove')
+
+    await expect(page.getByRole('heading', { name: 'Remove Reception Store?' })).toBeVisible()
     await page.getByRole('button', { name: 'Remove storage location' }).click()
 
     const managePage = await ManagePropertyLocationsPage.verifyOnPage(page)
-    await expect(managePage.errorBanner).toContainText('cannot be removed')
+    await expect(managePage.successBanner).toContainText('removed')
   })
 
   test('rejects an edit that drops capacity below the containers currently held', async ({ page }) => {

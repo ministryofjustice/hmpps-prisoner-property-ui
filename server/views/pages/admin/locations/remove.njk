@@ -1,50 +1,61 @@
 {% extends "../../../partials/layout.njk" %}
 
-{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+{% from "govuk/components/back-link/macro.njk" import govukBackLink %}
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
 
-{% set pageTitle = applicationName + " - Remove a storage location" %}
+{#
+  Two states, not one screen with a warning bolted on. A location that still holds containers cannot
+  be removed, so it gets a blocked state that says so and offers only a way back - rather than a red
+  button that submits a request the API is certain to reject with a 409.
+#}
+{% set blocked = location.containersHeld > 0 %}
+
+{% set pageTitle = applicationName + (" - You cannot remove a storage location" if blocked else " - Remove a storage location") %}
 {% set mainClasses = "govuk-body" %}
 
 {% block beforeContent %}
-  {% set crumbs = [
-    { text: "Digital Prison Services", href: dpsUrl },
-    { text: "Prisoner property", href: "/" }
-  ] %}
-  {% if returnTo %}{% set _ = crumbs.push({ text: "Select a storage location", href: returnTo }) %}{% endif %}
-  {% set _ = crumbs.push({ text: "Manage storage locations", href: "/admin/locations" }) %}
-  {% set _ = crumbs.push({ text: "Remove a storage location" }) %}
-  {{ govukBreadcrumbs({ items: crumbs }) }}
+  {{ govukBackLink({ text: "Back", href: "/admin/locations" }) }}
 {% endblock %}
 
 {% block content %}
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-two-thirds">
-      <h1 class="govuk-heading-xl">Remove {{ location.name }}?</h1>
+      {% if blocked %}
+        {% set containerCount = "1 property container" if location.containersHeld == 1 else location.containersHeld + " property containers" %}
+        {% set containerNoun = "the container" if location.containersHeld == 1 else "the containers" %}
 
-      <p class="govuk-body">
-        This location will no longer be offered as a place to store property. It can only be removed while
-        it is empty.
-      </p>
+        <h1 class="govuk-heading-xl">You cannot remove {{ location.name }}</h1>
 
-      {% if location.containersHeld > 0 %}
         {{ govukWarningText({
-          text: "This location currently holds " + location.containersHeld + " container(s). Move or remove them before removing the location.",
+          text: location.name + " contains " + containerCount + ". You must move or remove " + containerNoun + " before you can remove this storage location.",
           iconFallbackText: "Warning",
           attributes: { "data-qa": "in-use-warning" }
         }) }}
-      {% endif %}
 
-      <form method="post" action="/admin/locations/{{ location.id }}/remove" novalidate>
-        <input type="hidden" name="_csrf" value="{{ csrfToken }}">
         {{ govukButton({
-          text: "Remove storage location",
-          classes: "govuk-button--warning",
-          attributes: { "data-qa": "confirm-remove" }
+          text: "Back to storage locations",
+          href: "/admin/locations",
+          attributes: { "data-qa": "back-to-locations" }
         }) }}
-        <a class="govuk-link govuk-!-margin-left-2" href="/admin/locations">Cancel</a>
-      </form>
+      {% else %}
+        <h1 class="govuk-heading-xl">Remove {{ location.name }}?</h1>
+
+        <p class="govuk-body">
+          This location will no longer be offered as a place to store property. It can only be removed while
+          it is empty.
+        </p>
+
+        <form method="post" action="/admin/locations/{{ location.id }}/remove" novalidate>
+          <input type="hidden" name="_csrf" value="{{ csrfToken }}">
+          {{ govukButton({
+            text: "Remove storage location",
+            classes: "govuk-button--warning",
+            attributes: { "data-qa": "confirm-remove" }
+          }) }}
+          <a class="govuk-link govuk-!-margin-left-2" href="/admin/locations">Cancel</a>
+        </form>
+      {% endif %}
     </div>
   </div>
 {% endblock %}

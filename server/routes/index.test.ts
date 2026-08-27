@@ -2910,6 +2910,58 @@ describe('Admin - manage storage locations', () => {
       })
   })
 
+  it('blocks removal and offers no destructive action when the location still holds containers', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
+
+    return request(locationAdminApp())
+      .get('/admin/locations/loc-1/remove')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('You cannot remove Reception Store')
+        expect(res.text).toContain(
+          'Reception Store contains 3 property containers. You must move or remove the containers before you can remove this storage location.',
+        )
+        expect(res.text).toContain('Back to storage locations')
+        // no form, no red button, nothing to submit
+        expect(res.text).not.toContain('Remove storage location')
+        expect(res.text).not.toContain('Remove Reception Store?')
+      })
+  })
+
+  it('uses the singular when a blocked location holds exactly one container', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue([
+      { ...locations[0], containersHeld: 1, availableSpaces: 9 },
+    ])
+
+    return request(locationAdminApp())
+      .get('/admin/locations/loc-1/remove')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain(
+          'Reception Store contains 1 property container. You must move or remove the container before you can remove this storage location.',
+        )
+      })
+  })
+
+  it('offers the removal confirmation when the location is empty', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue([
+      { ...locations[0], containersHeld: 0, availableSpaces: 10 },
+    ])
+
+    return request(locationAdminApp())
+      .get('/admin/locations/loc-1/remove')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Remove Reception Store?')
+        expect(res.text).toContain('This location will no longer be offered as a place to store property')
+        expect(res.text).toContain('Remove storage location')
+        expect(res.text).not.toContain('You cannot remove')
+      })
+  })
+
   it('removes an empty storage location and redirects with a success message', async () => {
     prisonerPropertyService.removePropertyLocation.mockResolvedValue(locations[0])
 
