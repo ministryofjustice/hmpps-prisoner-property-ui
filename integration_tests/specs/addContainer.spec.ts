@@ -86,12 +86,14 @@ test.describe('Add a property container', () => {
     await locationPage.selectFirstLocation()
 
     const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.heading).toHaveText('Check your answers before adding the property container')
     await expect(checkPage.containerSummary.first()).toContainText('SN9')
+    await expect(checkPage.confirm).toHaveText('Add property container')
     await checkPage.confirm.click()
 
     await expect(page).toHaveURL(/\/prisoner\/A1234BC$/)
     const backPage = await PrisonerPropertyPage.verifyOnPage(page)
-    await expect(backPage.successBanner).toContainText('Property container(s) added')
+    await expect(backPage.successBanner).toContainText('Property container added')
   })
 
   test('searches from the establishment list, then adds two containers (one Excess)', async ({ page }) => {
@@ -131,10 +133,13 @@ test.describe('Add a property container', () => {
     const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
     await expect(page.getByRole('heading', { name: /Property container SN1/ })).toBeVisible()
     await expect(page.getByRole('heading', { name: /Property container SN2/ })).toBeVisible()
+    // two containers, so the heading and button pluralise
+    await expect(checkPage.heading).toHaveText('Check your answers before adding the property containers')
+    await expect(checkPage.confirm).toHaveText('Add property containers')
     await checkPage.confirm.click()
 
     // Confirm creates both and returns to the establishment list with the banner.
-    await expect(page.getByTestId('success-banner')).toContainText('Property container(s) added')
+    await expect(page.getByTestId('success-banner')).toContainText('2 property containers added')
   })
 
   test('refuses the search entry for a user without the manage role', async ({ page }) => {

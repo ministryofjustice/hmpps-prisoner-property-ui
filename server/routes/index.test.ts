@@ -1435,7 +1435,7 @@ describe('Add container journey - search entry', () => {
       .expect(200)
       .expect(res => {
         expect(res.text).toContain('Who is the property container for?')
-        expect(res.text).toContain('You can search by name or prison number')
+        expect(res.text).toContain('Search by name or prison number.')
       })
   })
 
@@ -1582,7 +1582,7 @@ describe('Add container journey - steps', () => {
       }),
       user.username,
     )
-    expect(flashProvider).toHaveBeenCalledWith('success', 'Property container(s) added')
+    expect(flashProvider).toHaveBeenCalledWith('success', 'Property container added')
     expect(auditService.logPageView).toHaveBeenCalledWith(
       Page.ADD_PROPERTY_CONTAINER,
       expect.objectContaining({ subjectId: 'A1234BC', details: { count: 1 } }),
@@ -1673,6 +1673,8 @@ describe('Add container journey - steps', () => {
     await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
 
     expect(prisonerPropertyService.createContainer).toHaveBeenCalledTimes(2)
+    // several containers are counted rather than pluralised with "(s)"
+    expect(flashProvider).toHaveBeenCalledWith('success', '2 property containers added')
     expect(prisonerPropertyService.createContainer).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ sealNumber: 'SN1', containerType: 'STANDARD', internalLocationId: 'box1' }),
@@ -1781,13 +1783,13 @@ describe('Add container journey - steps', () => {
   it('shows the success banner on the person view from a flash message', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
-    flashProvider.mockReturnValueOnce(['Property container(s) added'])
+    flashProvider.mockReturnValueOnce(['Property container added'])
 
     return request(manageApp())
       .get('/prisoner/A1234BC')
       .expect(200)
       .expect(res => {
-        expect(res.text).toContain('Property container(s) added')
+        expect(res.text).toContain('Property container added')
       })
   })
 })
