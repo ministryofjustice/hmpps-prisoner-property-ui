@@ -3016,6 +3016,8 @@ describe('Admin - manage storage locations', () => {
       .expect(res => {
         expect(res.text).toContain('data-qa="manage-locations-link"')
         expect(res.text).toContain('/admin/locations')
+        // The label has to match the heading of the page it opens.
+        expect(res.text).toContain('Manage storage locations')
       })
   })
 

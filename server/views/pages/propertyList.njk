@@ -36,7 +36,7 @@
     {% if isLocationAdmin %}
       <div class="govuk-grid-column-one-third govuk-!-text-align-right">
         {{ govukButton({
-          text: "Manage property locations",
+          text: "Manage storage locations",
           href: "/admin/locations",
           classes: "govuk-button--secondary",
           attributes: { "data-qa": "manage-locations-link" }
@@ -80,7 +80,7 @@
   <div class="app-search-panel">
     <form method="get" action="/" novalidate data-qa="property-search">
       <h2 class="govuk-heading-m">Search for property</h2>
-      <p class="govuk-hint">You can search by prison number, seal number or storage location</p>
+      <p class="govuk-hint">Search by prison number, seal number or storage location.</p>
 
       <div class="app-search-panel__row">
         {{ govukInput({
