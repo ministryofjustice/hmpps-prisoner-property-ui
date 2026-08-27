@@ -25,7 +25,8 @@ export const formatShortDate = (value?: string | null): string => {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`
 }
 
 export const formatDateTime = (value?: string | null): string => {
@@ -39,6 +40,11 @@ export const formatDateTime = (value?: string | null): string => {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+export const formatNumber = (value?: number | null): string => {
+  if (value === null || value === undefined) return ''
+  return value.toLocaleString('en-GB')
 }
 
 export const initialiseName = (fullName?: string | null): string | null => {

@@ -3,7 +3,14 @@ import path from 'path'
 import nunjucks from 'nunjucks'
 import express from 'express'
 import fs from 'fs'
-import { initialiseName, formatDate, formatShortDate, formatDateTime, convertToTitleCase } from './utils'
+import {
+  initialiseName,
+  formatDate,
+  formatShortDate,
+  formatDateTime,
+  convertToTitleCase,
+  formatNumber,
+} from './utils'
 import {
   statusTag,
   establishmentListStatusTag,
@@ -55,6 +62,7 @@ export default function nunjucksSetup(app: express.Express): void {
   njkEnv.addFilter('formatDate', formatDate)
   njkEnv.addFilter('formatShortDate', formatShortDate)
   njkEnv.addFilter('formatDateTime', formatDateTime)
+  njkEnv.addFilter('formatNumber', formatNumber)
   njkEnv.addFilter('statusTag', statusTag)
   njkEnv.addFilter('establishmentListStatusTag', establishmentListStatusTag)
   njkEnv.addFilter('containerTypeLabel', containerTypeLabel)
