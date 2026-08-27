@@ -15,7 +15,6 @@
   ] %}
   {% if returnTo %}{% set _ = crumbs.push({ text: "Select a storage location", href: returnTo }) %}{% endif %}
   {% set _ = crumbs.push({ text: "Manage storage locations", href: "/admin/locations" }) %}
-  {% set _ = crumbs.push({ text: "Change a storage location" }) %}
   {{ govukBreadcrumbs({ items: crumbs }) }}
 {% endblock %}
 
@@ -39,7 +38,7 @@
         <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
         {{ govukInput({
-          label: { text: "Name", classes: "govuk-label--s" },
+          label: { text: "Storage location name", classes: "govuk-label--s" },
           id: "localName",
           name: "localName",
           value: values.localName,
@@ -49,7 +48,7 @@
 
         {{ govukInput({
           label: { text: "Capacity", classes: "govuk-label--s" },
-          hint: { text: "How many containers can be stored here. This location currently holds " + location.containersHeld + (" container." if location.containersHeld == 1 else " containers.") + (" Set this to 0 to take the location out of use." if location.containersHeld == 0 else "") },
+          hint: { text: "Enter the maximum number of property containers this location can hold. It currently contains " + location.containersHeld + "." + (" Set this to 0 to take the location out of use." if location.containersHeld == 0 else "") },
           id: "capacity",
           name: "capacity",
           value: values.capacity,

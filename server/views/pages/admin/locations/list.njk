@@ -13,7 +13,6 @@
     { text: "Prisoner property", href: "/" }
   ] %}
   {% if returnTo %}{% set _ = crumbs.push({ text: "Select a storage location", href: returnTo }) %}{% endif %}
-  {% set _ = crumbs.push({ text: "Manage storage locations" }) %}
   {{ govukBreadcrumbs({ items: crumbs }) }}
 {% endblock %}
 
@@ -28,7 +27,7 @@
 
   <h1 class="govuk-heading-xl govuk-!-margin-bottom-2">Manage storage locations</h1>
   <p class="govuk-body-l govuk-!-margin-bottom-6">
-    The places property can be stored in this establishment, and how many containers each can hold.
+    View and manage where property containers are stored and how many each location can hold.
   </p>
 
   {{ govukButton({
@@ -45,8 +44,8 @@
         <tr class="govuk-table__row">
           <th scope="col" class="govuk-table__header">Storage location</th>
           <th scope="col" class="govuk-table__header govuk-table__header--numeric">Capacity</th>
-          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Containers held</th>
-          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Spaces left</th>
+          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Containers stored</th>
+          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Available spaces</th>
           <th scope="col" class="govuk-table__header"><span class="govuk-visually-hidden">Actions</span></th>
         </tr>
       </thead>
