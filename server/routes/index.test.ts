@@ -1836,8 +1836,9 @@ describe('Remove container journey - steps', () => {
       .expect(res => {
         expect(res.text).toContain('Remove property container SN0001')
         expect(res.text).toContain('Why are you removing this property container record?')
-        expect(res.text).toContain('The property has been returned')
-        expect(res.text).toContain('This record was created in error')
+        expect(res.text).toContain('The property was returned')
+        expect(res.text).toContain('The property was disposed of')
+        expect(res.text).toContain('The record was created in error')
         expect(res.text).toContain('Due for disposal')
       })
   })

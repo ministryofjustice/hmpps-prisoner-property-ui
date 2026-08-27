@@ -45,7 +45,6 @@ export default function removeContainerRoutes(
       reasons: REMOVE_REASONS.map(reason => ({
         value: reason.value,
         text: reason.text,
-        hint: { text: reason.hint },
         checked: reason.value === options.selected,
       })),
       errorList: options.errorList ?? [],
