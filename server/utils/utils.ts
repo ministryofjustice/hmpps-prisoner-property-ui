@@ -21,11 +21,16 @@ export const formatDate = (value?: string | null): string => {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+/**
+ * A short date with no leading zeros, per the MOJ style guide - `3/1/2026`, not `03/01/2026`.
+ * Built from the date parts rather than `toLocaleDateString`, because the en-GB locale pads day and
+ * month to two digits whatever the `day`/`month` options say.
+ */
 export const formatShortDate = (value?: string | null): string => {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`
 }
 
 export const formatDateTime = (value?: string | null): string => {
@@ -39,6 +44,13 @@ export const formatDateTime = (value?: string | null): string => {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+export const formatNumber = (value?: number | string | null): string => {
+  if (value === null || value === undefined || value === '') return ''
+  const number = typeof value === 'number' ? value : Number(value)
+  if (Number.isNaN(number)) return ''
+  return number.toLocaleString('en-GB')
 }
 
 export const initialiseName = (fullName?: string | null): string | null => {

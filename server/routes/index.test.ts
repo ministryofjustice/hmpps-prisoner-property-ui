@@ -792,7 +792,7 @@ describe('GET /prisoner/:prisonerNumber', () => {
         // name in "Lastname, Firstname" order, linking to the DPS profile
         expect(res.text).toContain('Smith, John')
         expect(res.text).toContain('/prisoner/A1234BC"')
-        expect(res.text).toContain('01/01/2001')
+        expect(res.text).toContain('1/1/2001')
         expect(res.text).toContain('Cell number')
         expect(res.text).toContain('F-3-042')
         expect(res.text).toContain('ACTIVE IN')
