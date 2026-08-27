@@ -45,8 +45,8 @@ const NOT_AN_ESTABLISHMENT = ['TRN', 'OUT']
 const realPrisonId = (prisonId: string | null | undefined): string | null =>
   prisonId && !NOT_AN_ESTABLISHMENT.includes(prisonId) ? prisonId : null
 
-/** Short forms of the person-location labels: the checkbox wording is too long to sit in a tag. */
-const PERSON_LOCATION_TAG_LABELS: Record<PersonLocation, string> = {
+/** The person-location labels, shared by the filter checkboxes and the applied-filter tags. */
+export const PERSON_LOCATION_LABELS: Record<PersonLocation, string> = {
   IN_ESTABLISHMENT: 'In this establishment',
   LEFT_ESTABLISHMENT: 'No longer in this establishment',
 }
@@ -251,7 +251,7 @@ export const appliedFilterTags = (parsed: ParsedPropertyListQuery): AppliedFilte
       ? [{ text: 'Status: Due for transfer in', href: withoutIt({ dueForTransferIn: false }) }]
       : []),
     ...parsed.personLocations.map(location => ({
-      text: `People: ${PERSON_LOCATION_TAG_LABELS[location]}`,
+      text: `People: ${PERSON_LOCATION_LABELS[location]}`,
       href: withoutIt({ personLocations: parsed.personLocations.filter(other => other !== location) }),
     })),
     ...(parsed.includeRemoved
