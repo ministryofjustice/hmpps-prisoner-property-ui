@@ -57,9 +57,9 @@ test.describe('Remove a property container', () => {
     await reasonPage.remove.click()
 
     const checkPage = await RemoveContainerCheckAnswersPage.verifyOnPage(page)
-    await expect(checkPage.heading).toHaveText('Check your answers before removing the property container record')
+    await expect(checkPage.heading).toHaveText('Check your answers before removing the property container')
     // removal cannot be undone, so the final action is a warning button
-    await expect(checkPage.confirm).toHaveText('Remove property container record')
+    await expect(checkPage.confirm).toHaveText('Remove property container')
     await expect(checkPage.confirm).toHaveClass(/govuk-button--warning/)
     await expect(checkPage.containerSummary).toContainText('Returned')
     await expect(checkPage.containerSummary).toContainText('Date property returned')
