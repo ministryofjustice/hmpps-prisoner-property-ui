@@ -10,7 +10,8 @@ Backed by [hmpps-prisoner-property-api](https://github.com/ministryofjustice/hmp
 
 | Doc | For |
 | --- | --- |
-| [Business overview](https://github.com/ministryofjustice/hmpps-prisoner-property-api/blob/main/docs/business-overview.md) | What the service does and why, in plain English. Start here. |
+| [Getting started](https://github.com/ministryofjustice/hmpps-prisoner-property-api/blob/main/docs/getting-started.md) | **New to the project? Start here.** How the front end and back end fit together, and the state model behind property containers. |
+| [Business overview](https://github.com/ministryofjustice/hmpps-prisoner-property-api/blob/main/docs/business-overview.md) | What the service does and why, in plain English. |
 | [Architecture](https://github.com/ministryofjustice/hmpps-prisoner-property-api/blob/main/docs/architecture.md) | The whole service — both repos, diagrams, messaging, domain model. |
 | [Technical implementation](docs/technical-implementation.md) | This app's internals: routes, services, data clients, auth. |
 | [API technical implementation](https://github.com/ministryofjustice/hmpps-prisoner-property-api/blob/main/docs/technical-implementation.md) | The back end's internals. |
@@ -120,8 +121,11 @@ To start the dependencies without the app itself (so you can run it from your ID
 
 `docker compose up --scale=app=0`
 
-Create an environment file by copying `.env.example` -> `.env`
-Environment variables set in here will be available when running `start:dev`
+Create an environment file by copying `.env.example` -> `.env.dev`. That is the file the dev scripts
+read (`.env.example` is the tracked template; `.env.dev` is gitignored and stays local).
+
+Note that plain `npm run start:dev` reads **no** env file — it only runs the esbuild watcher. To pick up
+`.env.dev` use `npm run start-dev:watch` (esbuild watch) or `npm run start-dev` (the built output).
 
 Install dependencies using `npm run setup`, ensuring you are using `node v24`
 
@@ -129,9 +133,9 @@ Note: Using `nvm` (or [fnm](https://github.com/Schniz/fnm)), run `nvm install --
 to use the correct version of node, and the latest version of npm. This matches the `engines` config in `package.json`
 and the github pipeline build config.
 
-And then, to build the assets and start the app with esbuild:
+And then, to build the assets and start the app with esbuild, picking up `.env.dev`:
 
-`npm run start:dev`
+`npm run start-dev:watch`
 
 ### Logging in with a test user
 
@@ -166,7 +170,7 @@ The secret scanner hook can also be configured as described [here](https://githu
 
 - `npm run lint` runs `eslint` with `--max-warnings 0`, so a warning fails the build.
 - `npm run lint-fix` applies the fixes it can, including prettier formatting. Run this before pushing.
-- `npm run typecheck` runs the TypeScript compiler `tsc`.
+- `npm run typecheck` runs the TypeScript compiler over **three** projects — the server, `integration_tests` and `assets/js` — so a type error in a Playwright spec or in client-side JS fails it too.
 
 ### Run unit tests
 
