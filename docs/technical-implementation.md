@@ -32,11 +32,27 @@ API. This is the most common wrong assumption about the front end, so it's worth
 
 ## The shape of a request
 
+The app-wide middleware stack is assembled in `server/app.ts`, in this order:
+
 ```
 browser
+  → setUpHealthChecks      /health, /info — before auth, so probes never sign in
+  → setUpWebSecurity       helmet, CSP
   → setUpWebSession        session (Redis in deployed envs, memory locally)
-  → passport / auth        signed in? token still valid?
+  → setUpWebRequestParsing body / urlencoded
+  → setUpStaticResources   assets
+  → nunjucksSetup          view engine, filters
+  → setUpAuthentication    passport — signed in?
+  → authorisationMiddleware token still valid? (Token Verification API)
+  → setUpCsrf              csrf-sync
   → setUpCurrentUser       decode JWT → res.locals.user (incl. roles)
+  → dpsComponents          shared DPS header / footer
+  → routes(services)       ↓
+```
+
+and then, inside a route:
+
+```
   → requireManageRole      does this user hold the role for this journey?      (write journeys only)
   → requireActivePrison    is their caseload prison live on DPS?               (write journeys only)
   → route handler          validate input, orchestrate
@@ -46,8 +62,9 @@ browser
   → Nunjucks render
 ```
 
-The two gates in the middle are the interesting part: **role** answers "may this person do this at all",
-**active prison** answers "is this prison using DPS for property yet". Both must pass to write.
+The two gates are the interesting part: **role** answers "may this person do this at all", **active
+prison** answers "is this prison using DPS for property yet". Both must pass to write. Note they are
+route-level, not app-level — a read-only page passes through neither.
 
 ---
 
@@ -60,15 +77,17 @@ The two gates in the middle are the interesting part: **role** answers "may this
 | `server/data/` | REST clients, one per external API, plus the Redis client and audit client. |
 | `server/utils/` | View-model builders and Nunjucks filters — where API shapes become template shapes. |
 | `server/middleware/` | Session, auth, CSRF, security headers, health, and the role/active-prison gates. |
-| `server/views/` | Nunjucks templates: `pages/**`, `partials/**`. |
+| `server/views/` | Nunjucks templates: `pages/**`, `partials/**`, and `components/**` — which holds exactly one thing, a local fork of the MoJ pagination component. |
 | `server/config.ts` | All environment configuration, in one place. |
 
 ---
 
 ## Routes
 
-`server/routes/index.ts` is 32 lines: it builds the two shared gates and mounts eight routers. Each group
-below is its own file.
+`server/routes/index.ts` is 32 lines: it builds the one shared gate — `requireActivePrison`, which needs
+the two services — and mounts eight routers, passing that gate to the four write journeys.
+`requireManageRole` needs no construction, so each journey imports it directly. Each group below is its
+own file.
 
 | Group | File | What it does | Gated by |
 | --- | --- | --- | --- |
@@ -227,7 +246,16 @@ template and injects the shared DPS header/footer fetched at request time, falli
 if the component service is unavailable. Assets are cache-busted via the `assetMap` filter reading the
 esbuild-generated `assets/manifest.json`.
 
-There are no custom macro files — components come straight from GOV.UK and MoJ Frontend.
+Components come straight from GOV.UK and MoJ Frontend, with **one** exception:
+`views/components/pagination/` (`macro.njk` + `template.njk`) is a **local fork of the MoJ Frontend
+`mojPagination` component**, taken so the results line ("Showing 1 to 20 of 43 people") could be
+worded for a list that pages by *prisoner* rather than by row. It is imported as `mojPagination` by
+`propertyList.njk` and the two `addContainer` search/location pages.
+
+Because it is a fork, two things follow: its params are built by `buildPagination` in
+`utils/propertyList.ts` (there is no `paginationComponent.ts` — only
+`paginationComponent.test.ts`, which renders the macro to assert the wording), and it does **not**
+pick up upstream fixes. Re-check it whenever `@ministryofjustice/frontend` is upgraded.
 
 ---
 
@@ -247,6 +275,6 @@ Commands are in the [README](../README.md).
 
 - **Contributor conventions aren't written down** anywhere in this repo — they live in this doc and in
   code comments only.
-- **`server/routes/index.test.ts` is one ~2,500-line file**, even though the routes themselves were split
+- **`server/routes/index.test.ts` is one ~3,000-line file**, even though the routes themselves were split
   into one file per group. If you go looking for `establishmentList.test.ts`, it isn't there. Splitting it
   to mirror the routes is the obvious next tidy-up.
