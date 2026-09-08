@@ -2,7 +2,12 @@ import { Router, type Request, type RequestHandler, type Response } from 'expres
 
 import type { Services } from '../../services'
 import { Page } from '../../services/auditService'
-import { ALL_CONTAINER_TYPES, buildPagination, containerTypeLabel } from '../../utils/propertyList'
+import {
+  ALL_CONTAINER_TYPES,
+  buildPagination,
+  canManageContainerHere,
+  containerTypeLabel,
+} from '../../utils/propertyList'
 import { buildPersonPropertyView } from '../../utils/personProperty'
 import { validateDetails } from '../../utils/addContainer'
 import requireManageRole from '../../middleware/requireManageRole'
@@ -68,9 +73,7 @@ export default function combineContainerRoutes(
     // API requires the sources to share one prisoner + prison and be active.
     const ticked = ([] as string[]).concat((req.body.containerIds as string | string[]) ?? []).map(String)
     const containers = await prisonerPropertyService.getPropertyForPrisoner(ctx.prisonerNumber, username)
-    const selectable = new Set(
-      containers.filter(c => !c.removalOutcome && c.prisonId === ctx.activeCaseloadId).map(c => c.id),
-    )
+    const selectable = new Set(containers.filter(c => canManageContainerHere(c, ctx.activeCaseloadId)).map(c => c.id))
     const sourceContainerIds = ticked.filter(id => selectable.has(id))
 
     if (sourceContainerIds.length < 2) {

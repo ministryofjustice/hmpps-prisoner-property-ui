@@ -7,6 +7,7 @@ import { initialiseName, formatDate, formatShortDate, formatDateTime, formatNumb
 import {
   statusTag,
   establishmentListStatusTag,
+  canManageContainerHere,
   containerTypeLabel,
   containerLocation,
   establishmentLabel,
@@ -58,6 +59,7 @@ export default function nunjucksSetup(app: express.Express): void {
   njkEnv.addFilter('formatNumber', formatNumber)
   njkEnv.addFilter('statusTag', statusTag)
   njkEnv.addFilter('establishmentListStatusTag', establishmentListStatusTag)
+  njkEnv.addFilter('canManageContainerHere', canManageContainerHere)
   njkEnv.addFilter('containerTypeLabel', containerTypeLabel)
   njkEnv.addFilter('containerLocation', containerLocation)
   njkEnv.addFilter('establishmentLabel', establishmentLabel)

@@ -294,6 +294,53 @@ describe('GET /', () => {
       })
   })
 
+  it('hides the Manage link for property held at another establishment (MAPB-860)', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: 'MDI',
+      activeCaseloadName: 'Moorland (HMP & YOI)',
+      caseloadIds: ['MDI'],
+    })
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue({
+      ...emptyPage,
+      totalElements: 1,
+      totalPages: 1,
+      numberOfElements: 1,
+      content: [
+        {
+          prisonerNumber: 'A1234BC',
+          prisonerName: 'John Smith',
+          prisonerCurrentPrisonId: 'MDI',
+          prisonerCurrentPrisonName: 'Moorland (HMP & YOI)',
+          containers: [
+            container({ id: 'here' }),
+            // Still held at the prison the person came from, so it reads "Due for transfer in" here and
+            // stays Leeds's to manage until this prison logs its arrival.
+            container({
+              id: 'elsewhere',
+              prisonId: 'LEI',
+              prisonName: 'Leeds (HMP)',
+              inPrisonersCurrentPrison: false,
+              currentSealNumber: 'SN0002',
+              currentStatus: 'DUE_FOR_TRANSFER_OUT',
+            }),
+          ],
+        },
+      ],
+    })
+
+    return request(manageApp())
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text.match(/data-qa="manage-link"/g)).toHaveLength(1)
+        expect(res.text).toContain('change-container/here')
+        expect(res.text).not.toContain('change-container/elsewhere')
+        // The row itself still renders, tagged as incoming.
+        expect(res.text).toContain('SN0002')
+        expect(res.text).toContain('Due for transfer in')
+      })
+  })
+
   it('passes search and filters through to the service', async () => {
     userService.getActiveCaseload.mockResolvedValue({
       activeCaseloadId: 'MDI',
@@ -1872,6 +1919,13 @@ describe('Remove container journey - steps', () => {
     return request(manageApp()).get('/prisoner/A1234BC/remove-container/c1').expect(404)
   })
 
+  it('404s when the container is held at another establishment (MAPB-860)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonId: 'LEI' })])
+
+    return request(manageApp()).get('/prisoner/A1234BC/remove-container/c1').expect(404)
+  })
+
   it('404s when the container has already been removed', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ removalOutcome: 'RETURNED' })])
@@ -2248,6 +2302,13 @@ describe('Change container journey', () => {
       .expect(() => {
         expect(userService.getActiveCaseload).not.toHaveBeenCalled()
       })
+  })
+
+  it('404s when the container is held at another establishment (MAPB-860)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonId: 'LEI' })])
+
+    return request(manageApp()).get('/prisoner/A1234BC/change-container/c1').expect(404)
   })
 
   it('renders the change form prefilled with the current details', async () => {

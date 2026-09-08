@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import createError from 'http-errors'
 
 import type { Services } from '../services'
-import { isPrisonerNumber } from '../utils/propertyList'
+import { canManageContainerHere, isPrisonerNumber } from '../utils/propertyList'
 import { canManageLocations } from '../middleware/requireLocationAdminRole'
 import type { PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
 
@@ -39,17 +39,21 @@ export const resolveContext = async (
 }
 
 // Resolve the container from the prisoner's own active property so the URL is coherent (it belongs to
-// this prisoner) and we have its enriched details for the screens. Returns null when it is not found
-// or has already been removed, so the caller can 404.
+// this prisoner) and we have its enriched details for the screens. Returns null when it is not found, has
+// already been removed, or is held at another establishment, so the caller can 404.
+//
+// The prison check is the guard, not the hidden link: a prisoner's property spans establishments, so this
+// list contains containers held elsewhere, and without it any of them could be managed by URL alone.
 export const loadRemovableContainer = async (
   prisonerPropertyService: Services['prisonerPropertyService'],
   prisonerNumber: string,
   id: string,
   username: string,
+  prisonId: string,
 ): Promise<PrisonerPropertyContainer | null> => {
   const containers = await prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username)
   const container = containers.find(c => c.id === id)
-  if (!container || container.removalOutcome) return null
+  if (!container || !canManageContainerHere(container, prisonId)) return null
   return container
 }
 
