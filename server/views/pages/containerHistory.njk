@@ -15,7 +15,7 @@
   </h1>
   <p class="govuk-body" data-qa="container-summary">
     {{ container.containerType | containerTypeLabel }} container
-    {% if container.currentSealNumber %}(seal {{ container.currentSealNumber }}){% endif %}
+    {% set seal = container.currentSealNumber | realSealNumber %}{% if seal %}(seal {{ seal }}){% endif %}
     for {{ (prisonerName | convertToTitleCase) or "Unknown" }} ({{ prisonerNumber }})
   </p>
 

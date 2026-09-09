@@ -341,6 +341,47 @@ describe('GET /', () => {
       })
   })
 
+  it('reads "Not entered" for a placeholder seal on the establishment list (MAPB-855)', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: 'MDI',
+      activeCaseloadName: 'Moorland (HMP & YOI)',
+      caseloadIds: ['MDI'],
+    })
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue({
+      ...emptyPage,
+      totalElements: 1,
+      totalPages: 1,
+      numberOfElements: 1,
+      content: [
+        {
+          prisonerNumber: 'A1234BC',
+          prisonerName: 'John Smith',
+          prisonerCurrentPrisonId: 'MDI',
+          prisonerCurrentPrisonName: 'Moorland (HMP & YOI)',
+          containers: [
+            container({ id: 'here', prisonId: 'MDI', currentSealNumber: 'MISSING-111' }),
+            container({
+              id: 'incoming',
+              prisonId: 'LEI',
+              prisonName: 'Leeds (HMP)',
+              inPrisonersCurrentPrison: false,
+              currentSealNumber: 'MISSING-222',
+            }),
+          ],
+        },
+      ],
+    })
+
+    return request(app)
+      .get('/')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Not entered')
+        expect(res.text).not.toContain('MISSING-111')
+        expect(res.text).toContain('MISSING-222')
+      })
+  })
+
   it('passes search and filters through to the service', async () => {
     userService.getActiveCaseload.mockResolvedValue({
       activeCaseloadId: 'MDI',
@@ -739,6 +780,31 @@ describe('GET /prisoner/:prisonerNumber', () => {
         expect(res.text).not.toContain('Stored')
         expect(res.text).not.toContain('/change-container/c9')
         expect(res.text).not.toContain('/remove-container/c9')
+      })
+  })
+
+  it('reads "Not entered" for a placeholder seal, but keeps it quotable on incoming property (MAPB-855)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'here', prisonId: 'MDI', currentSealNumber: 'MISSING-111' }),
+      container({
+        id: 'incoming',
+        prisonId: 'LEI',
+        prisonName: 'Leeds (HMP)',
+        inPrisonersCurrentPrison: false,
+        currentSealNumber: 'MISSING-222',
+      }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Not entered')
+        expect(res.text).not.toContain('MISSING-111')
+        // Incoming property keeps its stored seal: this is what staff quote as the previous seal number when
+        // they log its arrival, and it is matched against the stored string.
+        expect(res.text).toContain('MISSING-222')
       })
   })
 
@@ -2325,6 +2391,24 @@ describe('Change container journey', () => {
         expect(res.text).toContain('value="SN0001"')
         expect(res.text).toContain('Remove container')
         expect(res.text).toContain('/prisoner/A1234BC/remove-container/c1?from=person')
+      })
+  })
+
+  it('leaves the seal field empty and drops it from the heading for a placeholder seal (MAPB-855)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ currentSealNumber: 'MISSING-1234567' }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC/change-container/c1')
+      .expect(200)
+      .expect(res => {
+        // The NOMIS placeholder is never shown, and never prefilled - the required-field validation then
+        // makes the user enter the seal the placeholder was standing in for.
+        expect(res.text).not.toContain('MISSING-1234567')
+        expect(res.text).toContain('Manage property container<')
+        expect(res.text).toContain('value=""')
       })
   })
 

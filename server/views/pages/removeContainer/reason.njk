@@ -24,8 +24,9 @@
     {{ govukErrorSummary({ titleText: "There is a problem", errorList: errorList }) }}
   {% endif %}
 
+  {% set heading = container.currentSealNumber | realSealNumber %}
   <h1 class="govuk-heading-xl" data-qa="remove-container-heading">
-    Remove property container {{ container.currentSealNumber }}
+    Remove property container{% if heading %} {{ heading }}{% endif %}
   </h1>
 
   {{ govukSummaryList({
@@ -40,7 +41,7 @@
   {{ govukSummaryList({
     attributes: { "data-qa": "container-summary" },
     rows: [
-      { key: { text: "Seal number" }, value: { text: container.currentSealNumber or "-" } },
+      { key: { text: "Seal number" }, value: { text: container.currentSealNumber | sealNumberLabel } },
       { key: { text: "Property type" }, value: { text: container.containerType | containerTypeLabel } },
       { key: { text: "Storage location" }, value: { text: container | containerLocation } },
       { key: { text: "Disposal date" }, value: { text: (container.proposedDisposalDate | formatDate) if container.proposedDisposalDate else "No date set" } },

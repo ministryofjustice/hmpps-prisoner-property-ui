@@ -54,7 +54,7 @@
                   </div>
                   <div class="govuk-summary-list__row">
                     <dt class="govuk-summary-list__key">Seal number</dt>
-                    <dd class="govuk-summary-list__value">{{ row.details.sealNumber or "-" }}</dd>
+                    <dd class="govuk-summary-list__value">{{ row.details.sealNumber | sealNumberLabel }}</dd>
                   </div>
                   <div class="govuk-summary-list__row">
                     <dt class="govuk-summary-list__key">Status</dt>

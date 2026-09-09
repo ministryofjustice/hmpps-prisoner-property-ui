@@ -1,6 +1,12 @@
 import type { PrisonerPropertyContainer, RemovalOutcome } from '../data/prisonerPropertyApiTypes'
 import { containerStatusTag } from './statusTags'
-import { canManageContainerHere, DUE_FOR_TRANSFER_IN_TAG, IN_TRANSIT_TAG, isInTransitTo } from './propertyList'
+import {
+  canManageContainerHere,
+  DUE_FOR_TRANSFER_IN_TAG,
+  IN_TRANSIT_TAG,
+  isInTransitTo,
+  sealNumberLabel,
+} from './propertyList'
 
 const REMOVAL_OUTCOME_LABELS: Record<RemovalOutcome, string> = {
   DISPOSED: 'Disposed',
@@ -133,6 +139,23 @@ export const buildPersonPropertyView = (
  */
 export const isIncomingTo = (container: PrisonerPropertyContainer, viewedPrisonId: string): boolean =>
   (!container.removalOutcome && container.prisonId !== viewedPrisonId) || isInTransitTo(container, viewedPrisonId)
+
+/**
+ * The seal number for a container in a list, as seen from [viewedPrisonId].
+ *
+ * Property coming *in* here keeps its stored seal even when that is the NOMIS placeholder, because this is the
+ * value staff read off the screen and type into "previous seal number" when they log its arrival - and that
+ * field is matched against the stored string, by exactly this set of containers (see `matchableContainers`).
+ * Replacing it with "Not entered" would leave nothing to quote and no way to reconcile the transfer. Everything
+ * else reads "Not entered" as usual. MAPB-862 removes the placeholder properly, at which point this exception
+ * goes with it.
+ */
+export const sealNumberCell = (container: PrisonerPropertyContainer, viewedPrisonId: string): string => {
+  const stored = container.currentSealNumber?.trim()
+  // A container with no seal at all has nothing to quote either, so it reads "Not entered" wherever it is.
+  if (stored && isIncomingTo(container, viewedPrisonId)) return stored
+  return sealNumberLabel(stored)
+}
 
 const transferInStatus = (container: PrisonerPropertyContainer, viewedPrisonId: string): PropertyStatusTag => {
   // An in-transit container has already left the sending prison, so its own status is a historical

@@ -1,5 +1,5 @@
 import type { ContainerType, PropertyEvent, PropertyEventType } from '../data/prisonerPropertyApiTypes'
-import { containerTypeLabel } from './propertyList'
+import { containerTypeLabel, realSealNumber } from './propertyList'
 import { formatDate } from './utils'
 
 const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
@@ -45,17 +45,19 @@ export const propertyTypeChange = (
  * names yet (deferred to a follow-up), so a move to an internal location is described generically.
  */
 export const eventDescription = (event: PropertyEvent): string => {
+  // A NOMIS placeholder seal names nothing a reader can act on, so these read as if no seal were recorded -
+  // which is what the placeholder stands for. See realSealNumber.
+  const seal = realSealNumber(event.sealNumber)
+  const relatedSeal = realSealNumber(event.relatedContainerSealNumber)
   switch (event.eventType) {
     case 'CREATED_SEALED': {
-      const added = event.sealNumber ? `Added to storage with seal number ${event.sealNumber}.` : 'Added to storage.'
+      const added = seal ? `Added to storage with seal number ${seal}.` : 'Added to storage.'
       // Set when the container was logged as property arriving on transfer and matched to the record it was
       // held under at the sending prison - so the history shows the two records were joined up.
-      return event.relatedContainerSealNumber
-        ? `${added} Matched to previous seal number ${event.relatedContainerSealNumber}.`
-        : added
+      return relatedSeal ? `${added} Matched to previous seal number ${relatedSeal}.` : added
     }
     case 'SEAL_CHANGED':
-      return event.sealNumber ? `Seal number changed to ${event.sealNumber}.` : 'Seal number changed.'
+      return seal ? `Seal number changed to ${seal}.` : 'Seal number changed.'
     case 'CONTAINER_TYPE_CHANGE':
       // containerType is snapshotted as at this event, so it names what the type was changed to; the API
       // derives what it was changed from where it can.
@@ -78,9 +80,7 @@ export const eventDescription = (event: PropertyEvent): string => {
         : 'Transferred to another establishment.'
       // The seal it was re-recorded under once the receiving prison logged its arrival, so both records'
       // histories name the other's seal.
-      return event.relatedContainerSealNumber
-        ? `${transferred} Matched to new seal number ${event.relatedContainerSealNumber}.`
-        : transferred
+      return relatedSeal ? `${transferred} Matched to new seal number ${relatedSeal}.` : transferred
     }
     case 'RETURNED':
       return 'Returned to the person.'
@@ -93,9 +93,7 @@ export const eventDescription = (event: PropertyEvent): string => {
     case 'DISPOSED':
       return 'Disposed of.'
     case 'COMBINED':
-      return event.relatedContainerSealNumber
-        ? `Combined into property container ${event.relatedContainerSealNumber}.`
-        : 'Combined into another container.'
+      return relatedSeal ? `Combined into property container ${relatedSeal}.` : 'Combined into another container.'
     case 'CREATED_IN_ERROR':
       return 'Removed because the record was created in error.'
     case 'REMOVED':

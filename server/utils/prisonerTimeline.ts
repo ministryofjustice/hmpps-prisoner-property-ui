@@ -1,5 +1,5 @@
 import type { PrisonerTimelineItem } from '../data/prisonerPropertyApiTypes'
-import { containerTypeLabel } from './propertyList'
+import { containerTypeLabel, realSealNumber } from './propertyList'
 import { containerStatusTag, type StatusTag } from './statusTags'
 import { formatDate } from './utils'
 
@@ -43,7 +43,11 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     return `Property management started in DPS at ${item.toPrisonName ?? 'this establishment'}`
   }
 
-  const container = containerPrefix(item.sealNumber)
+  // A NOMIS placeholder seal identifies nothing to a reader, so these titles read as if no seal were
+  // recorded - the seal-less wording each case already carries. See realSealNumber.
+  const seal = realSealNumber(item.sealNumber)
+  const relatedSeal = realSealNumber(item.relatedContainerSealNumber)
+  const container = containerPrefix(seal)
   const establishment = item.actingEstablishmentName ?? 'this establishment'
   const toPrison = item.toPrisonName ?? 'another establishment'
 
@@ -51,13 +55,13 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     case 'CREATED_SEALED':
       // A related seal here means the container was logged as property arriving on transfer and matched to
       // the record it was held under at the sending prison.
-      return item.relatedContainerSealNumber
-        ? `${container} added to storage at ${establishment}, matched to previous seal number ${item.relatedContainerSealNumber}`
+      return relatedSeal
+        ? `${container} added to storage at ${establishment}, matched to previous seal number ${relatedSeal}`
         : `${container} added to storage at ${establishment}`
     case 'SEAL_CHANGED':
       // The container is identified by its (new) seal, so avoid repeating it as a prefix.
-      return item.sealNumber
-        ? `Property container details changed — seal number now ${item.sealNumber}`
+      return seal
+        ? `Property container details changed — seal number now ${seal}`
         : 'Property container details changed — seal number'
     case 'CONTAINER_TYPE_CHANGE': {
       // Mirrors the "seal number now X" idiom above. The API supplies what the type was changed from where
@@ -77,8 +81,8 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     case 'DIED_IN_CUSTODY':
       return `${container} due for return following death in custody`
     case 'TRANSFERRED':
-      return item.relatedContainerSealNumber
-        ? `${container} transferred out to ${toPrison}, matched to new seal number ${item.relatedContainerSealNumber}`
+      return relatedSeal
+        ? `${container} transferred out to ${toPrison}, matched to new seal number ${relatedSeal}`
         : `${container} transferred out to ${toPrison}`
     case 'RETURNED':
       return `${container} returned to the person`
@@ -87,8 +91,8 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     case 'DISPOSED':
       return `${container} disposed of`
     case 'COMBINED':
-      return item.relatedContainerSealNumber
-        ? `${container} combined into property container ${item.relatedContainerSealNumber}`
+      return relatedSeal
+        ? `${container} combined into property container ${relatedSeal}`
         : `${container} combined into another container`
     case 'CREATED_IN_ERROR':
       return `${container} removed — created in error`

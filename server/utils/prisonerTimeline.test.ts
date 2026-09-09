@@ -86,6 +86,18 @@ describe('buildPrisonerTimeline', () => {
     expect(titleFor('CREATED_SEALED', { sealNumber: null })).toBe('Property container added to storage at Leeds (HMP)')
   })
 
+  it('omits a placeholder seal from the title, as it would an unknown one', () => {
+    expect(titleFor('CREATED_SEALED', { sealNumber: 'MISSING-1234567' })).toBe(
+      'Property container added to storage at Leeds (HMP)',
+    )
+  })
+
+  it('drops the matched-seal clause when the other record only has a placeholder', () => {
+    expect(titleFor('CREATED_SEALED', { relatedContainerSealNumber: 'MISSING-42' })).toBe(
+      'Property container SN880032 added to storage at Leeds (HMP)',
+    )
+  })
+
   it('names what a property type was changed from when the API could determine it', () => {
     expect(titleFor('CONTAINER_TYPE_CHANGE', { containerType: 'EXCESS', previousContainerType: 'STANDARD' })).toBe(
       'Property container SN880032 details changed — property type now Excess (was Standard)',

@@ -27,8 +27,9 @@
     ]
   }) }}
 
+  {% set heading = container.currentSealNumber | realSealNumber %}
   <h2 class="govuk-heading-m govuk-!-margin-top-6">
-    Remove property container {{ container.currentSealNumber }}
+    Remove property container{% if heading %} {{ heading }}{% endif %}
     <span class="govuk-!-font-weight-regular govuk-!-font-size-19 govuk-!-margin-left-3">
       <a class="govuk-link" href="{{ reasonUrl }}" data-qa="change-reason">Change<span class="govuk-visually-hidden"> the reason for removing this container</span></a>
     </span>
@@ -37,7 +38,7 @@
   {{ govukSummaryList({
     attributes: { "data-qa": "container-summary" },
     rows: [
-      { key: { text: "Seal number" }, value: { text: container.currentSealNumber or "-" } },
+      { key: { text: "Seal number" }, value: { text: container.currentSealNumber | sealNumberLabel } },
       { key: { text: "Property type" }, value: { text: container.containerType | containerTypeLabel } },
       { key: { text: "Disposal date" }, value: { text: (container.proposedDisposalDate | formatDate) if container.proposedDisposalDate else "Not provided" } },
       { key: { text: removalDateLabel }, value: { text: removalDate | formatDate } },

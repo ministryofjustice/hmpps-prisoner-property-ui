@@ -5,6 +5,7 @@ import {
   partitionContainers,
   removalOutcomeLabel,
   resolveCurrentPrisonName,
+  sealNumberCell,
 } from './personProperty'
 
 const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPropertyContainer => ({
@@ -367,5 +368,38 @@ describe('buildPersonPropertyView', () => {
     })
 
     expect(buildPersonPropertyView([reconciled], 'MDI').dueToTransferIn).toEqual([])
+  })
+})
+
+describe('sealNumberCell', () => {
+  it('reads "Not entered" for a placeholder seal on property held here', () => {
+    expect(sealNumberCell(container({ prisonId: 'MDI', currentSealNumber: 'MISSING-1234567' }), 'MDI')).toBe(
+      'Not entered',
+    )
+  })
+
+  it('shows the real seal for property held here', () => {
+    expect(sealNumberCell(container({ prisonId: 'MDI', currentSealNumber: 'SN0001' }), 'MDI')).toBe('SN0001')
+  })
+
+  it('keeps a placeholder seal on incoming property so it can still be quoted', () => {
+    // This is the value staff type into "previous seal number" when logging the arrival, and it is matched
+    // against the stored string - so replacing it would leave the transfer impossible to reconcile.
+    const incoming = container({ prisonId: 'LEI', currentSealNumber: 'MISSING-1234567' })
+    expect(sealNumberCell(incoming, 'MDI')).toBe('MISSING-1234567')
+  })
+
+  it('keeps a placeholder seal on property already in transit here', () => {
+    const inTransit = container({
+      prisonId: 'LEI',
+      currentSealNumber: 'MISSING-42',
+      removalOutcome: 'TRANSFERRED',
+      receivingPrisonId: 'MDI',
+    })
+    expect(sealNumberCell(inTransit, 'MDI')).toBe('MISSING-42')
+  })
+
+  it('reads "Not entered" for incoming property with no seal at all, having nothing to quote', () => {
+    expect(sealNumberCell(container({ prisonId: 'LEI', currentSealNumber: null }), 'MDI')).toBe('Not entered')
   })
 })

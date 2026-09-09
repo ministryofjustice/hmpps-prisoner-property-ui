@@ -11,8 +11,10 @@ import {
   containerTypeLabel,
   containerLocation,
   establishmentLabel,
+  realSealNumber,
+  sealNumberLabel,
 } from './propertyList'
-import { removalOutcomeLabel } from './personProperty'
+import { removalOutcomeLabel, sealNumberCell } from './personProperty'
 import { eventTypeLabel, eventDescription } from './containerHistory'
 import config from '../config'
 import logger from '../../logger'
@@ -64,6 +66,9 @@ export default function nunjucksSetup(app: express.Express): void {
   njkEnv.addFilter('containerLocation', containerLocation)
   njkEnv.addFilter('establishmentLabel', establishmentLabel)
   njkEnv.addFilter('removalOutcomeLabel', removalOutcomeLabel)
+  njkEnv.addFilter('realSealNumber', realSealNumber)
+  njkEnv.addFilter('sealNumberLabel', sealNumberLabel)
+  njkEnv.addFilter('sealNumberCell', sealNumberCell)
   njkEnv.addFilter('eventTypeLabel', eventTypeLabel)
   njkEnv.addFilter('eventDescription', eventDescription)
 }
