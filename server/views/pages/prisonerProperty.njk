@@ -46,7 +46,7 @@
     }) }}
   {% endif %}
 
-  {% if inEstablishment.length == 0 and dueToTransferIn.length == 0 %}
+  {% if inEstablishment.length == 0 and dueToTransferIn.length == 0 and elsewhereInTransit.length == 0 %}
     <p class="govuk-body" data-qa="no-results">No property found for this person.</p>
   {% else %}
     <h2 class="govuk-heading-m govuk-!-margin-top-6">Property in this establishment</h2>
@@ -147,6 +147,39 @@
           { text: "Property status", attributes: { "aria-sort": "none" } }
         ],
         rows: transferInRows
+      }) }}
+    {% endif %}
+
+    {# Property left behind by someone who is between establishments. Nobody knows where they are going yet,
+       so this is not "due to be transferred in" - it is stated plainly, with no actions, until they arrive
+       somewhere and the property can properly be claimed. #}
+    {% if elsewhereInTransit.length %}
+      <h2 class="govuk-heading-m govuk-!-margin-top-6">Property at another establishment</h2>
+      {{ govukInsetText({
+        attributes: { "data-qa": "in-transit-explanation" },
+        text: "This person is being transferred. Their property is still held at the establishment they left, and cannot be managed here."
+      }) }}
+      {% set inTransitRows = [] %}
+      {% for row in elsewhereInTransit %}
+        {% set inTransitRows = (inTransitRows.push([
+          { text: row.container | sealNumberCell(viewedPrisonId) },
+          { text: row.container.containerType | containerTypeLabel },
+          { text: row.container.prisonName or "-" },
+          { text: row.container.createDateTime | formatShortDate, attributes: { "data-sort-value": row.container.createDateTime } },
+          { html: govukTag({ text: row.status.text, classes: row.status.classes }), attributes: { "data-sort-value": row.status.text } }
+        ]), inTransitRows) %}
+      {% endfor %}
+
+      {{ govukTable({
+        attributes: { "data-qa": "in-transit-property", "data-module": "moj-sortable-table" },
+        head: [
+          { text: "Seal number" },
+          { text: "Property type", attributes: { "aria-sort": "none" } },
+          { text: "Establishment" },
+          { text: "Last updated", attributes: { "aria-sort": "none" } },
+          { text: "Property status", attributes: { "aria-sort": "none" } }
+        ],
+        rows: inTransitRows
       }) }}
     {% endif %}
   {% endif %}

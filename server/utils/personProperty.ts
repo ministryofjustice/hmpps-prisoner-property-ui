@@ -1,4 +1,8 @@
-import type { PrisonerPropertyContainer, RemovalOutcome } from '../data/prisonerPropertyApiTypes'
+import type {
+  PrisonerMovementStatus,
+  PrisonerPropertyContainer,
+  RemovalOutcome,
+} from '../data/prisonerPropertyApiTypes'
 import { containerStatusTag } from './statusTags'
 import {
   canManageContainerHere,
@@ -79,6 +83,7 @@ export interface PersonPropertyRow {
 export interface PersonPropertyView {
   inEstablishment: PersonPropertyRow[]
   dueToTransferIn: PersonPropertyRow[]
+  elsewhereInTransit: PersonPropertyRow[]
   hasLeft: boolean
   prisonerCurrentPrisonName: string | null
 }
@@ -104,6 +109,7 @@ export interface PersonPropertyView {
 export const buildPersonPropertyView = (
   containers: PrisonerPropertyContainer[],
   viewedPrisonId: string,
+  prisonerMovementStatus?: PrisonerMovementStatus | null,
 ): PersonPropertyView => {
   const prisonerCurrentPrisonId = containers.find(c => c.prisonerCurrentPrisonId)?.prisonerCurrentPrisonId ?? null
   // When the current prison is unknown (older API responses) assume the prisoner is here, so we never
@@ -124,7 +130,24 @@ export const buildPersonPropertyView = (
         .map(container => ({ container, status: transferInStatus(container, viewedPrisonId) }))
     : []
 
-  return { inEstablishment, dueToTransferIn, hasLeft, prisonerCurrentPrisonName: resolveCurrentPrisonName(containers) }
+  // While the person is between establishments nobody can claim their property: the transfer-out movement
+  // does not say where they are going, so no prison knows it is coming to them. It is still worth seeing that
+  // it exists and where it is, so it is listed plainly - held at another establishment, no actions, and
+  // deliberately not called "due to be transferred in", which would assert a destination we do not have.
+  const elsewhereInTransit: PersonPropertyRow[] =
+    prisonerMovementStatus === 'IN_TRANSIT'
+      ? containers
+          .filter(container => !container.removalOutcome && container.prisonId !== viewedPrisonId)
+          .map(container => ({ container, status: containerStatusTag(container.currentStatus) }))
+      : []
+
+  return {
+    inEstablishment,
+    dueToTransferIn,
+    elsewhereInTransit,
+    hasLeft,
+    prisonerCurrentPrisonName: resolveCurrentPrisonName(containers),
+  }
 }
 
 /**
