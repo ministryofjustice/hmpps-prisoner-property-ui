@@ -56,6 +56,22 @@ describe('eventDescription', () => {
     ).toBe('Added to storage with seal number 124744/2. Matched to previous seal number 124744.')
   })
 
+  it('describes a placeholder seal as no seal at all', () => {
+    // A NOMIS record with no seal mark is synced with a generated MISSING-<nomis id>, which names nothing a
+    // reader can act on.
+    expect(eventDescription(event({ eventType: 'CREATED_SEALED', sealNumber: 'MISSING-1234567' }))).toBe(
+      'Added to storage.',
+    )
+  })
+
+  it('drops the matched-seal clause when the other record only has a placeholder', () => {
+    expect(
+      eventDescription(
+        event({ eventType: 'CREATED_SEALED', sealNumber: 'SN0001', relatedContainerSealNumber: 'MISSING-42' }),
+      ),
+    ).toBe('Added to storage with seal number SN0001.')
+  })
+
   it('describes a seal change', () => {
     expect(eventDescription(event({ eventType: 'SEAL_CHANGED', sealNumber: 'SN0002' }))).toBe(
       'Seal number changed to SN0002.',

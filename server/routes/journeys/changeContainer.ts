@@ -8,6 +8,7 @@ import {
   buildPagination,
   containerLocation,
   containerTypeLabel,
+  realSealNumber,
   statusTag,
 } from '../../utils/propertyList'
 import { validateDetails } from '../../utils/addContainer'
@@ -93,7 +94,9 @@ export default function changeContainerRoutes(
         prisonerNumber: ctx.prisonerNumber,
         containerId: id,
         origin,
-        sealNumber: container.currentSealNumber ?? undefined,
+        // A NOMIS placeholder is not a seal anyone can confirm, so the field starts empty and the required-
+        // field validation makes the user enter the real one - which is what the placeholder was asking for.
+        sealNumber: realSealNumber(container.currentSealNumber) ?? undefined,
         containerType: container.containerType,
         proposedDisposalDate: container.proposedDisposalDate ?? undefined,
         locationChoice: 'current',
@@ -102,7 +105,7 @@ export default function changeContainerRoutes(
         locationName: excessInternal ? (container.locationDescription ?? undefined) : undefined,
       }
       return renderChangeDetails(req, res, ctx, container, req.session.changeContainerJourney, {
-        sealNumber: container.currentSealNumber,
+        sealNumber: realSealNumber(container.currentSealNumber),
         containerType: container.containerType,
         locationChoice: 'current',
         ...isoToParts(container.proposedDisposalDate ?? undefined),

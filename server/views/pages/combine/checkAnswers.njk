@@ -33,7 +33,7 @@
   {% set sourceRows = [] %}
   {% for row in sources %}
     {% set sourceRows = (sourceRows.push([
-      { text: row.container.currentSealNumber or "-" },
+      { text: row.container.currentSealNumber | sealNumberLabel },
       { text: row.container.containerType | containerTypeLabel },
       { text: (row.container.proposedDisposalDate | formatShortDate) or "No date set" },
       { html: govukTag({ text: row.status.text, classes: row.status.classes }) }

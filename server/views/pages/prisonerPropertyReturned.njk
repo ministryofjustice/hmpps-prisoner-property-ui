@@ -35,7 +35,7 @@
     {% set returnedRows = [] %}
     {% for row in returned %}
       {% set returnedRows = (returnedRows.push([
-        { text: row.container.currentSealNumber or "-" },
+        { text: row.container.currentSealNumber | sealNumberLabel },
         { text: row.container.prisonName or "-" },
         { text: row.container.containerType | containerTypeLabel },
         { text: (row.container.removalDate | formatShortDate) or "No date set", attributes: { "data-sort-value": row.container.removalDate or "" } },

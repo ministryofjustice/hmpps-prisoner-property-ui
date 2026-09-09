@@ -10,6 +10,8 @@ import {
   isPrisonerNumber,
   listQueryString,
   parsePropertyListQuery,
+  realSealNumber,
+  sealNumberLabel,
   statusTag,
 } from './propertyList'
 
@@ -454,6 +456,45 @@ describe('propertyList utils', () => {
 
     it('makes the results noun singular for a single result', () => {
       expect(buildPagination(1, 1, 1, 20, '').results.text).toBe('result')
+    })
+  })
+
+  describe('realSealNumber', () => {
+    it('returns a real seal number, trimmed', () => {
+      expect(realSealNumber('SN0001')).toBe('SN0001')
+      expect(realSealNumber('  SN0001  ')).toBe('SN0001')
+    })
+
+    it('treats the NOMIS placeholder as no seal at all', () => {
+      expect(realSealNumber('MISSING-1234567')).toBeNull()
+      expect(realSealNumber('missing-42')).toBeNull()
+      expect(realSealNumber('  MISSING-42  ')).toBeNull()
+    })
+
+    it('returns null when there is no seal', () => {
+      expect(realSealNumber(null)).toBeNull()
+      expect(realSealNumber(undefined)).toBeNull()
+      expect(realSealNumber('   ')).toBeNull()
+    })
+
+    it('keeps a real seal that only resembles the placeholder', () => {
+      // The placeholder is exactly MISSING- followed by the NOMIS id, so a seal a prison actually wrote on a
+      // box must survive even when it starts with the same word.
+      expect(realSealNumber('MISSING-LABEL')).toBe('MISSING-LABEL')
+      expect(realSealNumber('MISSING-123A')).toBe('MISSING-123A')
+      expect(realSealNumber('NOTMISSING-123')).toBe('NOTMISSING-123')
+    })
+  })
+
+  describe('sealNumberLabel', () => {
+    it('reads the seal number when there is one', () => {
+      expect(sealNumberLabel('SN0001')).toBe('SN0001')
+    })
+
+    it('reads "Not entered" for a placeholder or an absent seal', () => {
+      expect(sealNumberLabel('MISSING-1234567')).toBe('Not entered')
+      expect(sealNumberLabel(null)).toBe('Not entered')
+      expect(sealNumberLabel('')).toBe('Not entered')
     })
   })
 })

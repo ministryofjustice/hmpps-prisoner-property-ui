@@ -89,6 +89,26 @@ export const canManageContainerHere = (container: PrisonerPropertyContainer, pri
   !container.removalOutcome && container.prisonId === prisonId
 
 /**
+ * The seal the API generates for property synced from NOMIS with no seal mark: `MISSING-<nomis property id>`.
+ * It is a placeholder standing in for a seal nobody recorded, not something written on the box, and the NOMIS
+ * id in it means nothing to a property officer - so it is never shown.
+ */
+const MISSING_SEAL_PATTERN = /^MISSING-\d+$/i
+
+/**
+ * The seal number worth showing, or null when there is none: absent, blank, or the NOMIS placeholder. The one
+ * place that answers "have we got a real seal?", so the placeholder cannot leak into a heading, a sentence or
+ * a form field that is about to be saved.
+ */
+export const realSealNumber = (seal: string | null | undefined): string | null => {
+  const trimmed = seal?.trim()
+  return !trimmed || MISSING_SEAL_PATTERN.test(trimmed) ? null : trimmed
+}
+
+/** A seal number for reading: the number itself, or "Not entered" when there is none to show. */
+export const sealNumberLabel = (seal: string | null | undefined): string => realSealNumber(seal) ?? 'Not entered'
+
+/**
  * The status tag for a container in the establishment list, relative to the viewed establishment. A
  * container physically held at another prison is due to be transferred *in* here (its owner was received
  * here), so it reads "Due for transfer in" rather than the API's viewer-independent "Due for transfer
