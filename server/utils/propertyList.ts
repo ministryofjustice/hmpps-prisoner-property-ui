@@ -80,6 +80,15 @@ export const isInTransitTo = (container: PrisonerPropertyContainer, viewedPrison
 }
 
 /**
+ * Whether a container can be managed from [prisonId]: it is still in active storage, and this is the
+ * establishment holding it. Property held elsewhere belongs to the establishment holding it - the person view
+ * already presents it read-only, and the establishment list, the combine journey and the write journeys' guard
+ * all defer to this, so a link is never offered for something the journey would refuse.
+ */
+export const canManageContainerHere = (container: PrisonerPropertyContainer, prisonId: string): boolean =>
+  !container.removalOutcome && container.prisonId === prisonId
+
+/**
  * The status tag for a container in the establishment list, relative to the viewed establishment. A
  * container physically held at another prison is due to be transferred *in* here (its owner was received
  * here), so it reads "Due for transfer in" rather than the API's viewer-independent "Due for transfer

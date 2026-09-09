@@ -72,7 +72,13 @@ export default function changeContainerRoutes(
       const { username } = res.locals.user
       const id = String(req.params.id)
 
-      const container = await loadRemovableContainer(prisonerPropertyService, ctx.prisonerNumber, id, username)
+      const container = await loadRemovableContainer(
+        prisonerPropertyService,
+        ctx.prisonerNumber,
+        id,
+        username,
+        ctx.activeCaseloadId,
+      )
       if (!container) return next(createError(404, 'Property container not found'))
 
       // Pre-fill the excess storage choice from where it is currently held, so the where-stored step is
@@ -118,7 +124,13 @@ export default function changeContainerRoutes(
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}`)
       }
 
-      const container = await loadRemovableContainer(prisonerPropertyService, ctx.prisonerNumber, id, username)
+      const container = await loadRemovableContainer(
+        prisonerPropertyService,
+        ctx.prisonerNumber,
+        id,
+        username,
+        ctx.activeCaseloadId,
+      )
       if (!container) return next(createError(404, 'Property container not found'))
 
       const { values, errors } = validateDetails(req.body)
@@ -327,7 +339,13 @@ export default function changeContainerRoutes(
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/change-container/${id}/location`)
       }
 
-      const container = await loadRemovableContainer(prisonerPropertyService, ctx.prisonerNumber, id, username)
+      const container = await loadRemovableContainer(
+        prisonerPropertyService,
+        ctx.prisonerNumber,
+        id,
+        username,
+        ctx.activeCaseloadId,
+      )
       if (!container) return next(createError(404, 'Property container not found'))
 
       // Excess sent off-site reads "Branston (offsite)"; excess in a prison location shows the chosen box;

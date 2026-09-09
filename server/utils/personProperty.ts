@@ -1,6 +1,6 @@
 import type { PrisonerPropertyContainer, RemovalOutcome } from '../data/prisonerPropertyApiTypes'
 import { containerStatusTag } from './statusTags'
-import { DUE_FOR_TRANSFER_IN_TAG, IN_TRANSIT_TAG, isInTransitTo } from './propertyList'
+import { canManageContainerHere, DUE_FOR_TRANSFER_IN_TAG, IN_TRANSIT_TAG, isInTransitTo } from './propertyList'
 
 const REMOVAL_OUTCOME_LABELS: Record<RemovalOutcome, string> = {
   DISPOSED: 'Disposed',
@@ -107,7 +107,7 @@ export const buildPersonPropertyView = (
   const hasLeft = prisonerCurrentPrisonId != null && !prisonerHere
 
   const inEstablishment: PersonPropertyRow[] = containers
-    .filter(container => !container.removalOutcome && container.prisonId === viewedPrisonId)
+    .filter(container => canManageContainerHere(container, viewedPrisonId))
     .map(container => ({ container, status: containerStatusTag(container.currentStatus) }))
 
   // Incoming property, only meaningful while the prisoner is here. Non-editable until this prison logs the

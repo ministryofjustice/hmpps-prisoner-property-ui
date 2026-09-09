@@ -62,7 +62,13 @@ export default function removeContainerRoutes(
       const { username } = res.locals.user
       const id = String(req.params.id)
 
-      const container = await loadRemovableContainer(prisonerPropertyService, ctx.prisonerNumber, id, username)
+      const container = await loadRemovableContainer(
+        prisonerPropertyService,
+        ctx.prisonerNumber,
+        id,
+        username,
+        ctx.activeCaseloadId,
+      )
       if (!container) return next(createError(404, 'Property container not found'))
 
       const origin = req.query.from === 'list' ? 'list' : 'person'
@@ -82,7 +88,13 @@ export default function removeContainerRoutes(
       const id = String(req.params.id)
       const origin = req.session.removeContainerJourney?.origin ?? 'person'
 
-      const container = await loadRemovableContainer(prisonerPropertyService, ctx.prisonerNumber, id, username)
+      const container = await loadRemovableContainer(
+        prisonerPropertyService,
+        ctx.prisonerNumber,
+        id,
+        username,
+        ctx.activeCaseloadId,
+      )
       if (!container) return next(createError(404, 'Property container not found'))
 
       const { outcome } = req.body
@@ -123,7 +135,13 @@ export default function removeContainerRoutes(
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}`)
       }
 
-      const container = await loadRemovableContainer(prisonerPropertyService, ctx.prisonerNumber, id, username)
+      const container = await loadRemovableContainer(
+        prisonerPropertyService,
+        ctx.prisonerNumber,
+        id,
+        username,
+        ctx.activeCaseloadId,
+      )
       if (!container) return next(createError(404, 'Property container not found'))
 
       const target = resolveTransferTarget(container, ctx.activeCaseloadId)
@@ -152,7 +170,13 @@ export default function removeContainerRoutes(
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/remove-container/${id}`)
       }
 
-      const container = await loadRemovableContainer(prisonerPropertyService, ctx.prisonerNumber, id, username)
+      const container = await loadRemovableContainer(
+        prisonerPropertyService,
+        ctx.prisonerNumber,
+        id,
+        username,
+        ctx.activeCaseloadId,
+      )
       if (!container) return next(createError(404, 'Property container not found'))
 
       return res.render('pages/removeContainer/checkAnswers', {
