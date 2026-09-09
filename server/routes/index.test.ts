@@ -950,6 +950,62 @@ describe('GET /prisoner/:prisonerNumber', () => {
   })
 })
 
+describe('GET /prisoner/:prisonerNumber - property left behind in transit (MAPB-861)', () => {
+  it('lists property at the establishment the person left, read-only', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({
+        id: 'atLeeds',
+        prisonId: 'LEI',
+        prisonName: 'Leeds (HMP)',
+        inPrisonersCurrentPrison: false,
+        currentSealNumber: 'SN-LEEDS',
+        prisonerCurrentPrisonId: 'TRN',
+        prisonerMovementStatus: 'IN_TRANSIT',
+      }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('data-qa="in-transit-property"')
+        expect(res.text).toContain('Property at another establishment')
+        expect(res.text).toContain('SN-LEEDS')
+        expect(res.text).toContain('Leeds (HMP)')
+        // Nobody knows where the person is going, so it is not claimed as incoming and cannot be acted on.
+        expect(res.text).not.toContain('data-qa="due-transfer-in"')
+        expect(res.text).not.toContain('data-qa="manage-link"')
+        expect(res.text).not.toContain('/change-container/atLeeds')
+        // ...and it is not mistaken for having no property at all
+        expect(res.text).not.toContain('data-qa="no-results"')
+      })
+  })
+
+  it('does not list it once the person is in an establishment', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({
+        id: 'atLeeds',
+        prisonId: 'LEI',
+        prisonName: 'Leeds (HMP)',
+        inPrisonersCurrentPrison: false,
+        prisonerCurrentPrisonId: 'MDI',
+        prisonerMovementStatus: 'IN_ESTABLISHMENT',
+      }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).not.toContain('data-qa="in-transit-property"')
+        // The existing rule takes over: their owner is here, so it really is due to transfer in.
+        expect(res.text).toContain('data-qa="due-transfer-in"')
+      })
+  })
+})
+
 describe('GET /prisoner/:prisonerNumber/image', () => {
   it('streams the prisoner image from prison-api', async () => {
     withActiveCaseload()

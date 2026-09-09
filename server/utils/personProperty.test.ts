@@ -403,3 +403,60 @@ describe('sealNumberCell', () => {
     expect(sealNumberCell(container({ prisonId: 'LEI', currentSealNumber: null }), 'MDI')).toBe('Not entered')
   })
 })
+
+describe('buildPersonPropertyView - property left behind while the owner is in transit', () => {
+  it('lists property held elsewhere when the person is between establishments', () => {
+    const left = container({
+      id: 'atLeeds',
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      prisonerCurrentPrisonId: 'TRN',
+    })
+
+    const view = buildPersonPropertyView([left], 'MDI', 'IN_TRANSIT')
+
+    expect(view.elsewhereInTransit.map(row => row.container.id)).toEqual(['atLeeds'])
+    // It is not claimed as incoming: nobody knows the transfer is coming here.
+    expect(view.dueToTransferIn).toHaveLength(0)
+    expect(view.inEstablishment).toHaveLength(0)
+  })
+
+  it('excludes property already held here, and property that has left storage', () => {
+    const here = container({ id: 'here', prisonId: 'MDI', prisonerCurrentPrisonId: 'TRN' })
+    const removed = container({
+      id: 'gone',
+      prisonId: 'LEI',
+      prisonerCurrentPrisonId: 'TRN',
+      removalOutcome: 'DISPOSED',
+    })
+
+    const view = buildPersonPropertyView([here, removed], 'MDI', 'IN_TRANSIT')
+
+    expect(view.elsewhereInTransit).toHaveLength(0)
+    expect(view.inEstablishment.map(row => row.container.id)).toEqual(['here'])
+  })
+
+  it('lists nothing when the person is in an establishment', () => {
+    const elsewhere = container({ id: 'atLeeds', prisonId: 'LEI', prisonerCurrentPrisonId: 'MDI' })
+
+    const view = buildPersonPropertyView([elsewhere], 'MDI', 'IN_ESTABLISHMENT')
+
+    expect(view.elsewhereInTransit).toHaveLength(0)
+    // The existing incoming rule is untouched - their owner is here, so it is genuinely due to transfer in.
+    expect(view.dueToTransferIn.map(row => row.container.id)).toEqual(['atLeeds'])
+  })
+
+  it('lists nothing when the person has been released', () => {
+    const elsewhere = container({ id: 'atLeeds', prisonId: 'LEI', prisonerCurrentPrisonId: 'OUT' })
+
+    const view = buildPersonPropertyView([elsewhere], 'MDI', 'RELEASED')
+
+    expect(view.elsewhereInTransit).toHaveLength(0)
+  })
+
+  it('lists nothing when the movement status is unknown', () => {
+    const elsewhere = container({ id: 'atLeeds', prisonId: 'LEI', prisonerCurrentPrisonId: 'TRN' })
+
+    expect(buildPersonPropertyView([elsewhere], 'MDI').elsewhereInTransit).toHaveLength(0)
+  })
+})

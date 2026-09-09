@@ -65,14 +65,13 @@ export default function prisonerPropertyRoutes({
       correlationId: req.id,
     })
 
-    const { inEstablishment, dueToTransferIn, hasLeft, prisonerCurrentPrisonName } = buildPersonPropertyView(
-      containers,
-      activeCaseloadId,
-    )
-
     // Movement status is a prisoner-level attribute mirrored on every container; use it so the banner
-    // and the "Establishment" column read "Transferring"/"Released" rather than "Not known".
+    // and the "Establishment" column read "Transferring"/"Released" rather than "Not known", and so the
+    // view can list property left behind while its owner is between establishments.
     const prisonerMovementStatus = containers[0]?.prisonerMovementStatus
+
+    const { inEstablishment, dueToTransferIn, elsewhereInTransit, hasLeft, prisonerCurrentPrisonName } =
+      buildPersonPropertyView(containers, activeCaseloadId, prisonerMovementStatus)
     const banner = prisoner
       ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, prisonerMovementStatus)
       : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
@@ -86,6 +85,7 @@ export default function prisonerPropertyRoutes({
       banner,
       inEstablishment,
       dueToTransferIn,
+      elsewhereInTransit,
       ...(await manageFlags(res.locals.user.userRoles, activeCaseloadId)),
       successMessage: req.flash('success')[0],
       errorMessage: req.flash('error')[0],
