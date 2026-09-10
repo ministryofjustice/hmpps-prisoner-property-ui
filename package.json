@@ -32,8 +32,8 @@
     "npm": "^11"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.1069.0",
     "@ministryofjustice/frontend": "^9.0.0",
+    "@ministryofjustice/hmpps-audit-client": "2.0.0-beta.4",
     "@ministryofjustice/hmpps-auth-clients": "3.0.0",
     "@ministryofjustice/hmpps-azure-telemetry": "^1.0.0",
     "@ministryofjustice/hmpps-connect-dps-components": "6.2.1",
@@ -81,7 +81,6 @@
     "@types/superagent": "^8.1.10",
     "@types/supertest": "^7.2.0",
     "audit-ci": "^7.1.0",
-    "aws-sdk-client-mock": "^4.1.0",
     "del": "8.0.1",
     "esbuild": "^0.28.1",
     "esbuild-plugin-copy": "^2.1.1",

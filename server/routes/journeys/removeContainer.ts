@@ -2,7 +2,6 @@ import { Router, type RequestHandler, type Response } from 'express'
 import createError from 'http-errors'
 
 import type { Services } from '../../services'
-import { Page } from '../../services/auditService'
 import { movementEstablishmentLabel, statusTag } from '../../utils/propertyList'
 import {
   isRemoveReason,
@@ -237,13 +236,17 @@ export default function removeContainerRoutes(
         return next(error)
       }
 
-      await auditService.logPageView(Page.REMOVE_PROPERTY_CONTAINER, {
-        who: username,
-        subjectId: ctx.prisonerNumber,
-        subjectType: 'PRISONER_NUMBER',
-        correlationId: req.id,
-        details: { containerId: id, outcome: journey.outcome },
-      })
+      await auditService.logAuditEvent(
+        {
+          action: 'DELETE_PROPERTY_CONTAINER',
+          who: username,
+          subjectId: ctx.prisonerNumber,
+          subjectType: 'PRISONER_ID',
+          correlationId: req.id,
+          details: { containerId: id, outcome: journey.outcome },
+        },
+        { throwOnError: false, logOnError: true },
+      )
 
       const { origin } = journey
       req.session.removeContainerJourney = undefined

@@ -1,3 +1,4 @@
+import type { AuditEvent } from '@ministryofjustice/hmpps-audit-client'
 import { HmppsUser } from '../../interfaces/hmppsUser'
 import { ContainerType, RemovalOutcome } from '../../data/prisonerPropertyApiTypes'
 
@@ -104,6 +105,7 @@ export declare global {
     }
 
     interface Locals {
+      auditEvent?: Omit<AuditEvent, 'action'>
       user: HmppsUser
       cspNonce: string
       csrfToken: string

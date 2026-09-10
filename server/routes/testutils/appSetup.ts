@@ -2,16 +2,15 @@ import express, { Express } from 'express'
 import { NotFound } from 'http-errors'
 
 import { randomUUID } from 'crypto'
+import { AuditService } from '@ministryofjustice/hmpps-audit-client'
 import routes from '../index'
 import nunjucksSetup from '../../utils/nunjucksSetup'
 import errorHandler from '../../errorHandler'
 import type { Services } from '../../services'
-import AuditService from '../../services/auditService'
 import { HmppsUser } from '../../interfaces/hmppsUser'
 import setUpWebSession from '../../middleware/setUpWebSession'
-import HmppsAuditClient from '../../data/hmppsAuditClient'
 
-jest.mock('../../services/auditService')
+jest.mock('@ministryofjustice/hmpps-audit-client')
 
 export const user: HmppsUser = {
   name: 'FIRST LAST',
@@ -63,7 +62,7 @@ function appSetup(services: Services, production: boolean, userSupplier: () => H
 export function appWithAllRoutes({
   production = false,
   services = {
-    auditService: new AuditService({} as HmppsAuditClient) as jest.Mocked<AuditService>,
+    auditService: new AuditService(null) as jest.Mocked<AuditService>,
   },
   userSupplier = () => user,
 }: {

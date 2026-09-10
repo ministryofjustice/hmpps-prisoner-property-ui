@@ -1,7 +1,6 @@
 import { Router, type Request, type RequestHandler, type Response } from 'express'
 
 import type { Services } from '../../services'
-import { Page } from '../../services/auditService'
 import {
   ALL_CONTAINER_TYPES,
   buildPagination,
@@ -273,13 +272,17 @@ export default function combineContainerRoutes(
           username,
         )
 
-        await auditService.logPageView(Page.COMBINE_PROPERTY_CONTAINERS, {
-          who: username,
-          subjectId: ctx.prisonerNumber,
-          subjectType: 'PRISONER_NUMBER',
-          correlationId: req.id,
-          details: { containerId: created.id, sourceContainerIds: journey.sourceContainerIds },
-        })
+        await auditService.logAuditEvent(
+          {
+            action: 'CREATE_COMBINED_PROPERTY_CONTAINER',
+            who: username,
+            subjectId: ctx.prisonerNumber,
+            subjectType: 'PRISONER_ID',
+            correlationId: req.id,
+            details: { containerId: created.id, sourceContainerIds: journey.sourceContainerIds },
+          },
+          { throwOnError: false, logOnError: true },
+        )
 
         req.session.combineJourney = undefined
         req.flash('success', 'Property containers combined')

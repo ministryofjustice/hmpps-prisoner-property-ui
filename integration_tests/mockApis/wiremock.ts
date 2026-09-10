@@ -62,5 +62,62 @@ export const getMatchingRequests = (body: FindRequestCriteria): Promise<FoundReq
     .send(body)
     .then(data => data.body.requests)
 
+/** the audit SQS queue; the client posts SendMessage to the root path of AUDIT_SQS_QUEUE_URL */
+export const stubAuditSqs = (): SuperAgentRequest =>
+  stubFor({
+    request: { method: 'POST', url: '/' },
+    response: { status: 200, headers: { 'Content-Type': 'text/xml' }, body: '{}' },
+  })
+
+/**
+ * An audit message as it appears on the queue. Note the wire format keeps the field names from
+ * v1 of the audit client: the event's `action` is sent as `what`, and `details` is a JSON string.
+ */
+export interface SentAuditEvent {
+  what: string
+  who: string
+  service: string
+  subjectType?: string
+  subjectId?: string
+  details?: string
+}
+
+/**
+ * Audit events sent to the stubbed SQS endpoint, oldest first.
+ *
+ * Events are identified by their SQS SendMessage payload rather than by position, so that
+ * unrelated requests cannot shift the results.
+ *
+ * The app sends them fire-and-forget – and the access attempt only once the response has
+ * closed – so this waits for `expectedCount` of them to arrive before returning.
+ */
+export const getSentAuditEvents = async (expectedCount = 0): Promise<SentAuditEvent[]> => {
+  const readSentEvents = async (): Promise<SentAuditEvent[]> => {
+    const requests = await getMatchingRequests({ method: 'POST', urlPath: '/' })
+    return requests
+      .filter(({ body }) => body?.includes('MessageBody'))
+      .map(({ body }) => {
+        const event = JSON.parse(JSON.parse(body).MessageBody)
+        // vary per run, so cannot be asserted on
+        delete event.correlationId
+        delete event.when
+        return event
+      })
+  }
+
+  const waitForEvents = async (attemptsLeft: number): Promise<SentAuditEvent[]> => {
+    const events = await readSentEvents()
+    if (events.length >= expectedCount || attemptsLeft <= 0) {
+      return events
+    }
+    await new Promise(resolve => {
+      setTimeout(resolve, 50)
+    })
+    return waitForEvents(attemptsLeft - 1)
+  }
+
+  return waitForEvents(100)
+}
+
 export const resetStubs = (): Promise<Response[]> =>
   Promise.all([superagent.delete(`${url}/mappings`), superagent.delete(`${url}/requests`)])

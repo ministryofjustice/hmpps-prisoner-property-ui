@@ -1,23 +1,19 @@
+import { AuditServiceFactory } from '@ministryofjustice/hmpps-audit-client'
 import { dataAccess } from '../data'
-import AuditService from './auditService'
+import config from '../config'
+import logger from '../../logger'
 import PrisonerPropertyService from './prisonerPropertyService'
 import PrisonerService from './prisonerService'
 import UserService from './userService'
 import ActiveAgenciesService from './activeAgenciesService'
 
 export const services = () => {
-  const {
-    applicationInfo,
-    hmppsAuditClient,
-    prisonerPropertyApiClient,
-    prisonerSearchApiClient,
-    prisonApiClient,
-    manageUsersApiClient,
-  } = dataAccess()
+  const { applicationInfo, prisonerPropertyApiClient, prisonerSearchApiClient, prisonApiClient, manageUsersApiClient } =
+    dataAccess()
 
   return {
     applicationInfo,
-    auditService: new AuditService(hmppsAuditClient),
+    auditService: AuditServiceFactory.createInstance(config.sqs.audit, logger),
     prisonerPropertyService: new PrisonerPropertyService(prisonerPropertyApiClient),
     prisonerService: new PrisonerService(prisonerSearchApiClient, prisonApiClient),
     userService: new UserService(manageUsersApiClient),
