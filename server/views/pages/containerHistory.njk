@@ -30,6 +30,8 @@
             <p class="moj-timeline__byline">
               {%- if event.eventUserId == "PRISONER_PROPERTY_API" -%}
                 System generated
+              {%- elif event.eventUserId == "LEGACY_CLEANUP" -%}
+                Legacy property clean-up
               {%- else -%}
                 by {{ userNames[event.eventUserId] or event.eventUserId }}
               {%- endif -%}

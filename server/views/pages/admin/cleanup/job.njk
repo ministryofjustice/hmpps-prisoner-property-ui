@@ -1,0 +1,95 @@
+{% extends "../../../partials/layout.njk" %}
+
+{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+
+{% set pageTitle = applicationName + " - Clean-up progress - " + agency.name %}
+{% set mainClasses = "govuk-body" %}
+
+{% block head %}
+  {{ super() }}
+  {% if inProgress %}
+    {# Reload while the job is running. An inline script with the CSP nonce rather than a meta refresh, which the accessibility checks reject. #}
+    <script nonce="{{ cspNonce }}">setTimeout(function () { window.location.reload() }, 5000)</script>
+  {% endif %}
+{% endblock %}
+
+{% block beforeContent %}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: "Prisoner property", href: "/" },
+    { text: "Manage enabled prisons", href: "/admin/prisons" },
+    { text: "Clean up legacy property", href: "/admin/prisons/" + agency.agencyId + "/cleanup" },
+    { text: "Progress" }
+  ] }) }}
+{% endblock %}
+
+{% block content %}
+  {% if successMessage %}
+    {{ govukNotificationBanner({ type: "success", text: successMessage, attributes: { "data-qa": "success-banner" } }) }}
+  {% endif %}
+
+  <span class="govuk-caption-xl">{{ agency.name }} ({{ agency.agencyId }})</span>
+  <h1 class="govuk-heading-xl">Legacy property clean-up</h1>
+
+  {% set statusTag %}
+    {% if job.status == "FINISHED" %}
+      {{ govukTag({ text: job.statusLabel, classes: "govuk-tag--green", attributes: { "data-qa": "job-status" } }) }}
+    {% else %}
+      {{ govukTag({ text: job.statusLabel, classes: "govuk-tag--blue", attributes: { "data-qa": "job-status" } }) }}
+    {% endif %}
+  {% endset %}
+
+  {% if inProgress %}
+    {{ govukInsetText({
+      html: 'This page updates automatically while the clean-up runs. <a class="govuk-link" href="" data-qa="refresh-link">Refresh now</a>',
+      attributes: { "data-qa": "in-progress" }
+    }) }}
+  {% endif %}
+
+  {{ govukSummaryList({
+    attributes: { "data-qa": "job-summary" },
+    rows: [
+      { key: { text: "Status" }, value: { html: statusTag } },
+      { key: { text: "Progress" }, value: { html: '<span data-qa="progress">' + (job.processedRecords | formatNumber) + ' of ' + (job.totalRecords | formatNumber) + ' containers (' + job.percent + '%)</span>' } },
+      { key: { text: "Marked as returned" }, value: { html: '<span data-qa="returned">' + (job.returnedRecords | formatNumber) + '</span>' } },
+      { key: { text: "Marked as transferred" }, value: { html: '<span data-qa="transferred">' + (job.transferredRecords | formatNumber) + '</span>' } },
+      { key: { text: "Skipped" }, value: { html: '<span data-qa="skipped">' + (job.skippedRecords | formatNumber) + '</span>' } },
+      { key: { text: "Failed" }, value: { html: '<span data-qa="failed">' + (job.failedRecords | formatNumber) + '</span>' } },
+      { key: { text: "Window" }, value: { text: "People who left more than " + job.olderThanDays + " days ago (on or before " + (job.cutoffDate | formatDate) + ")" } },
+      { key: { text: "Requested" }, value: { text: (job.requestedAt | formatDateTime) + " by " + job.requestedBy } },
+      { key: { text: "Started" }, value: { text: (job.startTime | formatDateTime) if job.startTime else "Not yet" } },
+      { key: { text: "Finished" }, value: { text: (job.endTime | formatDateTime) if job.endTime else "Not yet" } }
+    ]
+  }) }}
+
+  {% if attention.length %}
+    <h2 class="govuk-heading-m">Containers that were not closed</h2>
+    <p class="govuk-body">
+      Skipped containers no longer qualified when they were checked again - the person came back, or staff
+      had already dealt with the property. Failed containers hit an error and were left unchanged.
+    </p>
+    {% set rows = [] %}
+    {% for item in attention %}
+      {% set rows = (rows.push([
+        { text: item.prisonerNumber },
+        { text: "Return" if item.action == "RETURN" else "Transfer" + (" to " + item.plannedToPrisonId if item.plannedToPrisonId else "") },
+        { text: "Skipped" if item.status == "SKIPPED" else "Failed" },
+        { text: item.message or "" }
+      ]), rows) %}
+    {% endfor %}
+    {{ govukTable({
+      attributes: { "data-qa": "attention-table" },
+      head: [{ text: "Prisoner number" }, { text: "Planned action" }, { text: "Outcome" }, { text: "Detail" }],
+      rows: rows
+    }) }}
+  {% endif %}
+
+  <p class="govuk-body">
+    <a class="govuk-link" href="/admin/prisons/{{ agency.agencyId }}/cleanup" data-qa="back-to-preview">Back to the clean-up preview</a>
+  </p>
+{% endblock %}

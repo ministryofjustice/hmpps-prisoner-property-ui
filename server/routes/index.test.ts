@@ -2934,6 +2934,256 @@ describe('Admin - manage enabled prisons', () => {
   })
 })
 
+describe('Admin - clean up legacy property', () => {
+  const agencies = [
+    { agencyId: 'LEI', name: 'Leeds (HMP)', active: false },
+    { agencyId: 'MDI', name: 'Moorland (HMP & YOI)', active: true },
+  ]
+  const preview = {
+    prisonId: 'LEI',
+    olderThanDays: 28,
+    cutoffDate: '2026-08-14',
+    generatedAt: '2026-09-11T10:00:00',
+    toReturn: { containers: 412, prisoners: 180 },
+    toTransfer: { containers: 96, prisoners: 70 },
+    dueForReturnNow: { containers: 430, prisoners: 190 },
+    dueForTransferOutNow: { containers: 120, prisoners: 85 },
+    candidates: { containers: 1200, prisoners: 600 },
+    ineligible: { OWNER_HERE: { containers: 600, prisoners: 300 }, TOO_RECENT: { containers: 42, prisoners: 25 } },
+    ageBands: [
+      { label: 'Up to 90 days', fromDays: 0, toDays: 90, containers: 100 },
+      { label: '91 to 365 days', fromDays: 91, toDays: 365, containers: 200 },
+      { label: 'Over a year', fromDays: 366, toDays: null, containers: 208 },
+    ],
+  }
+  const job = {
+    id: 'job-1',
+    prisonId: 'LEI',
+    status: 'PENDING' as const,
+    olderThanDays: 28,
+    cutoffDate: '2026-08-14',
+    requestedBy: 'user1',
+    requestedAt: '2026-09-11T10:00:00',
+    startTime: null as string | null,
+    endTime: null as string | null,
+    totalRecords: 508,
+    processedRecords: 0,
+    returnedRecords: 0,
+    transferredRecords: 0,
+    skippedRecords: 0,
+    failedRecords: 0,
+  }
+
+  beforeEach(() => {
+    prisonerPropertyService.getAllAgencies.mockResolvedValue(agencies)
+    prisonerPropertyService.getLegacyCleanupJobs.mockResolvedValue([])
+    prisonerPropertyService.previewLegacyCleanup.mockResolvedValue(preview)
+  })
+
+  it('links to the clean-up from every row of the admin console', async () => {
+    return request(adminApp())
+      .get('/admin/prisons')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('href="/admin/prisons/LEI/cleanup"')
+        expect(res.text).toContain('href="/admin/prisons/MDI/cleanup"')
+      })
+  })
+
+  it('shows the preview for the default window', async () => {
+    return request(adminApp())
+      .get('/admin/prisons/LEI/cleanup')
+      .expect(200)
+      .expect(res => {
+        expect(prisonerPropertyService.previewLegacyCleanup).toHaveBeenCalledWith('LEI', 28, 'user1')
+        expect(res.text).toContain('Leeds (HMP)')
+        expect(res.text).toContain('412 containers')
+        expect(res.text).toContain('for 180 people released')
+        expect(res.text).toContain('96 containers')
+        expect(res.text).toContain('508 containers will be closed')
+        expect(res.text).toContain('The person is at this prison')
+        expect(res.text).toContain('Over a year')
+        expect(res.text).toContain('data-qa="run-cleanup"')
+      })
+  })
+
+  it('passes a chosen window through to the preview', async () => {
+    return request(adminApp())
+      .get('/admin/prisons/LEI/cleanup?olderThanDays=7')
+      .expect(200)
+      .expect(() => {
+        expect(prisonerPropertyService.previewLegacyCleanup).toHaveBeenCalledWith('LEI', 7, 'user1')
+      })
+  })
+
+  it('rejects an unusable window without calling the API', async () => {
+    return request(adminApp())
+      .get('/admin/prisons/LEI/cleanup?olderThanDays=0')
+      .expect(400)
+      .expect(res => {
+        expect(prisonerPropertyService.previewLegacyCleanup).not.toHaveBeenCalled()
+        expect(res.text).toContain('Enter a whole number of days between 1 and 3650')
+        expect(res.text).not.toContain('data-qa="run-cleanup"')
+      })
+  })
+
+  it('hides the run button while a clean-up is in flight', async () => {
+    prisonerPropertyService.getLegacyCleanupJobs.mockResolvedValue([{ ...job, status: 'STARTED' }])
+
+    return request(adminApp())
+      .get('/admin/prisons/LEI/cleanup')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('A clean-up is already running for this prison')
+        expect(res.text).toContain('/admin/prisons/LEI/cleanup/jobs/job-1')
+        expect(res.text).not.toContain('data-qa="run-cleanup"')
+      })
+  })
+
+  it('says so when there is nothing to clean up', async () => {
+    prisonerPropertyService.previewLegacyCleanup.mockResolvedValue({
+      ...preview,
+      toReturn: { containers: 0, prisoners: 0 },
+      toTransfer: { containers: 0, prisoners: 0 },
+    })
+
+    return request(adminApp())
+      .get('/admin/prisons/LEI/cleanup')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is nothing to clean up with this window.')
+        expect(res.text).not.toContain('data-qa="run-cleanup"')
+      })
+  })
+
+  it('starts the clean-up and sends the admin to the job page', async () => {
+    prisonerPropertyService.startLegacyCleanup.mockResolvedValue(job)
+
+    return request(adminApp())
+      .post('/admin/prisons/LEI/cleanup')
+      .send({ olderThanDays: '28', name: 'Leeds (HMP)' })
+      .expect(302)
+      .expect('location', '/admin/prisons/LEI/cleanup/jobs/job-1')
+      .expect(() => {
+        expect(prisonerPropertyService.startLegacyCleanup).toHaveBeenCalledWith('LEI', 28, 'user1')
+        expect(flashProvider).toHaveBeenCalledWith(
+          'success',
+          'Clean-up started for Leeds (HMP): 508 containers queued.',
+        )
+      })
+  })
+
+  it('goes back to the preview with the reason when a clean-up is already running', async () => {
+    prisonerPropertyService.startLegacyCleanup.mockRejectedValue(
+      Object.assign(new Error('conflict'), { responseStatus: 409 }),
+    )
+
+    return request(adminApp())
+      .post('/admin/prisons/LEI/cleanup')
+      .send({ olderThanDays: '28', name: 'Leeds (HMP)' })
+      .expect(302)
+      .expect('location', '/admin/prisons/LEI/cleanup?olderThanDays=28')
+      .expect(() => {
+        expect(flashProvider).toHaveBeenCalledWith(
+          'error',
+          'A clean-up is already running for this prison. Wait for it to finish before starting another.',
+        )
+      })
+  })
+
+  it('shows a running job with its progress and reloads itself', async () => {
+    prisonerPropertyService.getLegacyCleanupJob.mockResolvedValue({
+      ...job,
+      status: 'STARTED',
+      startTime: '2026-09-11T10:00:05',
+      processedRecords: 127,
+      returnedRecords: 100,
+      transferredRecords: 25,
+      skippedRecords: 2,
+      items: [],
+    })
+
+    return request(adminApp())
+      .get('/admin/prisons/LEI/cleanup/jobs/job-1')
+      .expect(200)
+      .expect(res => {
+        expect(prisonerPropertyService.getLegacyCleanupJob).toHaveBeenCalledWith('job-1', 'user1')
+        expect(res.text).toContain('In progress')
+        expect(res.text).toContain('127 of 508 containers (25%)')
+        expect(res.text).toContain('This page updates automatically')
+        expect(res.text).toContain('window.location.reload()')
+        expect(res.text).not.toContain('http-equiv="refresh"')
+      })
+  })
+
+  it('shows a finished job with the containers that were not closed, and stops reloading', async () => {
+    prisonerPropertyService.getLegacyCleanupJob.mockResolvedValue({
+      ...job,
+      status: 'FINISHED',
+      startTime: '2026-09-11T10:00:05',
+      endTime: '2026-09-11T10:04:40',
+      processedRecords: 508,
+      returnedRecords: 410,
+      transferredRecords: 96,
+      skippedRecords: 1,
+      failedRecords: 1,
+      items: [
+        {
+          containerId: 'c1',
+          prisonerNumber: 'A1234AA',
+          action: 'RETURN',
+          plannedEventDate: '2026-06-01',
+          plannedToPrisonId: null,
+          status: 'SKIPPED',
+          message: 'no longer eligible: OWNER_HERE',
+          processedAt: '2026-09-11T10:01:00',
+        },
+        {
+          containerId: 'c2',
+          prisonerNumber: 'B2345BB',
+          action: 'TRANSFER',
+          plannedEventDate: '2026-06-01',
+          plannedToPrisonId: 'MDI',
+          status: 'FAILED',
+          message: 'boom',
+          processedAt: '2026-09-11T10:01:00',
+        },
+        {
+          containerId: 'c3',
+          prisonerNumber: 'C3456CC',
+          action: 'RETURN',
+          plannedEventDate: '2026-06-01',
+          plannedToPrisonId: null,
+          status: 'PROCESSED',
+          message: null,
+          processedAt: '2026-09-11T10:01:00',
+        },
+      ],
+    })
+
+    return request(adminApp())
+      .get('/admin/prisons/LEI/cleanup/jobs/job-1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Finished')
+        expect(res.text).toContain('508 of 508 containers (100%)')
+        expect(res.text).toContain('A1234AA')
+        expect(res.text).toContain('Transfer to MDI')
+        expect(res.text).toContain('boom')
+        expect(res.text).not.toContain('C3456CC')
+        expect(res.text).not.toContain('window.location.reload()')
+      })
+  })
+
+  it('forbids the clean-up for a user without the admin role', async () => {
+    await request(app).get('/admin/prisons/LEI/cleanup').expect(403)
+    await request(app).post('/admin/prisons/LEI/cleanup').send({ olderThanDays: '28' }).expect(403)
+    await request(app).get('/admin/prisons/LEI/cleanup/jobs/job-1').expect(403)
+    expect(prisonerPropertyService.previewLegacyCleanup).not.toHaveBeenCalled()
+    expect(prisonerPropertyService.startLegacyCleanup).not.toHaveBeenCalled()
+  })
+})
+
 const locationAdminUser = { ...user, userRoles: ['PRISONERPROP__LOCATION_ADMIN'] }
 const locationAdminApp = () =>
   appWithAllRoutes({

@@ -1,6 +1,8 @@
 import PrisonerPropertyApiClient from '../data/prisonerPropertyApiClient'
 import type {
   AgencyStatus,
+  LegacyCleanupJob,
+  LegacyCleanupPreview,
   BoxLocation,
   CombineContainersRequest,
   CreateContainerRequest,
@@ -75,6 +77,22 @@ export default class PrisonerPropertyService {
 
   setAgencyActive(agencyId: string, active: boolean, username: string): Promise<AgencyStatus> {
     return this.prisonerPropertyApiClient.setAgencyActive(agencyId, active, username)
+  }
+
+  previewLegacyCleanup(agencyId: string, olderThanDays: number, username: string): Promise<LegacyCleanupPreview> {
+    return this.prisonerPropertyApiClient.previewLegacyCleanup(agencyId, olderThanDays, username)
+  }
+
+  startLegacyCleanup(agencyId: string, olderThanDays: number, username: string): Promise<LegacyCleanupJob> {
+    return this.prisonerPropertyApiClient.startLegacyCleanup(agencyId, olderThanDays, username)
+  }
+
+  getLegacyCleanupJobs(agencyId: string, username: string): Promise<LegacyCleanupJob[]> {
+    return this.prisonerPropertyApiClient.getLegacyCleanupJobs(agencyId, username)
+  }
+
+  getLegacyCleanupJob(jobId: string, username: string): Promise<LegacyCleanupJob> {
+    return this.prisonerPropertyApiClient.getLegacyCleanupJob(jobId, username)
   }
 
   getPropertyLocations(prisonId: string, username: string): Promise<PropertyLocationAdmin[]> {
