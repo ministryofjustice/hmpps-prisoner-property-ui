@@ -1,0 +1,179 @@
+{% extends "../../../partials/layout.njk" %}
+
+{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+{% from "govuk/components/input/macro.njk" import govukInput %}
+{% from "govuk/components/button/macro.njk" import govukButton %}
+{% from "govuk/components/summary-list/macro.njk" import govukSummaryList %}
+{% from "govuk/components/table/macro.njk" import govukTable %}
+{% from "govuk/components/tag/macro.njk" import govukTag %}
+{% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
+{% from "govuk/components/inset-text/macro.njk" import govukInsetText %}
+{% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
+
+{% set pageTitle = applicationName + " - Clean up legacy property - " + agency.name %}
+{% set mainClasses = "govuk-body" %}
+
+{% block beforeContent %}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: "Prisoner property", href: "/" },
+    { text: "Manage enabled prisons", href: "/admin/prisons" },
+    { text: "Clean up legacy property" }
+  ] }) }}
+{% endblock %}
+
+{% block content %}
+  {% if errors.olderThanDays %}
+    {{ govukErrorSummary({
+      titleText: "There is a problem",
+      errorList: [{ text: errors.olderThanDays, href: "#olderThanDays" }],
+      attributes: { "data-qa": "error-summary" }
+    }) }}
+  {% endif %}
+
+  {% if successMessage %}
+    {{ govukNotificationBanner({ type: "success", text: successMessage, attributes: { "data-qa": "success-banner" } }) }}
+  {% endif %}
+
+  {% if errorMessage %}
+    {{ govukNotificationBanner({ titleText: "There is a problem", text: errorMessage, attributes: { "data-qa": "error-banner" } }) }}
+  {% endif %}
+
+  <span class="govuk-caption-xl">{{ agency.name }} ({{ agency.agencyId }})</span>
+  <h1 class="govuk-heading-xl">Clean up legacy property</h1>
+
+  <p class="govuk-body">
+    Property still recorded here for people who were released or moved to another prison long ago can be
+    closed automatically. Released people's property is marked as returned; property for people now at
+    another prison is marked as transferred there. Storage locations are freed and NOMIS is updated.
+  </p>
+
+  <form method="get" action="/admin/prisons/{{ agency.agencyId }}/cleanup" novalidate data-qa="window-form">
+    {{ govukInput({
+      id: "olderThanDays",
+      name: "olderThanDays",
+      label: { text: "Only include people who left more than this many days ago", classes: "govuk-label--s" },
+      hint: { text: "Recent leavers are left alone because their property may still be on its way to them. 28 days is the default." },
+      classes: "govuk-input--width-4",
+      inputmode: "numeric",
+      suffix: { text: "days" },
+      value: olderThanDays,
+      errorMessage: { text: errors.olderThanDays } if errors.olderThanDays else undefined,
+      attributes: { "data-qa": "older-than-days" }
+    }) }}
+    {{ govukButton({ text: "Update preview", classes: "govuk-button--secondary", attributes: { "data-qa": "update-preview" } }) }}
+  </form>
+
+  {% if preview %}
+    <h2 class="govuk-heading-l">What will happen</h2>
+    <p class="govuk-body" data-qa="cutoff">Counting people who left on or before {{ preview.cutoffDate | formatDate }}.</p>
+
+    {{ govukSummaryList({
+      attributes: { "data-qa": "preview-summary" },
+      rows: [
+        {
+          key: { text: "Will be marked as returned" },
+          value: { html: '<span data-qa="to-return">' + (preview.toReturn.containers | formatNumber) + ' containers</span> for ' + (preview.toReturn.prisoners | formatNumber) + ' people released' }
+        },
+        {
+          key: { text: "Will be marked as transferred" },
+          value: { html: '<span data-qa="to-transfer">' + (preview.toTransfer.containers | formatNumber) + ' containers</span> for ' + (preview.toTransfer.prisoners | formatNumber) + ' people now at another prison' }
+        },
+        {
+          key: { text: "Currently shown as due for return" },
+          value: { html: '<span data-qa="due-for-return-now">' + (preview.dueForReturnNow.containers | formatNumber) + ' containers</span> for ' + (preview.dueForReturnNow.prisoners | formatNumber) + ' people' }
+        },
+        {
+          key: { text: "Currently shown as due for transfer out" },
+          value: { html: '<span data-qa="due-for-transfer-out-now">' + (preview.dueForTransferOutNow.containers | formatNumber) + ' containers</span> for ' + (preview.dueForTransferOutNow.prisoners | formatNumber) + ' people' }
+        }
+      ]
+    }) }}
+
+    {% if preview.willClose > 0 %}
+      {% set ageRows = [] %}
+      {% for band in preview.ageBands %}
+        {% set ageRows = (ageRows.push([{ text: band.label }, { text: band.containers | formatNumber, format: "numeric" }]), ageRows) %}
+      {% endfor %}
+      {{ govukTable({
+        caption: "How long ago the people whose property will be closed left",
+        captionClasses: "govuk-table__caption--m",
+        attributes: { "data-qa": "age-bands" },
+        head: [{ text: "Time since they left" }, { text: "Containers", format: "numeric" }],
+        rows: ageRows
+      }) }}
+    {% endif %}
+
+    {% if preview.ineligibleRows.length %}
+      {% set ineligibleRows = [] %}
+      {% for row in preview.ineligibleRows %}
+        {% set ineligibleRows = (ineligibleRows.push([{ text: row.label }, { text: row.containers | formatNumber, format: "numeric" }, { text: row.prisoners | formatNumber, format: "numeric" }]), ineligibleRows) %}
+      {% endfor %}
+      {{ govukTable({
+        caption: "Left alone",
+        captionClasses: "govuk-table__caption--m",
+        attributes: { "data-qa": "ineligible" },
+        head: [{ text: "Why" }, { text: "Containers", format: "numeric" }, { text: "People", format: "numeric" }],
+        rows: ineligibleRows
+      }) }}
+    {% endif %}
+
+    {% if inFlight %}
+      {{ govukInsetText({
+        html: 'A clean-up is already running for this prison. <a class="govuk-link" href="/admin/prisons/' + agency.agencyId + '/cleanup/jobs/' + inFlight.id + '" data-qa="in-flight-link">View its progress</a> before starting another.',
+        attributes: { "data-qa": "in-flight" }
+      }) }}
+    {% elif preview.willClose > 0 %}
+      {{ govukWarningText({
+        text: "This cannot be undone. " + (preview.willClose | formatNumber) + " containers will be closed and NOMIS will be updated.",
+        iconFallbackText: "Warning",
+        attributes: { "data-qa": "warning" }
+      }) }}
+      <form method="post" action="/admin/prisons/{{ agency.agencyId }}/cleanup" novalidate data-qa="run-form">
+        <input type="hidden" name="_csrf" value="{{ csrfToken }}" />
+        <input type="hidden" name="olderThanDays" value="{{ preview.olderThanDays }}" />
+        <input type="hidden" name="name" value="{{ agency.name }}" />
+        {{ govukButton({ text: "Run clean-up", classes: "govuk-button--warning", attributes: { "data-qa": "run-cleanup" } }) }}
+      </form>
+    {% else %}
+      {{ govukInsetText({ text: "There is nothing to clean up with this window.", attributes: { "data-qa": "nothing-to-do" } }) }}
+    {% endif %}
+  {% endif %}
+
+  {% if jobs.length %}
+    <h2 class="govuk-heading-l">Previous clean-ups</h2>
+    {% set jobRows = [] %}
+    {% for job in jobs %}
+      {% set statusTag %}
+        {% if job.status == "FINISHED" %}
+          {{ govukTag({ text: job.statusLabel, classes: "govuk-tag--green" }) }}
+        {% else %}
+          {{ govukTag({ text: job.statusLabel, classes: "govuk-tag--blue" }) }}
+        {% endif %}
+      {% endset %}
+      {% set jobRows = (jobRows.push([
+        { html: '<a class="govuk-link" href="/admin/prisons/' + agency.agencyId + '/cleanup/jobs/' + job.id + '" data-qa="job-' + job.id + '">' + (job.requestedAt | formatDateTime) + '</a>' },
+        { text: job.requestedBy },
+        { text: job.olderThanDays + " days" },
+        { html: statusTag },
+        { text: job.returnedRecords | formatNumber, format: "numeric" },
+        { text: job.transferredRecords | formatNumber, format: "numeric" },
+        { text: job.skippedRecords + job.failedRecords | formatNumber, format: "numeric" }
+      ]), jobRows) %}
+    {% endfor %}
+    {{ govukTable({
+      attributes: { "data-qa": "jobs-table" },
+      head: [
+        { text: "Requested" },
+        { text: "By" },
+        { text: "Window" },
+        { text: "Status" },
+        { text: "Returned", format: "numeric" },
+        { text: "Transferred", format: "numeric" },
+        { text: "Skipped or failed", format: "numeric" }
+      ],
+      rows: jobRows
+    }) }}
+  {% endif %}
+{% endblock %}

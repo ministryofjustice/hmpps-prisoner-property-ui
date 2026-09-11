@@ -7,9 +7,12 @@ export interface ActiveCaseload {
   caseloadIds: string[]
 }
 
-// Sentinel used by the API as the acting user for system/event-driven property events (e.g. prisoner
-// received/released). It is not a real user, so it is never looked up and never shown as a name.
+// Sentinels the API records as the acting user for changes it makes itself: event-driven ones (prisoner
+// received/released) and closures by the legacy clean-up. Neither is a real user, so they are never looked
+// up and never shown as a name.
 export const SYSTEM_USER = 'PRISONER_PROPERTY_API'
+export const LEGACY_CLEANUP_USER = 'LEGACY_CLEANUP'
+const SYSTEM_USERS = new Set([SYSTEM_USER, LEGACY_CLEANUP_USER])
 
 // How long a resolved username -> name mapping is trusted before we look it up again. Names rarely
 // change, and history is read-heavy, so an hour keeps manage-users-api traffic low.
@@ -46,7 +49,7 @@ export default class UserService {
     const now = Date.now()
 
     const toLookUp = [...new Set(usernames)].filter(username => {
-      if (!username || username === SYSTEM_USER) return false
+      if (!username || SYSTEM_USERS.has(username)) return false
       const cached = this.nameCache.get(username)
       if (cached && cached.expiry > now) {
         resolved.set(username, cached.name)

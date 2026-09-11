@@ -4,6 +4,8 @@ import config from '../config'
 import logger from '../../logger'
 import type {
   AgencyStatus,
+  LegacyCleanupJob,
+  LegacyCleanupPreview,
   BoxLocation,
   CombineContainersRequest,
   CreateContainerRequest,
@@ -180,6 +182,38 @@ export default class PrisonerPropertyApiClient extends RestClient {
    */
   setAgencyActive(agencyId: string, active: boolean, username: string): Promise<AgencyStatus> {
     return this.put<AgencyStatus>({ path: `/active-agencies/${agencyId}`, data: { active } }, asSystem(username))
+  }
+
+  /**
+   * What a legacy clean-up would close at a prison for a look-back window, without changing anything.
+   * ROLE_PRISONER_PROPERTY__ADMIN on the system client.
+   */
+  previewLegacyCleanup(agencyId: string, olderThanDays: number, username: string): Promise<LegacyCleanupPreview> {
+    return this.get<LegacyCleanupPreview>(
+      { path: `/active-agencies/${agencyId}/cleanup/preview`, query: { olderThanDays } },
+      asSystem(username),
+    )
+  }
+
+  /**
+   * Queue a legacy clean-up at a prison. The API answers 202 with the job straight away and processes it
+   * asynchronously; 409 when one is already pending or running there. ROLE_PRISONER_PROPERTY__ADMIN.
+   */
+  startLegacyCleanup(agencyId: string, olderThanDays: number, username: string): Promise<LegacyCleanupJob> {
+    return this.post<LegacyCleanupJob>(
+      { path: `/active-agencies/${agencyId}/cleanup`, data: { olderThanDays } },
+      asSystem(username),
+    )
+  }
+
+  /** The clean-up jobs run at a prison, newest first, without their items. ROLE_PRISONER_PROPERTY__ADMIN. */
+  getLegacyCleanupJobs(agencyId: string, username: string): Promise<LegacyCleanupJob[]> {
+    return this.get<LegacyCleanupJob[]>({ path: `/active-agencies/${agencyId}/cleanup` }, asSystem(username))
+  }
+
+  /** One clean-up job with its items and progress. ROLE_PRISONER_PROPERTY__ADMIN. */
+  getLegacyCleanupJob(jobId: string, username: string): Promise<LegacyCleanupJob> {
+    return this.get<LegacyCleanupJob>({ path: `/active-agencies/cleanup/${jobId}` }, asSystem(username))
   }
 
   /**

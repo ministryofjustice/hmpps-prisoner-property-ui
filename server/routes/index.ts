@@ -10,6 +10,7 @@ import removeContainerRoutes from './journeys/removeContainer'
 import combineContainerRoutes from './journeys/combineContainer'
 import adminPrisonsRoutes from './admin/prisons'
 import adminLocationsRoutes from './admin/locations'
+import adminCleanupRoutes from './admin/cleanup'
 
 export default function routes(services: Services): Router {
   const router = Router()
@@ -27,6 +28,7 @@ export default function routes(services: Services): Router {
   router.use(combineContainerRoutes(services, requireActivePrisonMw))
   router.use(adminPrisonsRoutes(services))
   router.use(adminLocationsRoutes(services))
+  router.use(adminCleanupRoutes(services))
 
   return router
 }

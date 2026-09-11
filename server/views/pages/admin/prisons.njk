@@ -80,6 +80,7 @@
             attributes: { "data-qa": "toggle-" + agency.agencyId }
           }) }}
         </form>
+        <a class="govuk-link govuk-!-display-inline-block govuk-!-margin-top-2" href="/admin/prisons/{{ agency.agencyId }}/cleanup" data-qa="cleanup-{{ agency.agencyId }}">Clean up legacy property<span class="govuk-visually-hidden"> for {{ agency.name }}</span></a>
       {% endset %}
       {% set nomisTag %}
         {% if not nomisScreenAvailable %}

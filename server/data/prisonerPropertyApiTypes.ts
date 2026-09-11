@@ -257,6 +257,63 @@ export interface AgencyStatus {
   active: boolean
 }
 
+// The legacy property clean-up run from the admin console. See LegacyCleanupDtos in the API and
+// docs/legacy-cleanup.md there.
+export interface CleanupCount {
+  containers: number
+  prisoners: number
+}
+
+export type IneligibleReason =
+  'UNRESOLVED' | 'OWNER_HERE' | 'IN_TRANSIT' | 'NOT_RELEASED_MOVEMENT' | 'NO_MOVEMENT_DATE' | 'TOO_RECENT'
+
+export interface LegacyCleanupPreview {
+  prisonId: string
+  olderThanDays: number
+  cutoffDate: string
+  generatedAt: string
+  toReturn: CleanupCount
+  toTransfer: CleanupCount
+  dueForReturnNow: CleanupCount
+  dueForTransferOutNow: CleanupCount
+  candidates: CleanupCount
+  ineligible: Partial<Record<IneligibleReason, CleanupCount>>
+  ageBands: { label: string; fromDays: number; toDays: number | null; containers: number }[]
+}
+
+export type LegacyCleanupJobStatus = 'PENDING' | 'STARTED' | 'FINISHED'
+export type LegacyCleanupItemStatus = 'PENDING' | 'PROCESSED' | 'SKIPPED' | 'FAILED'
+
+export interface LegacyCleanupItem {
+  containerId: string
+  prisonerNumber: string
+  action: 'RETURN' | 'TRANSFER'
+  plannedEventDate: string
+  plannedToPrisonId: string | null
+  status: LegacyCleanupItemStatus
+  message: string | null
+  processedAt: string | null
+}
+
+export interface LegacyCleanupJob {
+  id: string
+  prisonId: string
+  status: LegacyCleanupJobStatus
+  olderThanDays: number
+  cutoffDate: string
+  requestedBy: string
+  requestedAt: string
+  startTime: string | null
+  endTime: string | null
+  totalRecords: number
+  processedRecords: number
+  returnedRecords: number
+  transferredRecords: number
+  skippedRecords: number
+  failedRecords: number
+  items?: LegacyCleanupItem[]
+}
+
 // A property storage location for the management screens, with its capacity and how full it is.
 // See PropertyLocationAdminDto in the API.
 export interface PropertyLocationAdmin {

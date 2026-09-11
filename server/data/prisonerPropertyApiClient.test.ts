@@ -120,6 +120,74 @@ describe('PrisonerPropertyApiClient', () => {
     })
   })
 
+  describe('legacy clean-up', () => {
+    const job = {
+      id: 'job-1',
+      prisonId: 'LEI',
+      status: 'PENDING',
+      olderThanDays: 28,
+      cutoffDate: '2026-08-14',
+      requestedBy: 'AUSER_GEN',
+      requestedAt: '2026-09-11T10:00:00',
+      startTime: null as string | null,
+      endTime: null as string | null,
+      totalRecords: 3,
+      processedRecords: 0,
+      returnedRecords: 0,
+      transferredRecords: 0,
+      skippedRecords: 0,
+      failedRecords: 0,
+    }
+
+    it('previewLegacyCleanup GETs the preview for the window with a system token for the user', async () => {
+      const preview = { prisonId: 'LEI', olderThanDays: 14, toReturn: { containers: 2, prisoners: 1 } }
+      nock(config.apis.prisonerPropertyApi.url)
+        .get('/active-agencies/LEI/cleanup/preview')
+        .query({ olderThanDays: 14 })
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, preview)
+
+      const response = await prisonerPropertyApiClient.previewLegacyCleanup('LEI', 14, 'AUSER_GEN')
+
+      expect(response).toEqual(preview)
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+    })
+
+    it('startLegacyCleanup POSTs the window and returns the accepted job', async () => {
+      nock(config.apis.prisonerPropertyApi.url)
+        .post('/active-agencies/LEI/cleanup', { olderThanDays: 28 })
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(202, job)
+
+      const response = await prisonerPropertyApiClient.startLegacyCleanup('LEI', 28, 'AUSER_GEN')
+
+      expect(response).toEqual(job)
+    })
+
+    it('startLegacyCleanup surfaces a 409 when a clean-up is already in flight', async () => {
+      nock(config.apis.prisonerPropertyApi.url)
+        .post('/active-agencies/LEI/cleanup')
+        .reply(409, { status: 409, userMessage: 'A legacy clean-up is already in progress for LEI' })
+
+      await expect(prisonerPropertyApiClient.startLegacyCleanup('LEI', 28, 'AUSER_GEN')).rejects.toMatchObject({
+        responseStatus: 409,
+      })
+    })
+
+    it('getLegacyCleanupJobs and getLegacyCleanupJob GET the jobs', async () => {
+      nock(config.apis.prisonerPropertyApi.url)
+        .get('/active-agencies/LEI/cleanup')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, [job])
+        .get('/active-agencies/cleanup/job-1')
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, { ...job, items: [] })
+
+      expect(await prisonerPropertyApiClient.getLegacyCleanupJobs('LEI', 'AUSER_GEN')).toEqual([job])
+      expect(await prisonerPropertyApiClient.getLegacyCleanupJob('job-1', 'AUSER_GEN')).toEqual({ ...job, items: [] })
+    })
+  })
+
   describe('property location management', () => {
     const location = {
       id: 'loc-1',
