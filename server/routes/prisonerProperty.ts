@@ -2,7 +2,6 @@ import { Router } from 'express'
 import createError from 'http-errors'
 
 import type { Services } from '../services'
-import { Page } from '../services/auditService'
 import { isPrisonerNumber, movementEstablishmentLabel } from '../utils/propertyList'
 import { buildPersonPropertyView, buildReturnedOrTransferredView } from '../utils/personProperty'
 import { buildPrisonerBanner, fallbackPrisonerBanner } from '../utils/prisonerBanner'
@@ -15,7 +14,6 @@ import logger from '../../logger'
 const PRISONER_IMAGE_PLACEHOLDER = '/assets/images/prisoner-image-withheld.svg'
 
 export default function prisonerPropertyRoutes({
-  auditService,
   prisonerPropertyService,
   prisonerService,
   userService,
@@ -57,13 +55,6 @@ export default function prisonerPropertyRoutes({
         return null
       }),
     ])
-
-    await auditService.logPageView(Page.PRISONER_PROPERTY, {
-      who: username,
-      subjectId: prisonerNumber,
-      subjectType: 'PRISONER_NUMBER',
-      correlationId: req.id,
-    })
 
     // Movement status is a prisoner-level attribute mirrored on every container; use it so the banner
     // and the "Establishment" column read "Transferring"/"Released" rather than "Not known", and so the
@@ -117,13 +108,6 @@ export default function prisonerPropertyRoutes({
       }),
     ])
 
-    await auditService.logPageView(Page.PRISONER_PROPERTY_HISTORY, {
-      who: username,
-      subjectId: prisonerNumber,
-      subjectType: 'PRISONER_NUMBER',
-      correlationId: req.id,
-    })
-
     const banner = prisoner
       ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, containers[0]?.prisonerMovementStatus)
       : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
@@ -167,13 +151,6 @@ export default function prisonerPropertyRoutes({
         return null
       }),
     ])
-
-    await auditService.logPageView(Page.PRISONER_PROPERTY_RETURNED, {
-      who: username,
-      subjectId: prisonerNumber,
-      subjectType: 'PRISONER_NUMBER',
-      correlationId: req.id,
-    })
 
     const banner = prisoner
       ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, containers[0]?.prisonerMovementStatus)
@@ -233,14 +210,6 @@ export default function prisonerPropertyRoutes({
     }
 
     const events = await prisonerPropertyService.getContainerEvents(id, username)
-
-    await auditService.logPageView(Page.CONTAINER_HISTORY, {
-      who: username,
-      subjectId: prisonerNumber,
-      subjectType: 'PRISONER_NUMBER',
-      correlationId: req.id,
-      details: { containerId: id },
-    })
 
     const nameByUsername = await userService.getUserDisplayNames(
       events.map(event => event.eventUserId),

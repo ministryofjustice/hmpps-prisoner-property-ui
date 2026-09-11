@@ -1,9 +1,8 @@
 import type { Express } from 'express'
 import { Readable } from 'stream'
 import request from 'supertest'
+import { AuditService } from '@ministryofjustice/hmpps-audit-client'
 import { appWithAllRoutes, flashProvider, user } from './testutils/appSetup'
-import AuditService, { Page } from '../services/auditService'
-import HmppsAuditClient from '../data/hmppsAuditClient'
 import PrisonerPropertyService from '../services/prisonerPropertyService'
 import PrisonerService from '../services/prisonerService'
 import UserService from '../services/userService'
@@ -19,13 +18,13 @@ import type {
 import type { Prisoner } from '../data/prisonerSearchApiTypes'
 import { NomisScreenNotSetUpError } from '../utils/nomisSplash'
 
-jest.mock('../services/auditService')
+jest.mock('@ministryofjustice/hmpps-audit-client')
 jest.mock('../services/prisonerPropertyService')
 jest.mock('../services/prisonerService')
 jest.mock('../services/userService')
 jest.mock('../services/activeAgenciesService')
 
-const auditService = new AuditService({} as HmppsAuditClient) as jest.Mocked<AuditService>
+const auditService = new AuditService(null) as jest.Mocked<AuditService>
 const prisonerPropertyService = new PrisonerPropertyService(null as never) as jest.Mocked<PrisonerPropertyService>
 const prisonerService = new PrisonerService(null as never, null as never) as jest.Mocked<PrisonerService>
 const userService = new UserService(null as never) as jest.Mocked<UserService>
@@ -49,7 +48,7 @@ beforeEach(() => {
     services: { auditService, prisonerPropertyService, prisonerService, userService, activeAgenciesService },
     userSupplier: () => user,
   })
-  auditService.logPageView.mockResolvedValue(undefined)
+  auditService.logAuditEvent.mockResolvedValue(undefined)
   // Default every establishment to switched-on in DPS so existing behaviour (writes gated only on the
   // manage role) holds; the active-prison tests override this to false.
   activeAgenciesService.isPrisonActive.mockResolvedValue(true)
@@ -134,10 +133,6 @@ describe('GET /', () => {
           'MDI',
           expect.objectContaining({ page: 0, size: 50 }),
           user.username,
-        )
-        expect(auditService.logPageView).toHaveBeenCalledWith(
-          Page.PROPERTY_LIST,
-          expect.objectContaining({ who: user.username, details: { prisonId: 'MDI' } }),
         )
       })
   })
@@ -474,7 +469,6 @@ describe('GET /', () => {
       .expect(res => {
         expect(res.text).toContain('You do not have an active caseload')
         expect(prisonerPropertyService.getPrisonProperty).not.toHaveBeenCalled()
-        expect(auditService.logPageView).not.toHaveBeenCalled()
       })
   })
 
@@ -746,10 +740,6 @@ describe('GET /prisoner/:prisonerNumber', () => {
         expect(res.text).toContain('Due for transfer in')
         expect(res.text).not.toContain('no longer in this establishment')
         expect(prisonerPropertyService.getPropertyForPrisoner).toHaveBeenCalledWith('A1234BC', user.username)
-        expect(auditService.logPageView).toHaveBeenCalledWith(
-          Page.PRISONER_PROPERTY,
-          expect.objectContaining({ who: user.username, subjectId: 'A1234BC', subjectType: 'PRISONER_NUMBER' }),
-        )
       })
   })
 
@@ -877,7 +867,6 @@ describe('GET /prisoner/:prisonerNumber', () => {
       .expect(res => {
         expect(res.text).toContain('You do not have an active caseload')
         expect(prisonerPropertyService.getPropertyForPrisoner).not.toHaveBeenCalled()
-        expect(auditService.logPageView).not.toHaveBeenCalled()
       })
   })
 
@@ -1136,10 +1125,6 @@ describe('GET /prisoner/:prisonerNumber/history', () => {
         // the NOMIS-migration note was removed - the per-prison DPS-first-used marker says this instead
         expect(res.text).not.toContain('History events before')
         expect(prisonerPropertyService.getPrisonerPropertyHistory).toHaveBeenCalledWith('A1234BC', user.username)
-        expect(auditService.logPageView).toHaveBeenCalledWith(
-          Page.PRISONER_PROPERTY_HISTORY,
-          expect.objectContaining({ who: user.username, subjectId: 'A1234BC' }),
-        )
       })
   })
 
@@ -1244,10 +1229,6 @@ describe('GET /prisoner/:prisonerNumber/returned', () => {
         expect(res.text).not.toContain('ACTIVE1')
         expect(res.text).not.toContain('COMB1')
         expect(prisonerPropertyService.getPropertyForPrisoner).toHaveBeenCalledWith('A1234BC', user.username)
-        expect(auditService.logPageView).toHaveBeenCalledWith(
-          Page.PRISONER_PROPERTY_RETURNED,
-          expect.objectContaining({ who: user.username, subjectId: 'A1234BC' }),
-        )
       })
   })
 
@@ -1312,10 +1293,6 @@ describe('GET /prisoner/:prisonerNumber/container/:id', () => {
         expect(res.text).toContain('Added to storage')
         expect(res.text).toContain('Moved to Branston (offsite)')
         expect(prisonerPropertyService.getContainerEvents).toHaveBeenCalledWith('c1', user.username)
-        expect(auditService.logPageView).toHaveBeenCalledWith(
-          Page.CONTAINER_HISTORY,
-          expect.objectContaining({ who: user.username, subjectId: 'A1234BC', details: { containerId: 'c1' } }),
-        )
       })
   })
 
@@ -1753,9 +1730,13 @@ describe('Add container journey - steps', () => {
       user.username,
     )
     expect(flashProvider).toHaveBeenCalledWith('success', 'Property container added')
-    expect(auditService.logPageView).toHaveBeenCalledWith(
-      Page.ADD_PROPERTY_CONTAINER,
-      expect.objectContaining({ subjectId: 'A1234BC', details: { count: 1 } }),
+    expect(auditService.logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'CREATE_PROPERTY_CONTAINER',
+        subjectId: 'A1234BC',
+        details: { count: 1 },
+      }),
+      { throwOnError: false, logOnError: true },
     )
   })
 
@@ -2110,9 +2091,13 @@ describe('Remove container journey - steps', () => {
       user.username,
     )
     expect(flashProvider).toHaveBeenCalledWith('success', 'Property container removed')
-    expect(auditService.logPageView).toHaveBeenCalledWith(
-      Page.REMOVE_PROPERTY_CONTAINER,
-      expect.objectContaining({ subjectId: 'A1234BC', details: { containerId: 'c1', outcome: 'RETURNED' } }),
+    expect(auditService.logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'DELETE_PROPERTY_CONTAINER',
+        subjectId: 'A1234BC',
+        details: { containerId: 'c1', outcome: 'RETURNED' },
+      }),
+      { throwOnError: false, logOnError: true },
     )
   })
 
@@ -2335,12 +2320,13 @@ describe('Combine containers journey', () => {
       user.username,
     )
     expect(flashProvider).toHaveBeenCalledWith('success', 'Property containers combined')
-    expect(auditService.logPageView).toHaveBeenCalledWith(
-      Page.COMBINE_PROPERTY_CONTAINERS,
+    expect(auditService.logAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
+        action: 'CREATE_COMBINED_PROPERTY_CONTAINER',
         subjectId: 'A1234BC',
         details: { containerId: 'newC', sourceContainerIds: ['c1', 'c2'] },
       }),
+      { throwOnError: false, logOnError: true },
     )
   })
 
@@ -2524,9 +2510,13 @@ describe('Change container journey', () => {
       user.username,
     )
     expect(flashProvider).toHaveBeenCalledWith('success', 'Property container updated')
-    expect(auditService.logPageView).toHaveBeenCalledWith(
-      Page.CHANGE_PROPERTY_CONTAINER,
-      expect.objectContaining({ subjectId: 'A1234BC', details: { containerId: 'c1' } }),
+    expect(auditService.logAuditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'EDIT_PROPERTY_CONTAINER',
+        subjectId: 'A1234BC',
+        details: { containerId: 'c1' },
+      }),
+      { throwOnError: false, logOnError: true },
     )
   })
 

@@ -5,9 +5,9 @@ import frontendComponents from './mockApis/frontendComponents'
 import manageUsersApi from './mockApis/manageUsersApi'
 import prisonerPropertyApi from './mockApis/prisonerPropertyApi'
 import prisonerSearchApi from './mockApis/prisonerSearchApi'
-import { resetStubs } from './mockApis/wiremock'
+import { getSentAuditEvents, resetStubs, stubAuditSqs } from './mockApis/wiremock'
 
-export { resetStubs }
+export { getSentAuditEvents, resetStubs }
 
 const DEFAULT_ROLES = ['ROLE_SOME_REQUIRED_ROLE']
 
@@ -40,6 +40,8 @@ export const login = async (
     // Prisoner banner defaults: prisoner-search details plus a 404 image (falls back to the placeholder).
     prisonerSearchApi.stubGetPrisoner(),
     prisonerSearchApi.stubGetPrisonerImage(),
+    // Page views are sent to HMPPS Audit over SQS, which posts to the root of AUDIT_SQS_QUEUE_URL
+    stubAuditSqs(),
   ])
   return attemptHmppsAuthLogin(page)
 }

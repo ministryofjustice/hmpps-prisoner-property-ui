@@ -2,7 +2,6 @@ import { Router, type Request, type RequestHandler, type Response } from 'expres
 import createError from 'http-errors'
 
 import type { Services } from '../../services'
-import { Page } from '../../services/auditService'
 import {
   ALL_CONTAINER_TYPES,
   buildPagination,
@@ -426,13 +425,17 @@ export default function changeContainerRoutes(
         return next(error)
       }
 
-      await auditService.logPageView(Page.CHANGE_PROPERTY_CONTAINER, {
-        who: username,
-        subjectId: ctx.prisonerNumber,
-        subjectType: 'PRISONER_NUMBER',
-        correlationId: req.id,
-        details: { containerId: id },
-      })
+      await auditService.logAuditEvent(
+        {
+          action: 'EDIT_PROPERTY_CONTAINER',
+          who: username,
+          subjectId: ctx.prisonerNumber,
+          subjectType: 'PRISONER_ID',
+          correlationId: req.id,
+          details: { containerId: id },
+        },
+        { throwOnError: false, logOnError: true },
+      )
 
       const { origin } = journey
       req.session.changeContainerJourney = undefined

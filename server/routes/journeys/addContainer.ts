@@ -1,7 +1,6 @@
 import { Router, type Request, type RequestHandler, type Response } from 'express'
 
 import type { Services } from '../../services'
-import { Page } from '../../services/auditService'
 import { ALL_CONTAINER_TYPES, buildPagination, containerTypeLabel, DEFAULT_PAGE_SIZE } from '../../utils/propertyList'
 import {
   errorCodeOf,
@@ -463,13 +462,17 @@ export default function addContainerRoutes(
         return next(error)
       }
 
-      await auditService.logPageView(Page.ADD_PROPERTY_CONTAINER, {
-        who: username,
-        subjectId: ctx.prisonerNumber,
-        subjectType: 'PRISONER_NUMBER',
-        correlationId: req.id,
-        details: { count: journey.containers.length },
-      })
+      await auditService.logAuditEvent(
+        {
+          action: 'CREATE_PROPERTY_CONTAINER',
+          who: username,
+          subjectId: ctx.prisonerNumber,
+          subjectType: 'PRISONER_ID',
+          correlationId: req.id,
+          details: { count: journey.containers.length },
+        },
+        { throwOnError: false, logOnError: true },
+      )
 
       const { origin } = journey
       const added = journey.containers.length

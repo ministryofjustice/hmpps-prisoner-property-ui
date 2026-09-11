@@ -1,7 +1,6 @@
 import { Router } from 'express'
 
 import type { Services } from '../../services'
-import { Page } from '../../services/auditService'
 import requireAdminRole from '../../middleware/requireAdminRole'
 import {
   isNomisScreenState,
@@ -10,11 +9,7 @@ import {
   nomisStateSuccessMessage,
 } from '../../utils/nomisSplash'
 
-export default function adminPrisonsRoutes({
-  auditService,
-  prisonerPropertyService,
-  prisonerService,
-}: Services): Router {
+export default function adminPrisonsRoutes({ prisonerPropertyService, prisonerService }: Services): Router {
   const router = Router()
 
   // Admin console: switch the property service on/off per prison. Not caseload-scoped - it is a
@@ -39,8 +34,6 @@ export default function adminPrisonsRoutes({
           )
         : agencies
     ).map(agency => ({ ...agency, nomisState: nomisStates?.get(agency.agencyId) ?? 'NORMAL' }))
-
-    await auditService.logPageView(Page.ADMIN_PRISONS, { who: username, correlationId: req.id })
 
     return res.render('pages/admin/prisons', {
       agencies: filtered,

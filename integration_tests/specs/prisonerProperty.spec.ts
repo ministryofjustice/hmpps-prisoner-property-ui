@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { login, resetStubs } from '../testUtils'
+import { getSentAuditEvents, login, resetStubs } from '../testUtils'
 import prisonerPropertyApi from '../mockApis/prisonerPropertyApi'
 import prisonerSearchApi from '../mockApis/prisonerSearchApi'
 import PropertyListPage from '../pages/propertyListPage'
@@ -81,6 +81,44 @@ test.describe('Person property view', () => {
     await expect(prisonerPage.dueTransferIn.getByRole('cell', { name: 'SN0002' })).toBeVisible()
     await expect(prisonerPage.dueTransferIn.getByRole('cell', { name: 'Leeds (HMP)' })).toBeVisible()
     await expect(prisonerPage.dueTransferIn.getByRole('cell', { name: 'Due for transfer in' })).toBeVisible()
+  })
+
+  test('sends page view events to HMPPS Audit', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [inEstablishmentContainer],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC')
+    await PrisonerPropertyPage.verifyOnPage(page)
+
+    // Signing in lands on the establishment list first, so filter to this page's events. `who` is the
+    // username from the auth token, which the audit middleware reads before setUpCurrentUser runs.
+    const events = await getSentAuditEvents(4)
+    const pageUrl = JSON.stringify({ pageUrl: '/prisoner/A1234BC' })
+    expect(events.filter(event => event.details === pageUrl)).toEqual([
+      {
+        what: 'PAGE_VIEW',
+        who: 'USER1',
+        service: 'hmpps-prisoner-property-ui',
+        subjectId: 'A1234BC',
+        subjectType: 'PRISONER_ID',
+        details: pageUrl,
+      },
+      {
+        what: 'PAGE_VIEW_ACCESS_ATTEMPT',
+        who: 'USER1',
+        service: 'hmpps-prisoner-property-ui',
+        subjectId: 'A1234BC',
+        subjectType: 'PRISONER_ID',
+        details: pageUrl,
+      },
+    ])
+
+    // The banner requests the prisoner photo on every prisoner page, so auditing it would double
+    // count every view. It must be excluded.
+    expect(events.filter(event => event.details?.includes('/image'))).toEqual([])
   })
 
   test('variant B: prisoner has left - warning, due for transfer out and prisoner establishment column', async ({

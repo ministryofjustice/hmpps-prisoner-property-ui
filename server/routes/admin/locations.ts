@@ -1,7 +1,6 @@
 import { Router, type RequestHandler } from 'express'
 
 import type { Services } from '../../services'
-import { Page } from '../../services/auditService'
 import requireLocationAdminRole from '../../middleware/requireLocationAdminRole'
 import { isSafeLocationReturnTo } from '../journeyHelpers'
 
@@ -61,7 +60,7 @@ function validatePropertyLocationForm(
   return errors
 }
 
-export default function adminLocationsRoutes({ auditService, prisonerPropertyService, userService }: Services): Router {
+export default function adminLocationsRoutes({ prisonerPropertyService, userService }: Services): Router {
   const router = Router()
 
   // Property storage location management: add, rename, re-capacity and remove the locations the user's
@@ -73,12 +72,6 @@ export default function adminLocationsRoutes({ auditService, prisonerPropertySer
     if (!activeCaseloadId) return res.render('pages/noCaseload')
 
     const locations = await prisonerPropertyService.getPropertyLocations(activeCaseloadId, username)
-    await auditService.logPageView(Page.MANAGE_PROPERTY_LOCATIONS, {
-      who: username,
-      correlationId: req.id,
-      details: { prisonId: activeCaseloadId },
-    })
-
     return res.render('pages/admin/locations/list', {
       locations,
       successMessage: req.flash('success')[0],

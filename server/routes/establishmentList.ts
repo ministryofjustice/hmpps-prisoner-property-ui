@@ -1,7 +1,6 @@
 import { Router } from 'express'
 
 import type { Services } from '../services'
-import { Page } from '../services/auditService'
 import {
   ALL_CONTAINER_TYPES,
   appliedFilterTags,
@@ -20,7 +19,6 @@ import { canAdminister } from '../middleware/requireAdminRole'
 import { canManageLocations } from '../middleware/requireLocationAdminRole'
 
 export default function establishmentListRoutes({
-  auditService,
   prisonerPropertyService,
   userService,
   activeAgenciesService,
@@ -75,12 +73,6 @@ export default function establishmentListRoutes({
       prisonerPropertyService.getPrisonProperty(activeCaseloadId, apiQuery, username),
       prisonerPropertyService.getPrisonPropertySummary(activeCaseloadId, username).catch((): null => null),
     ])
-
-    await auditService.logPageView(Page.PROPERTY_LIST, {
-      who: username,
-      correlationId: req.id,
-      details: { prisonId: activeCaseloadId },
-    })
 
     // Writes are allowed only when the user holds the manage role AND the establishment is switched on
     // in DPS. When they hold the role but the prison is still managed in NOMIS, show an explanatory
