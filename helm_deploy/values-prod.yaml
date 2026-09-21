@@ -17,5 +17,12 @@ generic-service:
     PRISONER_SEARCH_API_URL: 'https://prisoner-search.prison.service.justice.gov.uk'
     AUDIT_ENABLED: "false"
 
+  allowlist:
+    groups:
+      - digital_staff_and_mojo
+      - moj_cloud_platform
+      - prisons
+      - private_prisons
+
 generic-prometheus-alerts:
   alertSeverity: move-a-prisoner-alerts-prod
