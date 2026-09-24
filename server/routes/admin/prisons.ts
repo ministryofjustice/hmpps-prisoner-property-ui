@@ -4,7 +4,7 @@ import type { Services } from '../../services'
 import requireAdminRole from '../../middleware/requireAdminRole'
 import {
   isNomisScreenState,
-  NOMIS_PROPERTY_MODULE,
+  NOMIS_PROPERTY_MODULES_TEXT,
   NomisScreenNotSetUpError,
   nomisStateSuccessMessage,
 } from '../../utils/nomisSplash'
@@ -39,7 +39,7 @@ export default function adminPrisonsRoutes({ prisonerPropertyService, prisonerSe
       agencies: filtered,
       search,
       nomisScreenAvailable,
-      nomisModule: NOMIS_PROPERTY_MODULE,
+      nomisModules: NOMIS_PROPERTY_MODULES_TEXT,
       activeCount: agencies.filter(agency => agency.active).length,
       totalCount: agencies.length,
       successMessage: req.flash('success')[0],
@@ -64,8 +64,8 @@ export default function adminPrisonsRoutes({ prisonerPropertyService, prisonerSe
     return res.redirect(`/admin/prisons${query ? `?${query}` : ''}`)
   })
 
-  // Control the legacy NOMIS property screen (OIDMPCON) for a prison: show a warning, block it, or
-  // clear it. Independent of the DPS toggle above so the rollout steps stay explicit.
+  // Control the legacy NOMIS property screens (OIDMPCON and OIUPROPE, always together) for a prison:
+  // show a warning, block them, or clear them. Independent of the DPS toggle above so the rollout steps stay explicit.
   router.post('/admin/prisons/:agencyId/nomis-screen', requireAdminRole, async (req, res) => {
     const { username } = res.locals.user
     const agencyId = String(req.params.agencyId)
@@ -82,7 +82,7 @@ export default function adminPrisonsRoutes({ prisonerPropertyService, prisonerSe
         if (error instanceof NomisScreenNotSetUpError) {
           req.flash(
             'error',
-            `The NOMIS ${NOMIS_PROPERTY_MODULE} splash screen has not been set up yet. Create it before changing prison access.`,
+            `The NOMIS ${error.moduleName} splash screen has not been set up yet. Create it before changing prison access.`,
           )
         } else {
           throw error

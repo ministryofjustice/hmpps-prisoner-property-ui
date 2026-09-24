@@ -2852,6 +2852,7 @@ describe('Admin - manage enabled prisons', () => {
       .expect(200)
       .expect(res => {
         expect(res.text).toContain('data-qa="nomis-unavailable"')
+        expect(res.text).toContain('OIDMPCON and OIUPROPE')
         expect(res.text).toContain('Unknown')
         // no NOMIS action buttons when unavailable
         expect(res.text).not.toContain('data-qa="nomis-block-MDI"')
@@ -2887,14 +2888,17 @@ describe('Admin - manage enabled prisons', () => {
   })
 
   it('shows a helpful error when the NOMIS splash screen is not set up', async () => {
-    prisonerService.setNomisScreenState.mockRejectedValue(new NomisScreenNotSetUpError())
+    prisonerService.setNomisScreenState.mockRejectedValue(new NomisScreenNotSetUpError('OIUPROPE'))
 
     return request(adminApp())
       .post('/admin/prisons/MDI/nomis-screen')
       .send({ state: 'WARNING', name: 'Moorland (HMP & YOI)' })
       .expect(302)
       .expect(() => {
-        expect(flashProvider).toHaveBeenCalledWith('error', expect.stringContaining('has not been set up yet'))
+        expect(flashProvider).toHaveBeenCalledWith(
+          'error',
+          'The NOMIS OIUPROPE splash screen has not been set up yet. Create it before changing prison access.',
+        )
       })
   })
 

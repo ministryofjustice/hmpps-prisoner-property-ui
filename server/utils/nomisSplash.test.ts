@@ -47,6 +47,9 @@ describe('nomisSplash', () => {
   })
 
   it('NomisScreenNotSetUpError carries its name', () => {
-    expect(new NomisScreenNotSetUpError().name).toBe('NomisScreenNotSetUpError')
+    const error = new NomisScreenNotSetUpError('OIUPROPE')
+    expect(error.name).toBe('NomisScreenNotSetUpError')
+    expect(error.moduleName).toBe('OIUPROPE')
+    expect(error.message).toContain('OIUPROPE')
   })
 })

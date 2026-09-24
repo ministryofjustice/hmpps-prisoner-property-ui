@@ -2,11 +2,13 @@ import type { SuperAgentRequest } from 'superagent'
 import { stubFor } from './wiremock'
 import type { SplashScreen } from '../../server/data/prisonApiTypes'
 
-const NOMIS_PROPERTY_MODULE = 'OIDMPCON'
+// Matches every NOMIS property screen the admin console warns/blocks together (OIDMPCON and OIUPROPE).
+const NOMIS_PROPERTY_MODULES = '(OIDMPCON|OIUPROPE)'
 
 export default {
-  // Stub the OIDMPCON splash screen the admin console reads to show each prison's NOMIS state. Default
-  // 404 = screen not set up (admin list degrades to the "unavailable" notice).
+  // Stub the NOMIS property splash screens the admin console reads to show each prison's NOMIS state -
+  // both screens return the same conditions. Default 404 = screen not set up (admin list degrades to the
+  // "unavailable" notice).
   stubGetSplashScreen: (
     { conditions = [] as SplashScreen['conditions'], priority = undefined as number | undefined } = {},
     httpStatus = 200,
@@ -15,19 +17,22 @@ export default {
       priority,
       request: {
         method: 'GET',
-        urlPath: `/prison-api/api/splash-screen/${NOMIS_PROPERTY_MODULE}`,
+        urlPathPattern: `/prison-api/api/splash-screen/${NOMIS_PROPERTY_MODULES}`,
       },
       response: {
         status: httpStatus,
         headers: { 'Content-Type': 'application/json;charset=UTF-8' },
-        jsonBody: { moduleName: NOMIS_PROPERTY_MODULE, blockAccessType: 'COND', conditions },
+        jsonBody: { moduleName: 'OIDMPCON', blockAccessType: 'COND', conditions },
       },
     }),
 
   // Stub the write endpoints used by the NOMIS controls so a control POST succeeds in e2e.
   stubAddSplashCondition: (): SuperAgentRequest =>
     stubFor({
-      request: { method: 'POST', urlPath: `/prison-api/api/splash-screen/${NOMIS_PROPERTY_MODULE}/condition` },
+      request: {
+        method: 'POST',
+        urlPathPattern: `/prison-api/api/splash-screen/${NOMIS_PROPERTY_MODULES}/condition`,
+      },
       response: { status: 200, headers: { 'Content-Type': 'application/json;charset=UTF-8' }, jsonBody: {} },
     }),
 
@@ -35,7 +40,7 @@ export default {
     stubFor({
       request: {
         method: 'PUT',
-        urlPathPattern: `/prison-api/api/splash-screen/${NOMIS_PROPERTY_MODULE}/condition/.*`,
+        urlPathPattern: `/prison-api/api/splash-screen/${NOMIS_PROPERTY_MODULES}/condition/.*`,
       },
       response: { status: 200, headers: { 'Content-Type': 'application/json;charset=UTF-8' }, jsonBody: {} },
     }),
@@ -44,7 +49,7 @@ export default {
     stubFor({
       request: {
         method: 'DELETE',
-        urlPathPattern: `/prison-api/api/splash-screen/${NOMIS_PROPERTY_MODULE}/condition/.*`,
+        urlPathPattern: `/prison-api/api/splash-screen/${NOMIS_PROPERTY_MODULES}/condition/.*`,
       },
       response: { status: 200 },
     }),

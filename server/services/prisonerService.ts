@@ -3,10 +3,12 @@ import PrisonerSearchApiClient from '../data/prisonerSearchApiClient'
 import PrisonApiClient from '../data/prisonApiClient'
 import type { Prisoner } from '../data/prisonerSearchApiTypes'
 import type { RestPage } from '../data/prisonerPropertyApiTypes'
+import type { SplashScreenCondition } from '../data/prisonApiTypes'
 import {
   CASELOAD_CONDITION,
   deriveNomisState,
-  NOMIS_PROPERTY_MODULE,
+  NOMIS_PROPERTY_MODULES,
+  NOMIS_PROPERTY_MODULES_TEXT,
   NomisScreenNotSetUpError,
   type NomisScreenState,
 } from '../utils/nomisSplash'
@@ -38,66 +40,74 @@ export default class PrisonerService {
 
   /**
    * Read each prison's NOMIS property-screen state (Normal / Warning / Blocked) from the OIDMPCON
-   * splash screen's caseload conditions. Returns a prisonId -> state map, or `null` if the screen
-   * cannot be read (not set up yet, missing role, or prison-api down) so the admin list degrades to an
-   * "unavailable" notice rather than failing.
+   * splash screen's caseload conditions. Every property screen must be readable, so the admin console
+   * never offers a change it could only half apply. Returns a prisonId -> state map, or `null` if any
+   * screen cannot be read (not set up yet, missing role, or prison-api down) so the admin list degrades
+   * to an "unavailable" notice rather than failing.
    */
   async getNomisScreenStates(username: string): Promise<Map<string, NomisScreenState> | null> {
     try {
-      const screen = await this.prisonApiClient.getSplashScreen(NOMIS_PROPERTY_MODULE, username)
+      const screens = await Promise.all(
+        NOMIS_PROPERTY_MODULES.map(module => this.prisonApiClient.getSplashScreen(module, username)),
+      )
       const states = new Map<string, NomisScreenState>()
-      for (const condition of screen.conditions ?? []) {
+      for (const condition of screens[0].conditions ?? []) {
         if (condition.conditionType === CASELOAD_CONDITION) {
           states.set(condition.conditionValue, condition.blockAccess ? 'BLOCKED' : 'WARNING')
         }
       }
       return states
     } catch (error) {
-      logger.warn(`Failed to read NOMIS ${NOMIS_PROPERTY_MODULE} splash screen: ${(error as Error).message}`)
+      logger.warn(`Failed to read NOMIS ${NOMIS_PROPERTY_MODULES_TEXT} splash screens: ${(error as Error).message}`)
       return null
     }
   }
 
   /**
-   * Move a prison's NOMIS property screen to the target state. Reads the screen first so the change is
-   * idempotent — it adds, updates or removes the caseload condition depending on the current state,
-   * never duplicating or acting on a missing condition. Throws `NomisScreenNotSetUpError` if the
-   * OIDMPCON screen has not been created yet (its message text is configured manually first).
+   * Move a prison's NOMIS property screens to the target state. Reads every screen before changing any,
+   * throwing `NomisScreenNotSetUpError` if one has not been created yet (its message text is configured
+   * manually first). Each screen is then changed independently and idempotently - its caseload condition
+   * is added, updated or removed depending on that screen's own current state - so re-applying a state
+   * brings a screen that is out of step back into line.
    */
   async setNomisScreenState(agencyId: string, target: NomisScreenState, username: string): Promise<void> {
-    let conditions
-    try {
-      conditions = (await this.prisonApiClient.getSplashScreen(NOMIS_PROPERTY_MODULE, username)).conditions ?? []
-    } catch (error) {
-      if ((error as { responseStatus?: number }).responseStatus === 404) throw new NomisScreenNotSetUpError()
-      throw error
-    }
+    const screens = await Promise.all(
+      NOMIS_PROPERTY_MODULES.map(async module => {
+        try {
+          return { module, conditions: (await this.prisonApiClient.getSplashScreen(module, username)).conditions ?? [] }
+        } catch (error) {
+          if ((error as { responseStatus?: number }).responseStatus === 404) throw new NomisScreenNotSetUpError(module)
+          throw error
+        }
+      }),
+    )
 
+    for (const { module, conditions } of screens) {
+      // eslint-disable-next-line no-await-in-loop
+      await this.setScreenState(module, conditions, agencyId, target, username)
+    }
+  }
+
+  private async setScreenState(
+    module: string,
+    conditions: SplashScreenCondition[],
+    agencyId: string,
+    target: NomisScreenState,
+    username: string,
+  ): Promise<void> {
     const current = deriveNomisState(conditions, agencyId)
     if (current === target) return
 
     if (target === 'NORMAL') {
-      await this.prisonApiClient.removeSplashCondition(NOMIS_PROPERTY_MODULE, CASELOAD_CONDITION, agencyId, username)
+      await this.prisonApiClient.removeSplashCondition(module, CASELOAD_CONDITION, agencyId, username)
       return
     }
 
     const blockAccess = target === 'BLOCKED'
     if (current === 'NORMAL') {
-      await this.prisonApiClient.addSplashCondition(
-        NOMIS_PROPERTY_MODULE,
-        CASELOAD_CONDITION,
-        agencyId,
-        blockAccess,
-        username,
-      )
+      await this.prisonApiClient.addSplashCondition(module, CASELOAD_CONDITION, agencyId, blockAccess, username)
     } else {
-      await this.prisonApiClient.updateSplashCondition(
-        NOMIS_PROPERTY_MODULE,
-        CASELOAD_CONDITION,
-        agencyId,
-        blockAccess,
-        username,
-      )
+      await this.prisonApiClient.updateSplashCondition(module, CASELOAD_CONDITION, agencyId, blockAccess, username)
     }
   }
 }
