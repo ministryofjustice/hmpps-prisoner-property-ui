@@ -101,7 +101,7 @@ own file.
 | **Change container** | `journeys/changeContainer.ts` | Details → where stored → location → check → confirm. | manage + active prison |
 | **Remove container** | `journeys/removeContainer.ts` | Reason → (transfer interruption) → check → confirm. | manage + active prison |
 | **Combine containers** | `journeys/combineContainer.ts` | Select → details → location → check → confirm. | manage + active prison |
-| **Admin: prisons** (`/admin/prisons`) | `admin/prisons.ts` | The rollout console: switch prisons onto DPS, and control the warning staff see on the NOMIS property screen. | admin |
+| **Admin: prisons** (`/admin/prisons`) | `admin/prisons.ts` | The rollout console: switch prisons onto DPS, and control the warning staff see on the NOMIS property screens (OIDMPCON and OIUPROPE). | admin |
 | **Admin: locations** (`/admin/locations`) | `admin/locations.ts` | Add, edit and remove a prison's storage locations. | location admin |
 | **Admin: legacy clean-up** (`/admin/prisons/:agencyId/cleanup`) | `admin/cleanup.ts` | Preview what a look-back window would close of a prison's NOMIS backlog (released / moved-on owners), run it, and follow the queued job. The job page reloads itself every 5 s with a CSP-nonced inline script - not a meta refresh, which fails the accessibility checks. | admin |
 
@@ -138,7 +138,7 @@ Thin by design — most are a pass-through to a data client. The exceptions earn
 | Service | Responsibility |
 | --- | --- |
 | `prisonerPropertyService` | Everything property. A direct wrapper over the property API client. |
-| `prisonerService` | Prisoner detail and photo, plus the NOMIS splash-screen read/write logic (idempotent add/update/remove of the caseload condition). |
+| `prisonerService` | Prisoner detail and photo, plus the NOMIS splash-screen read/write logic for the property screens OIDMPCON and OIUPROPE, which are always warned/blocked together (idempotent add/update/remove of the caseload condition on each screen; state shown from OIDMPCON). |
 | `userService` | The signed-in user's active caseload — which scopes the whole app — and staff display-name lookups. **Caches names in memory for 1 hour.** |
 | `activeAgenciesService` | Is this prison live on DPS? **Read live, not cached** — see below. |
 | `auditService` | Records page views to HMPPS Audit over SQS. |

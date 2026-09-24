@@ -1,8 +1,13 @@
 import type { SplashScreenCondition } from '../data/prisonApiTypes'
 
-// The NOMIS screen/module that manages prisoner property. Blocking it for a caseload forces staff at
-// that prison to use DPS instead — the NOMIS half of the DPS/NOMIS mutual-exclusivity rollout.
-export const NOMIS_PROPERTY_MODULE = 'OIDMPCON'
+// The NOMIS screens/modules that manage prisoner property. Blocking them for a caseload forces staff at
+// that prison to use DPS instead — the NOMIS half of the DPS/NOMIS mutual-exclusivity rollout. They are
+// always warned/blocked together; the first (OIDMPCON, property management) drives the state shown.
+// OIUPROPE is the Deactivate Property Box admin screen.
+export const NOMIS_PROPERTY_MODULES = ['OIDMPCON', 'OIUPROPE'] as const
+
+// The screens as a readable list for admin-console messages, e.g. "OIDMPCON and OIUPROPE".
+export const NOMIS_PROPERTY_MODULES_TEXT = NOMIS_PROPERTY_MODULES.join(' and ')
 
 // We drive access per prison, so every condition we manage is a CASELOAD condition keyed by prison id.
 export const CASELOAD_CONDITION = 'CASELOAD'
@@ -39,11 +44,11 @@ export const nomisStateSuccessMessage = (name: string, state: NomisScreenState):
   }
 }
 
-// Thrown when an admin tries to warn/block a caseload but the OIDMPCON splash screen has not been set
-// up in NOMIS yet (the warning/blocked message text is configured manually first).
+// Thrown when an admin tries to warn/block a caseload but one of the property splash screens has not
+// been set up in NOMIS yet (the warning/blocked message text is configured manually first).
 export class NomisScreenNotSetUpError extends Error {
-  constructor() {
-    super(`The NOMIS ${NOMIS_PROPERTY_MODULE} splash screen has not been set up`)
+  constructor(readonly moduleName: string) {
+    super(`The NOMIS ${moduleName} splash screen has not been set up`)
     this.name = 'NomisScreenNotSetUpError'
   }
 }
