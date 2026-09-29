@@ -101,7 +101,6 @@
         <div class="app-search-panel__selected" data-qa="selected-filters">
           <div class="app-search-panel__selected-header">
             <h3 class="govuk-heading-s govuk-!-margin-bottom-1">Selected filters</h3>
-            <a class="govuk-link" href="{{ clearFiltersHref }}" data-qa="clear-all-filters">Clear filters</a>
           </div>
           <ul class="moj-filter-tags">
             {% for filter in appliedFilters %}
@@ -115,7 +114,8 @@
         </div>
       {% endif %}
 
-      <details class="govuk-details app-search-panel__filters" data-qa="filters">
+      <div class="app-search-panel__filters">
+      <details class="govuk-details app-search-panel__filters-details" data-qa="filters">
         <summary class="govuk-details__summary">
           <span class="govuk-details__summary-text">Filters</span>
         </summary>
@@ -155,9 +155,10 @@
           }) }}
 
           {{ govukButton({ text: "Apply filters", attributes: { "data-qa": "apply-filters" } }) }}
-          <a class="govuk-link govuk-!-margin-left-2" href="/?clear=1" data-qa="clear-filters">Clear filters</a>
         </div>
       </details>
+      <a class="govuk-link" href="{{ clearFiltersHref }}" data-qa="clear-filters">Clear filters</a>
+      </div>
     </form>
   </div>
 

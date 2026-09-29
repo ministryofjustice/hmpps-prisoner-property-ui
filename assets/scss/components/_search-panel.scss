@@ -52,9 +52,25 @@
     }
   }
 
+  // "Filters" toggle with "Clear filters" beside it.
   &__filters {
+    display: flex;
+    align-items: baseline;
+    gap: govuk-spacing(4);
     @include govuk-responsive-margin(4, 'top');
-    margin-bottom: 0;
+    container-type: inline-size;
+
+    &-details {
+      flex: 0 1 auto;
+      margin-bottom: 0;
+
+      // Full panel width, but the negative margin stops it widening <details> and pushing the link away.
+      .govuk-details__text {
+        box-sizing: border-box;
+        width: 100cqi;
+        margin-right: -100cqi;
+      }
+    }
   }
 }
 
