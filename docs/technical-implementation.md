@@ -206,8 +206,11 @@ makes it unit-testable without an Express app.
 
 > **There is one status palette: `statusTags.ts`.** There used to be more than one, and they had drifted
 > apart — the same container read as a different colour depending on which screen you were looking at.
-> `containerStatusTag` is now the single source, imported by the timeline, the establishment list and the
-> person view alike, so a colour change lands everywhere at once. Change it there, not at a call site.
+> `containerStatusTag` is now the single source, imported by the timeline, the establishment list, the
+> person view and the remove journey's result alike, so a colour change lands everywhere at once. Change it
+> there, not at a call site. The colours of the statuses property leaves storage with (returned, disposed,
+> transferred out, created in error, removed) were set by design for the list's "Property no longer held"
+> filter (MAPB-934), which submits those statuses alongside the live ones in the same `status` parameter.
 
 The one genuinely screen-specific tag is *Due for transfer in* (`DUE_FOR_TRANSFER_IN_TAG` in
 `propertyList.ts`). It is **viewer-relative** rather than a property of the container: the same box is

@@ -36,7 +36,14 @@ describe('propertyList utils', () => {
       expect(statusTag('DISPOSAL_REQUIRED')).toEqual({ text: 'Due for disposal', classes: 'govuk-tag--orange' })
       expect(statusTag('DUE_FOR_TRANSFER_OUT')).toEqual({ text: 'Due for transfer out', classes: 'govuk-tag--grey' })
       expect(statusTag('DUE_FOR_RETURN')).toEqual({ text: 'Due for return', classes: 'govuk-tag--yellow' })
-      expect(statusTag('REMOVED')).toEqual({ text: 'Removed', classes: 'govuk-tag--grey' })
+    })
+
+    it('colours the statuses property leaves storage with as design set them', () => {
+      expect(statusTag('RETURNED')).toEqual({ text: 'Returned', classes: 'govuk-tag--magenta' })
+      expect(statusTag('DISPOSED')).toEqual({ text: 'Disposed', classes: 'govuk-tag--orange' })
+      expect(statusTag('TRANSFER')).toEqual({ text: 'Transferred out', classes: 'govuk-tag--blue' })
+      expect(statusTag('CREATED_IN_ERROR')).toEqual({ text: 'Created in error', classes: 'govuk-tag--grey' })
+      expect(statusTag('REMOVED')).toEqual({ text: 'Removed', classes: 'moj-tag--grey' })
     })
   })
 
@@ -218,7 +225,6 @@ describe('propertyList utils', () => {
         q: 'A1234BC',
         containerType: ['STANDARD', 'VALUABLES'],
         status: ['STORED', 'BOGUS'],
-        includeRemoved: 'true',
         page: '3',
       } as unknown as ParsedQs
 
@@ -227,16 +233,31 @@ describe('propertyList utils', () => {
       expect(result.search).toBe('A1234BC')
       expect(result.containerTypes).toEqual(['STANDARD', 'VALUABLES'])
       expect(result.statuses).toEqual(['STORED'])
-      expect(result.includeRemoved).toBe(true)
       expect(result.page).toBe(3)
       expect(result.apiQuery).toEqual({
         query: 'A1234BC',
         containerType: ['STANDARD', 'VALUABLES'],
         status: ['STORED'],
-        includeRemoved: true,
         page: 2,
         size: 20,
       })
+    })
+
+    it('passes the "Property no longer held" statuses to the API alongside any live ones', () => {
+      const result = parsePropertyListQuery(
+        { status: ['DUE_FOR_RETURN', 'RETURNED', 'TRANSFER', 'REMOVED'] } as unknown as ParsedQs,
+        20,
+      )
+
+      expect(result.statuses).toEqual(['DUE_FOR_RETURN', 'RETURNED', 'TRANSFER', 'REMOVED'])
+      expect(result.apiQuery.status).toEqual(['DUE_FOR_RETURN', 'RETURNED', 'TRANSFER', 'REMOVED'])
+    })
+
+    it('ignores the old "Removed, returned or disposed of" checkbox left in a remembered query', () => {
+      const result = parsePropertyListQuery({ includeRemoved: 'true' } as unknown as ParsedQs, 20)
+
+      expect(result.statuses).toEqual([])
+      expect(result.apiQuery).toEqual({ page: 0, size: 20 })
     })
 
     it('accepts the DUE_FOR_RETURN status filter and passes it to the API', () => {
@@ -290,16 +311,14 @@ describe('propertyList utils', () => {
       expect(result.apiQuery.personLocation).toBeUndefined()
     })
 
-    it('defaults page to 1 and drops invalid container types / empty status / unticked includeRemoved', () => {
+    it('defaults page to 1 and drops invalid container types and an empty status', () => {
       const result = parsePropertyListQuery({ containerType: 'NOPE', page: '0' } as unknown as ParsedQs, 20)
 
       expect(result.page).toBe(1)
       expect(result.containerTypes).toEqual([])
-      expect(result.includeRemoved).toBe(false)
       expect(result.apiQuery.query).toBeUndefined()
       expect(result.apiQuery.containerType).toBeUndefined()
       expect(result.apiQuery.status).toBeUndefined()
-      expect(result.apiQuery.includeRemoved).toBeUndefined()
       expect(result.apiQuery.page).toBe(0)
     })
   })
@@ -322,9 +341,8 @@ describe('propertyList utils', () => {
       const original = {
         q: 'A1234BC',
         containerType: ['STANDARD', 'VALUABLES'],
-        status: ['STORED', 'DUE_FOR_TRANSFER_IN'],
+        status: ['STORED', 'DUE_FOR_TRANSFER_IN', 'DISPOSED'],
         personLocation: ['IN_ESTABLISHMENT'],
-        includeRemoved: 'true',
         page: '3',
       }
       const parsed = parse(original)
@@ -339,7 +357,6 @@ describe('propertyList utils', () => {
       expect(rebuilt.statuses).toEqual(parsed.statuses)
       expect(rebuilt.dueForTransferIn).toBe(parsed.dueForTransferIn)
       expect(rebuilt.personLocations).toEqual(parsed.personLocations)
-      expect(rebuilt.includeRemoved).toBe(parsed.includeRemoved)
       expect(rebuilt.page).toBe(parsed.page)
     })
 
@@ -382,16 +399,16 @@ describe('propertyList utils', () => {
     it('names the group in each label, since the values do not speak for themselves', () => {
       const tags = tagsFor({
         containerType: 'STANDARD',
-        status: 'DUE_FOR_RETURN',
+        status: ['DUE_FOR_RETURN', 'RETURNED', 'CREATED_IN_ERROR'],
         personLocation: 'IN_ESTABLISHMENT',
-        includeRemoved: 'true',
       })
 
       expect(tags.map(tag => tag.text)).toEqual([
         'Type: Standard',
         'Status: Due for return',
+        'No longer held: Returned',
+        'No longer held: Created in error',
         'People: In this establishment',
-        'Including removed property',
       ])
     })
 

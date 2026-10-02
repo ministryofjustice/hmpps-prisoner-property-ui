@@ -104,19 +104,19 @@ describe('buildReturnedOrTransferredView', () => {
     expect(rows.map(r => r.container.id)).toEqual(['transferred', 'disposed', 'returned', 'removed'])
     expect(rows.find(r => r.container.id === 'transferred')!.status).toEqual({
       text: 'Transferred out',
-      classes: 'govuk-tag--grey',
+      classes: 'govuk-tag--blue',
     })
     expect(rows.find(r => r.container.id === 'returned')!.status).toEqual({
       text: 'Returned',
-      classes: 'govuk-tag--green',
+      classes: 'govuk-tag--magenta',
     })
     expect(rows.find(r => r.container.id === 'disposed')!.status).toEqual({
       text: 'Disposed',
-      classes: 'govuk-tag--red',
+      classes: 'govuk-tag--orange',
     })
     expect(rows.find(r => r.container.id === 'removed')!.status).toEqual({
       text: 'Removed',
-      classes: 'govuk-tag--grey',
+      classes: 'moj-tag--grey',
     })
   })
 
@@ -138,7 +138,7 @@ describe('buildReturnedOrTransferredView', () => {
     const rows = buildReturnedOrTransferredView([inFlight])
 
     expect(rows.map(r => r.container.id)).toEqual(['in-flight'])
-    expect(rows[0]!.status).toEqual({ text: 'Transferred out', classes: 'govuk-tag--grey' })
+    expect(rows[0]!.status).toEqual({ text: 'Transferred out', classes: 'govuk-tag--blue' })
   })
 })
 

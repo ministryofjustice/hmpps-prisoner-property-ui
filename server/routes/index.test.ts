@@ -386,7 +386,7 @@ describe('GET /', () => {
     prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
 
     return request(app)
-      .get('/?q=A1234BC&containerType=STANDARD&status=STORED&includeRemoved=true')
+      .get('/?q=A1234BC&containerType=STANDARD&status=STORED&status=RETURNED')
       .expect(200)
       .expect(() => {
         expect(prisonerPropertyService.getPrisonProperty).toHaveBeenCalledWith(
@@ -394,11 +394,44 @@ describe('GET /', () => {
           expect.objectContaining({
             query: 'A1234BC',
             containerType: ['STANDARD'],
-            status: ['STORED'],
-            includeRemoved: true,
+            status: ['STORED', 'RETURNED'],
           }),
           user.username,
         )
+      })
+  })
+
+  it('offers the "Property no longer held" filter by how the property left, ticking the chosen ones', async () => {
+    userService.getActiveCaseload.mockResolvedValue({
+      activeCaseloadId: 'MDI',
+      activeCaseloadName: 'Moorland (HMP & YOI)',
+      caseloadIds: ['MDI'],
+    })
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+
+    return request(app)
+      .get('/?status=DISPOSED&status=REMOVED')
+      .expect(200)
+      .expect(res => {
+        expect(prisonerPropertyService.getPrisonProperty).toHaveBeenCalledWith(
+          'MDI',
+          expect.objectContaining({ status: ['DISPOSED', 'REMOVED'] }),
+          user.username,
+        )
+        const filter = res.text.slice(res.text.indexOf('Property no longer held'))
+        const labels = ['Returned', 'Disposed', 'Transferred out', 'Created in error', 'Removed']
+        labels.reduce((from, label) => {
+          const at = filter.indexOf(label, from)
+          expect(at).toBeGreaterThan(from)
+          return at
+        }, 0)
+        expect(res.text).toMatch(/id="noLongerHeld-2" name="status" type="checkbox" value="DISPOSED" checked/)
+        expect(res.text).toMatch(/id="noLongerHeld-5" name="status" type="checkbox" value="REMOVED" checked/)
+        expect(res.text).toMatch(/id="noLongerHeld" name="status" type="checkbox" value="RETURNED">/)
+        expect(res.text).not.toContain('Removed, returned or disposed of')
+        expect(res.text).toContain('No longer held: Disposed')
+        expect(res.text).toContain('No records found for the selected filter.')
+        expect(res.text).not.toContain('No property containers found.')
       })
   })
 
@@ -599,9 +632,9 @@ describe('GET /', () => {
 
     it('restores the last search and filters when returning to a bare list URL', async () => {
       const agent = request.agent(app)
-      await agent.get('/?q=A1234BC&status=DUE_FOR_RETURN&includeRemoved=true').expect(200)
+      await agent.get('/?q=A1234BC&status=DUE_FOR_RETURN&status=CREATED_IN_ERROR').expect(200)
 
-      return agent.get('/').expect(302).expect('Location', '/?q=A1234BC&status=DUE_FOR_RETURN&includeRemoved=true')
+      return agent.get('/').expect(302).expect('Location', '/?q=A1234BC&status=DUE_FOR_RETURN&status=CREATED_IN_ERROR')
     })
 
     it('restores the page, so returning does not lose your place in a long list', async () => {
