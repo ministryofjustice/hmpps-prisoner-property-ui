@@ -2,20 +2,36 @@ import { Router } from 'express'
 
 import type { Services } from '../../services'
 import requireAdminRole from '../../middleware/requireAdminRole'
-import type { AgencyStatus, LegacyCleanupJob, LegacyCleanupPreview } from '../../data/prisonerPropertyApiTypes'
-
-export const DEFAULT_OLDER_THAN_DAYS = 28
-const MIN_OLDER_THAN_DAYS = 1
-const MAX_OLDER_THAN_DAYS = 3650
+import type {
+  AgencyStatus,
+  CleanupCount,
+  CleanupReason,
+  LegacyCleanupItem,
+  LegacyCleanupJob,
+  LegacyCleanupPreview,
+} from '../../data/prisonerPropertyApiTypes'
 
 /** Human wording for why the preview left containers alone, keyed by the API's IneligibleReason. */
 export const INELIGIBLE_REASON_LABELS: Record<string, string> = {
+  CONFISCATED: 'Confiscated property',
+  DISPOSAL_DATE_NOT_REACHED: 'The disposal date has not been reached',
   OWNER_HERE: 'The person is at this prison',
-  TOO_RECENT: 'The person left within the window',
+  TOO_RECENT: 'The person left less than 13 months ago',
   IN_TRANSIT: 'The person is in transit between prisons',
   UNRESOLVED: 'The person could not be found in prisoner search',
   NOT_RELEASED_MOVEMENT: 'The person is out, but not on a release',
   NO_MOVEMENT_DATE: 'Prisoner search has no date for the movement',
+}
+
+/**
+ * Why the people whose property will be removed left, keyed by the API's CleanupReason, in the order the
+ * preview lists them. Whatever the reason, the property is marked as removed.
+ */
+export const REMOVAL_REASON_LABELS: Record<CleanupReason, string> = {
+  RELEASED: 'Released',
+  DIED: 'Died in custody',
+  ESCAPED: 'Escaped or absconded',
+  TRANSFERRED: 'Now at another prison',
 }
 
 export const JOB_STATUS_LABELS: Record<string, string> = {
@@ -24,25 +40,7 @@ export const JOB_STATUS_LABELS: Record<string, string> = {
   FINISHED: 'Finished',
 }
 
-/**
- * Parse the look-back window from a query string or form body: a whole number of days, defaulting when
- * absent. Returns the error message instead of a value when it is present but unusable, so the page can
- * show it against the field rather than silently falling back.
- */
-export const parseOlderThanDays = (raw: unknown): { value: number; error?: string } => {
-  if (raw === undefined || raw === null || (typeof raw === 'string' && raw.trim() === '')) {
-    return { value: DEFAULT_OLDER_THAN_DAYS }
-  }
-  const text = String(raw).trim()
-  const value = Number(text)
-  if (!/^\d+$/.test(text) || !Number.isInteger(value) || value < MIN_OLDER_THAN_DAYS || value > MAX_OLDER_THAN_DAYS) {
-    return {
-      value: DEFAULT_OLDER_THAN_DAYS,
-      error: `Enter a whole number of days between ${MIN_OLDER_THAN_DAYS} and ${MAX_OLDER_THAN_DAYS}`,
-    }
-  }
-  return { value }
-}
+const NONE: CleanupCount = { containers: 0, prisoners: 0 }
 
 const isInFlight = (job: LegacyCleanupJob) => job.status === 'PENDING' || job.status === 'STARTED'
 
@@ -54,25 +52,22 @@ export default function adminCleanupRoutes({ prisonerPropertyService }: Services
     return agencies.find(agency => agency.agencyId === agencyId) ?? { agencyId, name: agencyId, active: false }
   }
 
-  // The preview: what a run with this window would close, against what the tiles currently show. Changing
-  // the window re-submits as a GET so the URL stays shareable and the back button behaves.
+  // The preview: what a run would close under the fixed 13-month retention rule, against what the tiles
+  // currently show.
   router.get('/admin/prisons/:agencyId/cleanup', requireAdminRole, async (req, res) => {
     const { username } = res.locals.user
     const agencyId = String(req.params.agencyId)
-    const { value: olderThanDays, error } = parseOlderThanDays(req.query.olderThanDays)
 
     const [agency, jobs, preview] = await Promise.all([
       findAgency(agencyId, username),
       prisonerPropertyService.getLegacyCleanupJobs(agencyId, username),
-      error ? Promise.resolve(null) : prisonerPropertyService.previewLegacyCleanup(agencyId, olderThanDays, username),
+      prisonerPropertyService.previewLegacyCleanup(agencyId, username),
     ])
     const inFlight = jobs.find(isInFlight)
 
-    return res.status(error ? 400 : 200).render('pages/admin/cleanup/preview', {
+    return res.render('pages/admin/cleanup/preview', {
       agency,
-      olderThanDays: error ? String(req.query.olderThanDays) : olderThanDays,
-      errors: error ? { olderThanDays: error } : {},
-      preview: preview && presentPreview(preview),
+      preview: presentPreview(preview),
       inFlight,
       jobs: jobs.map(presentJob),
       successMessage: req.flash('success')[0],
@@ -85,14 +80,9 @@ export default function adminCleanupRoutes({ prisonerPropertyService }: Services
   router.post('/admin/prisons/:agencyId/cleanup', requireAdminRole, async (req, res) => {
     const { username } = res.locals.user
     const agencyId = String(req.params.agencyId)
-    const { value: olderThanDays, error } = parseOlderThanDays(req.body.olderThanDays)
-    if (error) {
-      req.flash('error', error)
-      return res.redirect(`/admin/prisons/${agencyId}/cleanup`)
-    }
 
     try {
-      const job = await prisonerPropertyService.startLegacyCleanup(agencyId, olderThanDays, username)
+      const job = await prisonerPropertyService.startLegacyCleanup(agencyId, username)
       const name = typeof req.body.name === 'string' && req.body.name ? req.body.name : agencyId
       req.flash(
         'success',
@@ -107,7 +97,7 @@ export default function adminCleanupRoutes({ prisonerPropertyService }: Services
           'error',
           'A clean-up is already running for this prison. Wait for it to finish before starting another.',
         )
-        return res.redirect(`/admin/prisons/${agencyId}/cleanup?olderThanDays=${olderThanDays}`)
+        return res.redirect(`/admin/prisons/${agencyId}/cleanup`)
       }
       throw e
     }
@@ -129,7 +119,9 @@ export default function adminCleanupRoutes({ prisonerPropertyService }: Services
       agency,
       job: presentJob(job),
       inProgress: isInFlight(job),
-      attention: (job.items ?? []).filter(item => item.status === 'SKIPPED' || item.status === 'FAILED'),
+      attention: (job.items ?? [])
+        .filter(item => item.status === 'SKIPPED' || item.status === 'FAILED')
+        .map(item => ({ ...item, actionLabel: actionLabel(item) })),
       successMessage: req.flash('success')[0],
     })
   })
@@ -137,16 +129,29 @@ export default function adminCleanupRoutes({ prisonerPropertyService }: Services
   return router
 }
 
+// REMOVE since the 13-month rule; RETURN and TRANSFER only appear on jobs run before it.
+const actionLabel = (item: LegacyCleanupItem): string => {
+  if (item.action === 'REMOVE') return 'Remove'
+  if (item.action === 'RETURN') return 'Return'
+  return item.plannedToPrisonId ? `Transfer to ${item.plannedToPrisonId}` : 'Transfer'
+}
+
 const presentPreview = (preview: LegacyCleanupPreview) => ({
   ...preview,
-  willClose: preview.toReturn.containers + preview.toTransfer.containers,
+  willClose: preview.toRemove.containers,
+  reasonRows: (Object.keys(REMOVAL_REASON_LABELS) as CleanupReason[])
+    .map(reason => ({ label: REMOVAL_REASON_LABELS[reason], ...(preview.toRemoveByReason[reason] ?? NONE) }))
+    .filter(row => row.containers > 0),
   ineligibleRows: Object.entries(preview.ineligible)
     .filter(([, count]) => count && count.containers > 0)
     .map(([reason, count]) => ({ label: INELIGIBLE_REASON_LABELS[reason] ?? reason, ...count })),
 })
 
+// Jobs run before the 13-month rule marked property returned or transferred rather than removed, so "closed"
+// counts all three.
 const presentJob = (job: LegacyCleanupJob) => ({
   ...job,
   statusLabel: JOB_STATUS_LABELS[job.status] ?? job.status,
   percent: job.totalRecords === 0 ? 100 : Math.round((job.processedRecords / job.totalRecords) * 100),
+  closedRecords: job.removedRecords + job.returnedRecords + job.transferredRecords,
 })

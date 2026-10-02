@@ -51,21 +51,27 @@
     }) }}
   {% endif %}
 
-  {{ govukSummaryList({
-    attributes: { "data-qa": "job-summary" },
-    rows: [
-      { key: { text: "Status" }, value: { html: statusTag } },
-      { key: { text: "Progress" }, value: { html: '<span data-qa="progress">' + (job.processedRecords | formatNumber) + ' of ' + (job.totalRecords | formatNumber) + ' containers (' + job.percent + '%)</span>' } },
+  {% set summaryRows = [
+    { key: { text: "Status" }, value: { html: statusTag } },
+    { key: { text: "Progress" }, value: { html: '<span data-qa="progress">' + (job.processedRecords | formatNumber) + ' of ' + (job.totalRecords | formatNumber) + ' containers (' + job.percent + '%)</span>' } },
+    { key: { text: "Marked as removed" }, value: { html: '<span data-qa="removed">' + (job.removedRecords | formatNumber) + '</span>' } }
+  ] %}
+  {# Only jobs run before the 13-month rule marked property returned or transferred. #}
+  {% if job.returnedRecords or job.transferredRecords %}
+    {% set summaryRows = (summaryRows.push(
       { key: { text: "Marked as returned" }, value: { html: '<span data-qa="returned">' + (job.returnedRecords | formatNumber) + '</span>' } },
-      { key: { text: "Marked as transferred" }, value: { html: '<span data-qa="transferred">' + (job.transferredRecords | formatNumber) + '</span>' } },
-      { key: { text: "Skipped" }, value: { html: '<span data-qa="skipped">' + (job.skippedRecords | formatNumber) + '</span>' } },
-      { key: { text: "Failed" }, value: { html: '<span data-qa="failed">' + (job.failedRecords | formatNumber) + '</span>' } },
-      { key: { text: "Window" }, value: { text: "People who left more than " + job.olderThanDays + " days ago (on or before " + (job.cutoffDate | formatDate) + ")" } },
-      { key: { text: "Requested" }, value: { text: (job.requestedAt | formatDateTime) + " by " + job.requestedBy } },
-      { key: { text: "Started" }, value: { text: (job.startTime | formatDateTime) if job.startTime else "Not yet" } },
-      { key: { text: "Finished" }, value: { text: (job.endTime | formatDateTime) if job.endTime else "Not yet" } }
-    ]
-  }) }}
+      { key: { text: "Marked as transferred" }, value: { html: '<span data-qa="transferred">' + (job.transferredRecords | formatNumber) + '</span>' } }
+    ), summaryRows) %}
+  {% endif %}
+  {% set summaryRows = (summaryRows.push(
+    { key: { text: "Skipped" }, value: { html: '<span data-qa="skipped">' + (job.skippedRecords | formatNumber) + '</span>' } },
+    { key: { text: "Failed" }, value: { html: '<span data-qa="failed">' + (job.failedRecords | formatNumber) + '</span>' } },
+    { key: { text: "People who left on or before" }, value: { html: '<span data-qa="cutoff">' + (job.cutoffDate | formatDate) + '</span>' + (' (a ' + job.olderThanDays + '-day window, before the 13-month rule)' if job.olderThanDays else '') } },
+    { key: { text: "Requested" }, value: { text: (job.requestedAt | formatDateTime) + " by " + job.requestedBy } },
+    { key: { text: "Started" }, value: { text: (job.startTime | formatDateTime) if job.startTime else "Not yet" } },
+    { key: { text: "Finished" }, value: { text: (job.endTime | formatDateTime) if job.endTime else "Not yet" } }
+  ), summaryRows) %}
+  {{ govukSummaryList({ attributes: { "data-qa": "job-summary" }, rows: summaryRows }) }}
 
   {% if attention.length %}
     <h2 class="govuk-heading-m">Containers that were not closed</h2>
@@ -77,7 +83,7 @@
     {% for item in attention %}
       {% set rows = (rows.push([
         { text: item.prisonerNumber },
-        { text: "Return" if item.action == "RETURN" else "Transfer" + (" to " + item.plannedToPrisonId if item.plannedToPrisonId else "") },
+        { text: item.actionLabel },
         { text: "Skipped" if item.status == "SKIPPED" else "Failed" },
         { text: item.message or "" }
       ]), rows) %}

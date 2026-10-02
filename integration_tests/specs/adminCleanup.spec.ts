@@ -16,7 +16,9 @@ test.describe('Admin - clean up legacy property', () => {
     await resetStubs()
   })
 
-  test('previews what a clean-up would close, then runs it and follows the job to completion', async ({ page }) => {
+  test('previews what the 13-month rule would remove, then runs it and follows the job to completion', async ({
+    page,
+  }) => {
     await login(page, { roles: ['ROLE_PRISONERPROP__ADMIN'] })
     await prisonerPropertyApi.stubGetAllAgencies({ agencies })
     await prisonerPropertyApi.stubGetLegacyCleanupJobs({ agencyId: 'LEI', jobs: [] })
@@ -29,13 +31,15 @@ test.describe('Admin - clean up legacy property', () => {
     await expect(adminPage.heading).toBeHidden()
 
     const preview = await AdminCleanupPreviewPage.verifyOnPage(page)
-    await expect(preview.olderThanDays).toHaveValue('28')
-    await expect(preview.toReturn).toHaveText('412 containers')
-    await expect(preview.toTransfer).toHaveText('96 containers')
+    await expect(preview.cutoff).toHaveText('Counting people who left on or before 2 September 2025.')
+    await expect(preview.toRemove).toHaveText('508 containers')
+    await expect(preview.removalReasons).toContainText('Escaped or absconded')
     await expect(preview.dueForReturnNow).toHaveText('430 containers')
     await expect(preview.dueForTransferOutNow).toHaveText('120 containers')
-    await expect(preview.warning).toContainText('508 containers will be closed')
+    await expect(preview.warning).toContainText('508 containers will be marked as removed')
     await expect(page.getByTestId('ineligible')).toContainText('The person is at this prison')
+    await expect(page.getByTestId('ineligible')).toContainText('Confiscated property')
+    await expect(page.locator('input[name="olderThanDays"]')).toHaveCount(0)
 
     // Running it: 202 lands on the job page, which is still in progress at first...
     const job = legacyCleanupJob('LEI')
@@ -44,10 +48,9 @@ test.describe('Admin - clean up legacy property', () => {
       job: {
         ...job,
         status: 'STARTED',
-        startTime: '2026-09-11T10:00:05',
+        startTime: '2026-10-02T10:00:05',
         processedRecords: 120,
-        returnedRecords: 100,
-        transferredRecords: 20,
+        removedRecords: 120,
       },
       priority: 5,
     })
@@ -64,32 +67,31 @@ test.describe('Admin - clean up legacy property', () => {
       job: {
         ...job,
         status: 'FINISHED',
-        startTime: '2026-09-11T10:00:05',
-        endTime: '2026-09-11T10:04:40',
+        startTime: '2026-10-02T10:00:05',
+        endTime: '2026-10-02T10:04:40',
         processedRecords: 508,
-        returnedRecords: 410,
-        transferredRecords: 96,
+        removedRecords: 506,
         skippedRecords: 2,
         items: [
           {
             containerId: 'c1',
             prisonerNumber: 'A1234AA',
-            action: 'RETURN',
-            plannedEventDate: '2026-06-01',
+            action: 'REMOVE',
+            plannedEventDate: '2024-06-01',
             plannedToPrisonId: null,
             status: 'SKIPPED',
             message: 'already removed: Property container has already left active storage (RETURNED)',
-            processedAt: '2026-09-11T10:01:00',
+            processedAt: '2026-10-02T10:01:00',
           },
           {
             containerId: 'c2',
             prisonerNumber: 'B2345BB',
-            action: 'RETURN',
-            plannedEventDate: '2026-06-01',
+            action: 'REMOVE',
+            plannedEventDate: '2024-06-01',
             plannedToPrisonId: null,
             status: 'SKIPPED',
             message: 'no longer eligible: OWNER_HERE',
-            processedAt: '2026-09-11T10:01:00',
+            processedAt: '2026-10-02T10:01:00',
           },
         ],
       },
@@ -97,8 +99,7 @@ test.describe('Admin - clean up legacy property', () => {
     })
     await expect(jobPage.status).toHaveText('Finished', { timeout: 10_000 })
     await expect(jobPage.progress).toHaveText('508 of 508 containers (100%)')
-    await expect(jobPage.returned).toHaveText('410')
-    await expect(jobPage.transferred).toHaveText('96')
+    await expect(jobPage.removed).toHaveText('506')
     await expect(jobPage.skipped).toHaveText('2')
     await expect(jobPage.inProgress).toBeHidden()
     await expect(jobPage.attentionTable).toContainText('B2345BB')
@@ -133,17 +134,6 @@ test.describe('Admin - clean up legacy property', () => {
     await expect(preview.inFlight).toBeVisible()
     await expect(preview.runCleanup).toBeHidden()
     await expect(preview.jobsTable).toContainText('In progress')
-  })
-
-  test('rejects a window that is not a number of days', async ({ page }) => {
-    await login(page, { roles: ['ROLE_PRISONERPROP__ADMIN'] })
-    await prisonerPropertyApi.stubGetAllAgencies({ agencies })
-    await prisonerPropertyApi.stubGetLegacyCleanupJobs({ agencyId: 'LEI', jobs: [] })
-    await page.goto('/admin/prisons/LEI/cleanup?olderThanDays=lots')
-
-    const preview = await AdminCleanupPreviewPage.verifyOnPage(page)
-    await expect(preview.errorSummary).toContainText('Enter a whole number of days between 1 and 3650')
-    await expect(preview.runCleanup).toBeHidden()
   })
 
   test('is not available without the admin role', async ({ page }) => {

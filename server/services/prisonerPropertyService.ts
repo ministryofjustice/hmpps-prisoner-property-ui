@@ -79,12 +79,12 @@ export default class PrisonerPropertyService {
     return this.prisonerPropertyApiClient.setAgencyActive(agencyId, active, username)
   }
 
-  previewLegacyCleanup(agencyId: string, olderThanDays: number, username: string): Promise<LegacyCleanupPreview> {
-    return this.prisonerPropertyApiClient.previewLegacyCleanup(agencyId, olderThanDays, username)
+  previewLegacyCleanup(agencyId: string, username: string): Promise<LegacyCleanupPreview> {
+    return this.prisonerPropertyApiClient.previewLegacyCleanup(agencyId, username)
   }
 
-  startLegacyCleanup(agencyId: string, olderThanDays: number, username: string): Promise<LegacyCleanupJob> {
-    return this.prisonerPropertyApiClient.startLegacyCleanup(agencyId, olderThanDays, username)
+  startLegacyCleanup(agencyId: string, username: string): Promise<LegacyCleanupJob> {
+    return this.prisonerPropertyApiClient.startLegacyCleanup(agencyId, username)
   }
 
   getLegacyCleanupJobs(agencyId: string, username: string): Promise<LegacyCleanupJob[]> {

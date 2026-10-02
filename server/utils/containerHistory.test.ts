@@ -1,5 +1,5 @@
 import type { PropertyEvent } from '../data/prisonerPropertyApiTypes'
-import { eventDescription, eventTypeLabel } from './containerHistory'
+import { eventDescription, eventTitle, eventTypeLabel } from './containerHistory'
 
 const event = (overrides: Partial<PropertyEvent>): PropertyEvent => ({
   id: 'e1',
@@ -41,7 +41,26 @@ describe('eventTypeLabel', () => {
   })
 })
 
+describe('eventTitle', () => {
+  it('uses the event type label for ordinary events', () => {
+    expect(eventTitle(event({ eventType: 'MOVED' }), 'SN0001')).toBe('Storage location changed')
+    expect(eventTitle(event({ eventType: 'REMOVED' }), 'SN0001')).toBe('Removed from the establishment')
+  })
+
+  it('titles a legacy record the clean-up archived by the container seal', () => {
+    const archived = event({ eventType: 'REMOVED', eventUserId: 'LEGACY_CLEANUP', legacyCleanup: true })
+    expect(eventTitle(archived, 'SN0001')).toBe('Seal SN0001 - Legacy property record archived following DPS migration')
+    expect(eventTitle(archived, 'MISSING-1234')).toBe('Legacy property record archived following DPS migration')
+  })
+})
+
 describe('eventDescription', () => {
+  it('explains why a legacy record was archived', () => {
+    expect(eventDescription(event({ eventType: 'REMOVED', eventUserId: 'LEGACY_CLEANUP', legacyCleanup: true }))).toBe(
+      'This record was automatically archived because it exceeded the applicable retention period before migration to DPS and no further property action was required.',
+    )
+  })
+
   it('describes an added-to-storage event with its seal number', () => {
     expect(eventDescription(event({ eventType: 'CREATED_SEALED', sealNumber: 'SN0001' }))).toBe(
       'Added to storage with seal number SN0001.',

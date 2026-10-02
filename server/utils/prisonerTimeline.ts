@@ -2,6 +2,7 @@ import type { PrisonerTimelineItem } from '../data/prisonerPropertyApiTypes'
 import { containerTypeLabel, realSealNumber } from './propertyList'
 import { containerStatusTag, type StatusTag } from './statusTags'
 import { formatDate } from './utils'
+import { isLegacyArchive, LEGACY_ARCHIVE_DETAILS, legacyArchiveTitle } from './legacyCleanup'
 
 export type TimelineTag = StatusTag
 
@@ -14,10 +15,12 @@ export interface TimelineDetails {
   historyUrl: string
 }
 
-// A single, render-ready timeline item: a status tag, a title sentence, a byline, the raw event
-// datetime (formatted in the template) and, for container events, the expandable container details.
+// A single, render-ready timeline item: a status tag, a title sentence, an optional explanatory sentence, a
+// byline, the raw event datetime (formatted in the template) and, for container events, the expandable
+// container details.
 export interface TimelineRow {
   title: string
+  description: string | null
   tag: TimelineTag | null
   byline: string
   dateTime: string
@@ -50,6 +53,8 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
   const container = containerPrefix(seal)
   const establishment = item.actingEstablishmentName ?? 'this establishment'
   const toPrison = item.toPrisonName ?? 'another establishment'
+
+  if (isLegacyArchive(item)) return legacyArchiveTitle(seal)
 
   switch (item.eventType) {
     case 'CREATED_SEALED':
@@ -121,10 +126,14 @@ const timelineByline = (item: PrisonerTimelineItem, nameByUsername: Map<string, 
 const REMOVAL_EVENTS = ['RETURNED', 'DISPOSED', 'CREATED_IN_ERROR', 'REMOVED']
 
 // The details block's location row is worded by event: a transfer names the destination establishment,
-// a removal reads "Removed", otherwise the current storage location.
+// an archived legacy record names where it was last stored (its location as at the event, which the archive
+// itself does not change), any other removal reads "Removed", otherwise the current storage location.
 const detailsLocation = (item: PrisonerTimelineItem): { locationLabel: string; location: string | null } => {
   if (item.eventType === 'TRANSFERRED') {
     return { locationLabel: 'Transferred to', location: item.toPrisonName ?? 'another establishment' }
+  }
+  if (isLegacyArchive(item)) {
+    return { locationLabel: 'Last known storage location', location: item.containerLocationDescription }
   }
   if (item.eventType && REMOVAL_EVENTS.includes(item.eventType)) {
     return { locationLabel: 'Storage location', location: 'Removed' }
@@ -155,6 +164,7 @@ export const buildPrisonerTimeline = (
 ): TimelineRow[] =>
   items.map(item => ({
     title: timelineTitle(item),
+    description: isLegacyArchive(item) ? LEGACY_ARCHIVE_DETAILS : null,
     tag: item.eventStatus ? containerStatusTag(item.eventStatus) : null,
     byline: timelineByline(item, nameByUsername),
     dateTime: item.eventDateTime,
