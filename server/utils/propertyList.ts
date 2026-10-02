@@ -8,7 +8,7 @@ import type {
   PrisonerPropertyGroup,
   PrisonPropertyListQuery,
 } from '../data/prisonerPropertyApiTypes'
-import { ALL_CONTAINER_STATUSES, containerStatusTag } from './statusTags'
+import { ALL_CONTAINER_STATUSES, containerStatusTag, NO_LONGER_HELD_STATUSES } from './statusTags'
 
 export const DEFAULT_PAGE_SIZE = 50
 const PRISON_NUMBER_PATTERN = /^[A-Za-z]\d{4}[A-Za-z]{2}$/
@@ -166,7 +166,6 @@ export interface ParsedPropertyListQuery {
   search: string
   containerTypes: ContainerType[]
   statuses: ContainerStatus[]
-  includeRemoved: boolean
   personLocations: PersonLocation[]
   dueForTransferIn: boolean
   page: number
@@ -188,7 +187,6 @@ export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_S
   const personLocations = toArray(reqQuery.personLocation).filter((value): value is PersonLocation =>
     ALL_PERSON_LOCATIONS.includes(value as PersonLocation),
   )
-  const includeRemoved = firstValue(reqQuery.includeRemoved) === 'true'
   const parsedPage = Number.parseInt(firstValue(reqQuery.page) ?? '1', 10)
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1
 
@@ -196,8 +194,9 @@ export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_S
     // The API `query` param does an OR match over prisoner number, seal number and storage location.
     query: search || undefined,
     containerType: containerTypes.length ? containerTypes : undefined,
+    // Live statuses and the "Property no longer held" ones share this parameter, and the API returns
+    // containers in any of them: a removal status matches only property that left storage that way.
     status: statuses.length ? statuses : undefined,
-    includeRemoved: includeRemoved || undefined,
     // In vs no-longer-in are complementary, so only a single ticked box narrows the list; both/neither is
     // "everyone" and sends nothing.
     personLocation: personLocations.length === 1 ? personLocations[0] : undefined,
@@ -206,7 +205,7 @@ export const parsePropertyListQuery = (reqQuery: ParsedQs, size = DEFAULT_PAGE_S
     size,
   }
 
-  return { search, containerTypes, statuses, includeRemoved, personLocations, dueForTransferIn, page, apiQuery }
+  return { search, containerTypes, statuses, personLocations, dueForTransferIn, page, apiQuery }
 }
 
 /**
@@ -231,7 +230,6 @@ export const listQueryString = (
   // "Due for transfer in" shares the status checkbox group, so it round-trips as a status value.
   if (parsed.dueForTransferIn) params.append('status', TRANSFER_IN_FILTER_VALUE)
   parsed.personLocations.forEach(location => params.append('personLocation', location))
-  if (parsed.includeRemoved) params.set('includeRemoved', 'true')
   // Page 1 is the default, so recording it would only make the remembered query look filtered when it is not.
   if (includePage && parsed.page > 1) params.set('page', parsed.page.toString())
   return params.toString()
@@ -271,7 +269,7 @@ export const appliedFilterTags = (parsed: ParsedPropertyListQuery): AppliedFilte
       href: withoutIt({ containerTypes: parsed.containerTypes.filter(other => other !== type) }),
     })),
     ...parsed.statuses.map(status => ({
-      text: `Status: ${statusTag(status).text}`,
+      text: `${NO_LONGER_HELD_STATUSES.includes(status) ? 'No longer held' : 'Status'}: ${statusTag(status).text}`,
       href: withoutIt({ statuses: parsed.statuses.filter(other => other !== status) }),
     })),
     // Not a real status - it rides along in the same parameter but is parsed out into its own flag, so
@@ -283,9 +281,6 @@ export const appliedFilterTags = (parsed: ParsedPropertyListQuery): AppliedFilte
       text: `People: ${PERSON_LOCATION_LABELS[location]}`,
       href: withoutIt({ personLocations: parsed.personLocations.filter(other => other !== location) }),
     })),
-    ...(parsed.includeRemoved
-      ? [{ text: 'Including removed property', href: withoutIt({ includeRemoved: false }) }]
-      : []),
   ]
 }
 

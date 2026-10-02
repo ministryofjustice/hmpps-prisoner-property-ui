@@ -145,13 +145,11 @@
           }) }}
 
           {{ govukCheckboxes({
-            idPrefix: "includeRemoved",
-            name: "includeRemoved",
-            classes: "govuk-checkboxes--small",
+            idPrefix: "noLongerHeld",
+            name: "status",
+            classes: "govuk-checkboxes--small app-checkboxes--inline",
             fieldset: { legend: { text: "Property no longer held", classes: "govuk-fieldset__legend--s" } },
-            items: [
-              { value: "true", text: "Removed, returned or disposed of", checked: includeRemoved }
-            ]
+            items: noLongerHeldItems
           }) }}
 
           {{ govukButton({ text: "Apply filters", attributes: { "data-qa": "apply-filters" } }) }}
@@ -163,7 +161,9 @@
   </div>
 
   {% if groups.length == 0 %}
-    <p class="govuk-body" data-qa="no-results">No property containers found.</p>
+    <p class="govuk-body" data-qa="no-results">
+      {{- "No records found for the selected filter." if appliedFilters | length else "No property containers found." -}}
+    </p>
   {% else %}
     {% set tableHead = [
       { text: "Name" },

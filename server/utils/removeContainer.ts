@@ -1,5 +1,6 @@
-import type { PrisonerPropertyContainer, RemovalOutcome } from '../data/prisonerPropertyApiTypes'
+import type { ContainerStatus, PrisonerPropertyContainer, RemovalOutcome } from '../data/prisonerPropertyApiTypes'
 import type { PropertyStatusTag } from './personProperty'
+import { containerStatusTag } from './statusTags'
 
 // The reasons staff can give for removing a container, in the order shown on the remove screen.
 export interface RemoveReason {
@@ -19,19 +20,21 @@ const REMOVE_REASON_VALUES = new Set<RemovalOutcome>(REMOVE_REASONS.map(reason =
 export const isRemoveReason = (value: unknown): value is RemovalOutcome =>
   typeof value === 'string' && REMOVE_REASON_VALUES.has(value as RemovalOutcome)
 
-// The status tag the container will show once removed with the given reason (shown on Check your answers).
-// COMBINED and REMOVED are not staff-selectable removal reasons (combine has its own journey; REMOVED is only
-// ever set by the NOMIS sync), but the map is keyed by every RemovalOutcome for completeness.
-const RESULT_STATUS: Record<RemovalOutcome, PropertyStatusTag> = {
-  RETURNED: { text: 'Returned', classes: 'govuk-tag--green' },
-  DISPOSED: { text: 'Disposed', classes: 'govuk-tag--red' },
-  TRANSFERRED: { text: 'Transferred', classes: 'govuk-tag--grey' },
-  CREATED_IN_ERROR: { text: 'Created in error', classes: 'govuk-tag--grey' },
-  COMBINED: { text: 'Combined', classes: 'govuk-tag--grey' },
-  REMOVED: { text: 'Removed', classes: 'govuk-tag--grey' },
+// The status the container will show once removed with the given reason (its tag is shown on Check your
+// answers, from the shared palette so it matches the lists). COMBINED and REMOVED are not staff-selectable
+// removal reasons (combine has its own journey; REMOVED is only ever set by the NOMIS sync or the legacy
+// clean-up), but the map is keyed by every RemovalOutcome for completeness.
+const RESULT_STATUS: Record<RemovalOutcome, ContainerStatus> = {
+  RETURNED: 'RETURNED',
+  DISPOSED: 'DISPOSED',
+  TRANSFERRED: 'TRANSFER',
+  CREATED_IN_ERROR: 'CREATED_IN_ERROR',
+  COMBINED: 'COMBINED',
+  REMOVED: 'REMOVED',
 }
 
-export const removeResultStatus = (outcome: RemovalOutcome): PropertyStatusTag => RESULT_STATUS[outcome]
+export const removeResultStatus = (outcome: RemovalOutcome): PropertyStatusTag =>
+  containerStatusTag(RESULT_STATUS[outcome])
 
 // The label for the removal-date row on Check your answers, per reason.
 export const removalDateLabel = (outcome: RemovalOutcome): string => {

@@ -14,6 +14,7 @@ import {
   statusTag,
   TRANSFER_IN_FILTER_VALUE,
 } from '../utils/propertyList'
+import { NO_LONGER_HELD_STATUSES } from '../utils/statusTags'
 import { canManageProperty } from '../middleware/requireManageRole'
 import { canAdminister } from '../middleware/requireAdminRole'
 import { canManageLocations } from '../middleware/requireLocationAdminRole'
@@ -54,8 +55,7 @@ export default function establishmentListRoutes({
     }
 
     const parsed = parsePropertyListQuery(req.query, DEFAULT_PAGE_SIZE)
-    const { search, containerTypes, statuses, includeRemoved, personLocations, dueForTransferIn, page, apiQuery } =
-      parsed
+    const { search, containerTypes, statuses, personLocations, dueForTransferIn, page, apiQuery } = parsed
 
     // Remember this view for next time, scoped to the establishment so switching caseload does not inherit
     // another prison's filters. An unfiltered view stores nothing, which also makes "apply filters with
@@ -86,7 +86,6 @@ export default function establishmentListRoutes({
       isAdmin: canAdminister(res.locals.user.userRoles),
       isLocationAdmin: canManageLocations(res.locals.user.userRoles),
       successMessage: req.flash('success')[0],
-      includeRemoved,
       // What is currently narrowing the list, shown above the collapsed filters so it is visible without
       // opening them - the filters persist between visits, so they are not always ones set in this sitting.
       appliedFilters: appliedFilterTags(parsed),
@@ -131,6 +130,13 @@ export default function establishmentListRoutes({
           checked: dueForTransferIn,
         },
       ],
+      // Property that has left storage, by how it left. These share the status parameter with the live
+      // statuses above; the API returns only removed property for them, never stored.
+      noLongerHeldItems: NO_LONGER_HELD_STATUSES.map(status => ({
+        value: status,
+        text: statusTag(status).text,
+        checked: statuses.includes(status),
+      })),
       personLocationItems: [
         {
           value: 'IN_ESTABLISHMENT',
