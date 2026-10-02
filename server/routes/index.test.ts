@@ -3274,6 +3274,9 @@ describe('Admin - clean up legacy property', () => {
         expect(jobs).toContain('2 September 2025')
         expect(jobs).toContain('>500<')
         expect(jobs).toContain('>350<')
+        // Skipped and failed are added, not joined as text ("80" for 8 skipped and none failed).
+        expect(jobs).toContain('>8<')
+        expect(jobs).not.toContain('>80<')
         expect(jobs).not.toContain('days')
       })
   })

@@ -139,7 +139,7 @@
         { text: job.cutoffDate | formatDate },
         { html: statusTag },
         { text: job.closedRecords | formatNumber, format: "numeric" },
-        { text: job.skippedRecords + job.failedRecords | formatNumber, format: "numeric" }
+        { text: (job.skippedRecords + job.failedRecords) | formatNumber, format: "numeric" }
       ]), jobRows) %}
     {% endfor %}
     {{ govukTable({
