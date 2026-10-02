@@ -148,6 +148,44 @@ test.describe('Property history timeline', () => {
     await expect(page.getByText('History events before')).toHaveCount(0)
   })
 
+  test('shows a legacy record the clean-up archived, with its last storage location', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [{ ...container, currentStatus: 'REMOVED', removalOutcome: 'REMOVED' }],
+      priority: 1,
+    })
+    await prisonerPropertyApi.stubGetPrisonerPropertyHistory({
+      prisonerNumber: 'A1234BC',
+      items: [
+        timelineItem({
+          eventId: 'e2',
+          eventType: 'REMOVED',
+          eventStatus: 'REMOVED',
+          eventDateTime: '2026-10-02T09:00:00',
+          eventUserId: 'LEGACY_CLEANUP',
+          systemGenerated: true,
+          legacyCleanup: true,
+          containerStatus: 'REMOVED',
+        }),
+        timelineItem(),
+      ],
+      priority: 1,
+    })
+    await manageUsersApi.stubGetUser({ username: 'AUSER', name: 'John Doe' })
+    await page.goto('/prisoner/A1234BC/history')
+
+    const historyPage = await PropertyHistoryPage.verifyOnPage(page)
+    await expect(historyPage.timeline).toContainText(
+      'Seal SN880032 - Legacy property record archived following DPS migration',
+    )
+    await expect(page.getByTestId('timeline-description')).toHaveText(
+      'This record was automatically archived because it exceeded the applicable retention period before migration to DPS and no further property action was required.',
+    )
+    await historyPage.timeline.getByText('Property container details').first().click()
+    await expect(historyPage.timeline).toContainText('Last known storage location')
+  })
+
   test('shows an empty state when the prisoner has no history', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPropertyForPrisoner({

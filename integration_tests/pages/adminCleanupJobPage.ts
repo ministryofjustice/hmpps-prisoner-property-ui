@@ -8,9 +8,7 @@ export default class AdminCleanupJobPage extends AbstractPage {
 
   readonly progress: Locator
 
-  readonly returned: Locator
-
-  readonly transferred: Locator
+  readonly removed: Locator
 
   readonly skipped: Locator
 
@@ -25,8 +23,7 @@ export default class AdminCleanupJobPage extends AbstractPage {
     this.heading = page.getByRole('heading', { name: 'Legacy property clean-up' })
     this.status = page.getByTestId('job-status')
     this.progress = page.getByTestId('progress')
-    this.returned = page.getByTestId('returned')
-    this.transferred = page.getByTestId('transferred')
+    this.removed = page.getByTestId('removed')
     this.skipped = page.getByTestId('skipped')
     this.inProgress = page.getByTestId('in-progress')
     this.attentionTable = page.getByTestId('attention-table')

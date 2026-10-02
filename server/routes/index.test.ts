@@ -1317,6 +1317,29 @@ describe('GET /prisoner/:prisonerNumber/container/:id', () => {
       })
   })
 
+  it('words a legacy record the clean-up archived, and credits the clean-up', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'c1', currentSealNumber: 'SN0001', currentStatus: 'REMOVED', removalOutcome: 'REMOVED' }),
+    ])
+    prisonerPropertyService.getContainerEvents.mockResolvedValue([
+      event({ id: 'e2', eventType: 'REMOVED', eventUserId: 'LEGACY_CLEANUP', legacyCleanup: true }),
+      event({ id: 'e1', eventType: 'CREATED_SEALED', sealNumber: 'SN0001' }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC/container/c1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Seal SN0001 - Legacy property record archived following DPS migration')
+        expect(res.text).toContain(
+          'This record was automatically archived because it exceeded the applicable retention period before migration to DPS and no further property action was required.',
+        )
+        expect(res.text).toContain('Legacy property clean-up')
+        expect(res.text).not.toContain('Removed from the establishment')
+      })
+  })
+
   it('falls back to the raw username when the name cannot be resolved', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ id: 'c1' })])
@@ -2945,33 +2968,43 @@ describe('Admin - clean up legacy property', () => {
   ]
   const preview = {
     prisonId: 'LEI',
-    olderThanDays: 28,
-    cutoffDate: '2026-08-14',
-    generatedAt: '2026-09-11T10:00:00',
-    toReturn: { containers: 412, prisoners: 180 },
-    toTransfer: { containers: 96, prisoners: 70 },
+    retentionMonths: 13,
+    cutoffDate: '2025-09-02',
+    generatedAt: '2026-10-02T10:00:00',
+    toRemove: { containers: 508, prisoners: 250 },
+    toRemoveByReason: {
+      RELEASED: { containers: 400, prisoners: 170 },
+      DIED: { containers: 2, prisoners: 1 },
+      ESCAPED: { containers: 10, prisoners: 9 },
+      TRANSFERRED: { containers: 96, prisoners: 70 },
+    },
     dueForReturnNow: { containers: 430, prisoners: 190 },
     dueForTransferOutNow: { containers: 120, prisoners: 85 },
     candidates: { containers: 1200, prisoners: 600 },
-    ineligible: { OWNER_HERE: { containers: 600, prisoners: 300 }, TOO_RECENT: { containers: 42, prisoners: 25 } },
+    ineligible: {
+      OWNER_HERE: { containers: 600, prisoners: 300 },
+      TOO_RECENT: { containers: 42, prisoners: 25 },
+      CONFISCATED: { containers: 7, prisoners: 6 },
+      DISPOSAL_DATE_NOT_REACHED: { containers: 3, prisoners: 3 },
+    },
     ageBands: [
-      { label: 'Up to 90 days', fromDays: 0, toDays: 90, containers: 100 },
-      { label: '91 to 365 days', fromDays: 91, toDays: 365, containers: 200 },
-      { label: 'Over a year', fromDays: 366, toDays: null, containers: 208 },
+      { label: '13 months to 2 years', fromMonths: 13, toMonths: 23, containers: 100 },
+      { label: '2 to 5 years', fromMonths: 24, toMonths: 59, containers: 200 },
+      { label: 'Over 5 years', fromMonths: 60, toMonths: null, containers: 208 },
     ],
   }
   const job = {
     id: 'job-1',
     prisonId: 'LEI',
     status: 'PENDING' as const,
-    olderThanDays: 28,
-    cutoffDate: '2026-08-14',
+    cutoffDate: '2025-09-02',
     requestedBy: 'user1',
-    requestedAt: '2026-09-11T10:00:00',
+    requestedAt: '2026-10-02T10:00:00',
     startTime: null as string | null,
     endTime: null as string | null,
     totalRecords: 508,
     processedRecords: 0,
+    removedRecords: 0,
     returnedRecords: 0,
     transferredRecords: 0,
     skippedRecords: 0,
@@ -2994,40 +3027,48 @@ describe('Admin - clean up legacy property', () => {
       })
   })
 
-  it('shows the preview for the default window', async () => {
+  it('shows the preview under the 13-month rule, with no window to choose', async () => {
     return request(adminApp())
       .get('/admin/prisons/LEI/cleanup')
       .expect(200)
       .expect(res => {
-        expect(prisonerPropertyService.previewLegacyCleanup).toHaveBeenCalledWith('LEI', 28, 'user1')
+        expect(prisonerPropertyService.previewLegacyCleanup).toHaveBeenCalledWith('LEI', 'user1')
         expect(res.text).toContain('Leeds (HMP)')
-        expect(res.text).toContain('412 containers')
-        expect(res.text).toContain('for 180 people released')
-        expect(res.text).toContain('96 containers')
-        expect(res.text).toContain('508 containers will be closed')
-        expect(res.text).toContain('The person is at this prison')
-        expect(res.text).toContain('Over a year')
+        expect(res.text).toContain('Property is kept for 13 months after a person leaves')
+        expect(res.text).toContain('Counting people who left on or before 2 September 2025')
+        expect(res.text).toContain('Will be marked as removed')
+        expect(res.text).toContain('508 containers</span> for 250 people')
+        expect(res.text).toContain('508 containers will be marked as removed')
+        expect(res.text).not.toContain('olderThanDays')
+        expect(res.text).not.toContain('Will be marked as returned')
         expect(res.text).toContain('data-qa="run-cleanup"')
       })
   })
 
-  it('passes a chosen window through to the preview', async () => {
+  it('breaks down why the people left, what is left alone, and how long ago', async () => {
     return request(adminApp())
-      .get('/admin/prisons/LEI/cleanup?olderThanDays=7')
+      .get('/admin/prisons/LEI/cleanup')
       .expect(200)
-      .expect(() => {
-        expect(prisonerPropertyService.previewLegacyCleanup).toHaveBeenCalledWith('LEI', 7, 'user1')
+      .expect(res => {
+        const reasons = res.text.slice(res.text.indexOf('data-qa="removal-reasons"'))
+        expect(reasons.indexOf('Released')).toBeLessThan(reasons.indexOf('Died in custody'))
+        expect(reasons.indexOf('Died in custody')).toBeLessThan(reasons.indexOf('Escaped or absconded'))
+        expect(reasons.indexOf('Escaped or absconded')).toBeLessThan(reasons.indexOf('Now at another prison'))
+        expect(res.text).toContain('The person is at this prison')
+        expect(res.text).toContain('The person left less than 13 months ago')
+        expect(res.text).toContain('Confiscated property')
+        expect(res.text).toContain('The disposal date has not been reached')
+        expect(res.text).toContain('13 months to 2 years')
+        expect(res.text).toContain('Over 5 years')
       })
   })
 
-  it('rejects an unusable window without calling the API', async () => {
+  it('ignores a window left on an old link', async () => {
     return request(adminApp())
       .get('/admin/prisons/LEI/cleanup?olderThanDays=0')
-      .expect(400)
-      .expect(res => {
-        expect(prisonerPropertyService.previewLegacyCleanup).not.toHaveBeenCalled()
-        expect(res.text).toContain('Enter a whole number of days between 1 and 3650')
-        expect(res.text).not.toContain('data-qa="run-cleanup"')
+      .expect(200)
+      .expect(() => {
+        expect(prisonerPropertyService.previewLegacyCleanup).toHaveBeenCalledWith('LEI', 'user1')
       })
   })
 
@@ -3047,15 +3088,18 @@ describe('Admin - clean up legacy property', () => {
   it('says so when there is nothing to clean up', async () => {
     prisonerPropertyService.previewLegacyCleanup.mockResolvedValue({
       ...preview,
-      toReturn: { containers: 0, prisoners: 0 },
-      toTransfer: { containers: 0, prisoners: 0 },
+      toRemove: { containers: 0, prisoners: 0 },
+      toRemoveByReason: {},
     })
 
     return request(adminApp())
       .get('/admin/prisons/LEI/cleanup')
       .expect(200)
       .expect(res => {
-        expect(res.text).toContain('There is nothing to clean up with this window.')
+        expect(res.text).toContain(
+          'There is nothing to clean up. Nobody whose property is held here left more than 13 months ago.',
+        )
+        expect(res.text).not.toContain('data-qa="removal-reasons"')
         expect(res.text).not.toContain('data-qa="run-cleanup"')
       })
   })
@@ -3065,11 +3109,11 @@ describe('Admin - clean up legacy property', () => {
 
     return request(adminApp())
       .post('/admin/prisons/LEI/cleanup')
-      .send({ olderThanDays: '28', name: 'Leeds (HMP)' })
+      .send({ name: 'Leeds (HMP)' })
       .expect(302)
       .expect('location', '/admin/prisons/LEI/cleanup/jobs/job-1')
       .expect(() => {
-        expect(prisonerPropertyService.startLegacyCleanup).toHaveBeenCalledWith('LEI', 28, 'user1')
+        expect(prisonerPropertyService.startLegacyCleanup).toHaveBeenCalledWith('LEI', 'user1')
         expect(flashProvider).toHaveBeenCalledWith(
           'success',
           'Clean-up started for Leeds (HMP): 508 containers queued.',
@@ -3084,9 +3128,9 @@ describe('Admin - clean up legacy property', () => {
 
     return request(adminApp())
       .post('/admin/prisons/LEI/cleanup')
-      .send({ olderThanDays: '28', name: 'Leeds (HMP)' })
+      .send({ name: 'Leeds (HMP)' })
       .expect(302)
-      .expect('location', '/admin/prisons/LEI/cleanup?olderThanDays=28')
+      .expect('location', '/admin/prisons/LEI/cleanup')
       .expect(() => {
         expect(flashProvider).toHaveBeenCalledWith(
           'error',
@@ -3101,8 +3145,7 @@ describe('Admin - clean up legacy property', () => {
       status: 'STARTED',
       startTime: '2026-09-11T10:00:05',
       processedRecords: 127,
-      returnedRecords: 100,
-      transferredRecords: 25,
+      removedRecords: 125,
       skippedRecords: 2,
       items: [],
     })
@@ -3115,6 +3158,10 @@ describe('Admin - clean up legacy property', () => {
         expect(res.text).toContain('In progress')
         expect(res.text).toContain('127 of 508 containers (25%)')
         expect(res.text).toContain('This page updates automatically')
+        expect(res.text).toContain('Marked as removed')
+        expect(res.text).toContain('2 September 2025')
+        // Returned and transferred only ever appear for jobs run before the 13-month rule.
+        expect(res.text).not.toContain('Marked as returned')
         expect(res.text).toContain('window.location.reload()')
         expect(res.text).not.toContain('http-equiv="refresh"')
       })
@@ -3127,36 +3174,35 @@ describe('Admin - clean up legacy property', () => {
       startTime: '2026-09-11T10:00:05',
       endTime: '2026-09-11T10:04:40',
       processedRecords: 508,
-      returnedRecords: 410,
-      transferredRecords: 96,
+      removedRecords: 506,
       skippedRecords: 1,
       failedRecords: 1,
       items: [
         {
           containerId: 'c1',
           prisonerNumber: 'A1234AA',
-          action: 'RETURN',
-          plannedEventDate: '2026-06-01',
+          action: 'REMOVE',
+          plannedEventDate: '2024-06-01',
           plannedToPrisonId: null,
           status: 'SKIPPED',
           message: 'no longer eligible: OWNER_HERE',
-          processedAt: '2026-09-11T10:01:00',
+          processedAt: '2026-10-02T10:01:00',
         },
         {
           containerId: 'c2',
           prisonerNumber: 'B2345BB',
-          action: 'TRANSFER',
-          plannedEventDate: '2026-06-01',
+          action: 'REMOVE',
+          plannedEventDate: '2024-06-01',
           plannedToPrisonId: 'MDI',
           status: 'FAILED',
           message: 'boom',
-          processedAt: '2026-09-11T10:01:00',
+          processedAt: '2026-10-02T10:01:00',
         },
         {
           containerId: 'c3',
           prisonerNumber: 'C3456CC',
-          action: 'RETURN',
-          plannedEventDate: '2026-06-01',
+          action: 'REMOVE',
+          plannedEventDate: '2024-06-01',
           plannedToPrisonId: null,
           status: 'PROCESSED',
           message: null,
@@ -3172,16 +3218,72 @@ describe('Admin - clean up legacy property', () => {
         expect(res.text).toContain('Finished')
         expect(res.text).toContain('508 of 508 containers (100%)')
         expect(res.text).toContain('A1234AA')
-        expect(res.text).toContain('Transfer to MDI')
+        expect(res.text).toContain('>Remove<')
         expect(res.text).toContain('boom')
         expect(res.text).not.toContain('C3456CC')
         expect(res.text).not.toContain('window.location.reload()')
       })
   })
 
+  it('still shows a job run before the 13-month rule as it was', async () => {
+    prisonerPropertyService.getLegacyCleanupJob.mockResolvedValue({
+      ...job,
+      status: 'FINISHED',
+      olderThanDays: 28,
+      cutoffDate: '2026-08-14',
+      processedRecords: 508,
+      returnedRecords: 412,
+      transferredRecords: 96,
+      items: [
+        {
+          containerId: 'c1',
+          prisonerNumber: 'A1234AA',
+          action: 'TRANSFER',
+          plannedEventDate: '2026-06-01',
+          plannedToPrisonId: 'MDI',
+          status: 'SKIPPED',
+          message: 'no longer eligible: OWNER_HERE',
+          processedAt: '2026-09-11T10:01:00',
+        },
+      ],
+    })
+
+    return request(adminApp())
+      .get('/admin/prisons/LEI/cleanup/jobs/job-1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Marked as returned')
+        expect(res.text).toContain('412')
+        expect(res.text).toContain('a 28-day window, before the 13-month rule')
+        expect(res.text).toContain('Transfer to MDI')
+      })
+  })
+
+  it('lists previous clean-ups by cut-off date and what they closed', async () => {
+    prisonerPropertyService.getLegacyCleanupJobs.mockResolvedValue([
+      { ...job, status: 'FINISHED', removedRecords: 500, skippedRecords: 8 },
+      { ...job, id: 'job-0', status: 'FINISHED', olderThanDays: 28, returnedRecords: 300, transferredRecords: 50 },
+    ])
+
+    return request(adminApp())
+      .get('/admin/prisons/LEI/cleanup')
+      .expect(200)
+      .expect(res => {
+        const jobs = res.text.slice(res.text.indexOf('data-qa="jobs-table"'))
+        expect(jobs).toContain('People who left on or before')
+        expect(jobs).toContain('2 September 2025')
+        expect(jobs).toContain('>500<')
+        expect(jobs).toContain('>350<')
+        // Skipped and failed are added, not joined as text ("80" for 8 skipped and none failed).
+        expect(jobs).toContain('>8<')
+        expect(jobs).not.toContain('>80<')
+        expect(jobs).not.toContain('days')
+      })
+  })
+
   it('forbids the clean-up for a user without the admin role', async () => {
     await request(app).get('/admin/prisons/LEI/cleanup').expect(403)
-    await request(app).post('/admin/prisons/LEI/cleanup').send({ olderThanDays: '28' }).expect(403)
+    await request(app).post('/admin/prisons/LEI/cleanup').send({}).expect(403)
     await request(app).get('/admin/prisons/LEI/cleanup/jobs/job-1').expect(403)
     expect(prisonerPropertyService.previewLegacyCleanup).not.toHaveBeenCalled()
     expect(prisonerPropertyService.startLegacyCleanup).not.toHaveBeenCalled()

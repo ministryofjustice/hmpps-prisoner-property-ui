@@ -97,6 +97,9 @@ export interface PropertyEvent {
   eventType: PropertyEventType
   eventDateTime: string
   eventUserId: string
+  // Set when a legacy clean-up job wrote the event: on a REMOVED event, the record was archived under the
+  // 13-month retention rule rather than marked inactive in NOMIS.
+  legacyCleanup?: boolean
   sealNumber: string | null
   fromInternalLocationId: string | null
   toInternalLocationId: string | null
@@ -142,6 +145,8 @@ export interface PrisonerTimelineItem {
   eventDate: string | null
   eventUserId: string
   systemGenerated: boolean
+  // Set when a legacy clean-up job wrote the event - see PropertyEvent.legacyCleanup.
+  legacyCleanup?: boolean
   prisonerName: string | null
   actingEstablishmentName: string | null
   fromPrisonName: string | null
@@ -265,20 +270,32 @@ export interface CleanupCount {
 }
 
 export type IneligibleReason =
-  'UNRESOLVED' | 'OWNER_HERE' | 'IN_TRANSIT' | 'NOT_RELEASED_MOVEMENT' | 'NO_MOVEMENT_DATE' | 'TOO_RECENT'
+  | 'CONFISCATED'
+  | 'DISPOSAL_DATE_NOT_REACHED'
+  | 'UNRESOLVED'
+  | 'OWNER_HERE'
+  | 'IN_TRANSIT'
+  | 'NOT_RELEASED_MOVEMENT'
+  | 'NO_MOVEMENT_DATE'
+  | 'TOO_RECENT'
 
+// Why the person whose property will be removed left. Whatever the reason, the property is marked as removed.
+export type CleanupReason = 'RELEASED' | 'DIED' | 'ESCAPED' | 'TRANSFERRED'
+
+// What a run would close under the fixed 13-month retention rule - property for people who left on or before
+// the cut-off date.
 export interface LegacyCleanupPreview {
   prisonId: string
-  olderThanDays: number
+  retentionMonths: number
   cutoffDate: string
   generatedAt: string
-  toReturn: CleanupCount
-  toTransfer: CleanupCount
+  toRemove: CleanupCount
+  toRemoveByReason: Partial<Record<CleanupReason, CleanupCount>>
   dueForReturnNow: CleanupCount
   dueForTransferOutNow: CleanupCount
   candidates: CleanupCount
   ineligible: Partial<Record<IneligibleReason, CleanupCount>>
-  ageBands: { label: string; fromDays: number; toDays: number | null; containers: number }[]
+  ageBands: { label: string; fromMonths: number; toMonths: number | null; containers: number }[]
 }
 
 export type LegacyCleanupJobStatus = 'PENDING' | 'STARTED' | 'FINISHED'
@@ -287,7 +304,8 @@ export type LegacyCleanupItemStatus = 'PENDING' | 'PROCESSED' | 'SKIPPED' | 'FAI
 export interface LegacyCleanupItem {
   containerId: string
   prisonerNumber: string
-  action: 'RETURN' | 'TRANSFER'
+  // REMOVE since the 13-month rule; RETURN and TRANSFER only on jobs run before it.
+  action: 'REMOVE' | 'RETURN' | 'TRANSFER'
   plannedEventDate: string
   plannedToPrisonId: string | null
   status: LegacyCleanupItemStatus
@@ -299,7 +317,8 @@ export interface LegacyCleanupJob {
   id: string
   prisonId: string
   status: LegacyCleanupJobStatus
-  olderThanDays: number
+  // The look-back window in days, only on jobs run before the fixed 13-month rule.
+  olderThanDays?: number
   cutoffDate: string
   requestedBy: string
   requestedAt: string
@@ -307,6 +326,8 @@ export interface LegacyCleanupJob {
   endTime: string | null
   totalRecords: number
   processedRecords: number
+  removedRecords: number
+  // Returned and transferred are only ever non-zero on jobs run before the 13-month rule.
   returnedRecords: number
   transferredRecords: number
   skippedRecords: number

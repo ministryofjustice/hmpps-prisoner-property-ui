@@ -1,6 +1,7 @@
 import type { ContainerType, PropertyEvent, PropertyEventType } from '../data/prisonerPropertyApiTypes'
 import { containerTypeLabel, realSealNumber } from './propertyList'
 import { formatDate } from './utils'
+import { isLegacyArchive, LEGACY_ARCHIVE_DETAILS, legacyArchiveTitle } from './legacyCleanup'
 
 const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
   CREATED_SEALED: 'Added to storage',
@@ -21,6 +22,13 @@ const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
 }
 
 export const eventTypeLabel = (type: PropertyEventType): string => EVENT_TYPE_LABELS[type] ?? type
+
+/**
+ * The heading for a history event. A legacy record the clean-up archived is titled by its seal - the
+ * container's seal, which does not change once it has been archived - rather than by its event type.
+ */
+export const eventTitle = (event: PropertyEvent, containerSeal: string | null): string =>
+  isLegacyArchive(event) ? legacyArchiveTitle(realSealNumber(containerSeal)) : eventTypeLabel(event.eventType)
 
 /**
  * Names a property type change, saying what it was changed from when the API could determine it. The
@@ -97,9 +105,9 @@ export const eventDescription = (event: PropertyEvent): string => {
     case 'CREATED_IN_ERROR':
       return 'Removed because the record was created in error.'
     case 'REMOVED':
-      // NOMIS marked the property inactive - removed from the prison, reason unknown (returned, disposed or
-      // transferred - NOMIS does not record which).
-      return 'Marked as removed from the establishment.'
+      // Archived by the legacy clean-up under the 13-month retention rule, or marked inactive in NOMIS -
+      // removed from the prison, reason unknown (returned, disposed or transferred - NOMIS does not record which).
+      return isLegacyArchive(event) ? LEGACY_ARCHIVE_DETAILS : 'Marked as removed from the establishment.'
     case 'REACTIVATED':
       return 'Reactivated and returned to active storage.'
     default:
