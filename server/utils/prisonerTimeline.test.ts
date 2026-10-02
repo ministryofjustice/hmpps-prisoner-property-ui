@@ -246,4 +246,49 @@ describe('buildPrisonerTimeline', () => {
     const [returned] = buildPrisonerTimeline([containerEvent({ eventType: 'RETURNED' })], 'A1234BC')
     expect(returned.details).toMatchObject({ locationLabel: 'Storage location', location: 'Removed' })
   })
+
+  describe('a legacy record the clean-up archived', () => {
+    const archived = (overrides: Partial<PrisonerTimelineItem> = {}) =>
+      containerEvent({
+        eventType: 'REMOVED',
+        eventStatus: 'REMOVED',
+        eventUserId: 'LEGACY_CLEANUP',
+        systemGenerated: true,
+        legacyCleanup: true,
+        containerStatus: 'REMOVED',
+        ...overrides,
+      })
+
+    it('is titled by its seal and explains why it was archived', () => {
+      const [row] = buildPrisonerTimeline([archived()], 'A1234BC')
+      expect(row.title).toBe('Seal SN880032 - Legacy property record archived following DPS migration')
+      expect(row.description).toBe(
+        'This record was automatically archived because it exceeded the applicable retention period before migration to DPS and no further property action was required.',
+      )
+      expect(row.byline).toBe('System generated, Leeds (HMP)')
+    })
+
+    it('leaves out a placeholder seal', () => {
+      const [row] = buildPrisonerTimeline([archived({ sealNumber: 'MISSING-1234' })], 'A1234BC')
+      expect(row.title).toBe('Legacy property record archived following DPS migration')
+    })
+
+    it('shows its last known storage location rather than "Removed"', () => {
+      const [row] = buildPrisonerTimeline([archived()], 'A1234BC')
+      expect(row.details).toMatchObject({ locationLabel: 'Last known storage location', location: 'Reception A1' })
+    })
+
+    it('does not change how a container marked inactive in NOMIS reads', () => {
+      const [row] = buildPrisonerTimeline([archived({ legacyCleanup: false, eventUserId: 'NOMIS_USER' })], 'A1234BC')
+      expect(row.title).toBe('Property container SN880032 marked as removed from the establishment')
+      expect(row.description).toBeNull()
+      expect(row.details).toMatchObject({ locationLabel: 'Storage location', location: 'Removed' })
+    })
+
+    it('only applies to the archive itself, not to other events the clean-up wrote before the 13-month rule', () => {
+      const [row] = buildPrisonerTimeline([archived({ eventType: 'RETURNED', eventStatus: 'RETURNED' })], 'A1234BC')
+      expect(row.title).toBe('Property container SN880032 returned to the person')
+      expect(row.description).toBeNull()
+    })
+  })
 })

@@ -185,25 +185,19 @@ export default class PrisonerPropertyApiClient extends RestClient {
   }
 
   /**
-   * What a legacy clean-up would close at a prison for a look-back window, without changing anything.
-   * ROLE_PRISONER_PROPERTY__ADMIN on the system client.
+   * What a legacy clean-up would close at a prison under the fixed 13-month retention rule, without changing
+   * anything. ROLE_PRISONER_PROPERTY__ADMIN on the system client.
    */
-  previewLegacyCleanup(agencyId: string, olderThanDays: number, username: string): Promise<LegacyCleanupPreview> {
-    return this.get<LegacyCleanupPreview>(
-      { path: `/active-agencies/${agencyId}/cleanup/preview`, query: { olderThanDays } },
-      asSystem(username),
-    )
+  previewLegacyCleanup(agencyId: string, username: string): Promise<LegacyCleanupPreview> {
+    return this.get<LegacyCleanupPreview>({ path: `/active-agencies/${agencyId}/cleanup/preview` }, asSystem(username))
   }
 
   /**
    * Queue a legacy clean-up at a prison. The API answers 202 with the job straight away and processes it
    * asynchronously; 409 when one is already pending or running there. ROLE_PRISONER_PROPERTY__ADMIN.
    */
-  startLegacyCleanup(agencyId: string, olderThanDays: number, username: string): Promise<LegacyCleanupJob> {
-    return this.post<LegacyCleanupJob>(
-      { path: `/active-agencies/${agencyId}/cleanup`, data: { olderThanDays } },
-      asSystem(username),
-    )
+  startLegacyCleanup(agencyId: string, username: string): Promise<LegacyCleanupJob> {
+    return this.post<LegacyCleanupJob>({ path: `/active-agencies/${agencyId}/cleanup` }, asSystem(username))
   }
 
   /** The clean-up jobs run at a prison, newest first, without their items. ROLE_PRISONER_PROPERTY__ADMIN. */
