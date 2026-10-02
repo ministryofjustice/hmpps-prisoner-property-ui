@@ -44,8 +44,12 @@
           <p class="moj-timeline__date">
             <time datetime="{{ row.dateTime }}">{{ row.dateTime | formatDateTime }}</time>
           </p>
-          {% if row.details %}
+          {% if row.description or row.details %}
             <div class="moj-timeline__description">
+              {% if row.description %}
+                <p class="govuk-body" data-qa="timeline-description">{{ row.description }}</p>
+              {% endif %}
+              {% if row.details %}
               {% set detailsHtml %}
                 <dl class="govuk-summary-list govuk-summary-list--no-border govuk-!-margin-bottom-2">
                   <div class="govuk-summary-list__row">
@@ -70,6 +74,7 @@
                 <a class="govuk-link" href="{{ row.details.historyUrl }}">View full container history</a>
               {% endset %}
               {{ govukDetails({ summaryText: "Property container details", html: detailsHtml }) }}
+              {% endif %}
             </div>
           {% endif %}
         </div>

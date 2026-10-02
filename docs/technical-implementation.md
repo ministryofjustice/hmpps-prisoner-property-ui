@@ -103,7 +103,7 @@ own file.
 | **Combine containers** | `journeys/combineContainer.ts` | Select → details → location → check → confirm. | manage + active prison |
 | **Admin: prisons** (`/admin/prisons`) | `admin/prisons.ts` | The rollout console: switch prisons onto DPS, and control the warning staff see on the NOMIS property screens (OIDMPCON and OIUPROPE). | admin |
 | **Admin: locations** (`/admin/locations`) | `admin/locations.ts` | Add, edit and remove a prison's storage locations. | location admin |
-| **Admin: legacy clean-up** (`/admin/prisons/:agencyId/cleanup`) | `admin/cleanup.ts` | Preview what a look-back window would close of a prison's NOMIS backlog (released / moved-on owners), run it, and follow the queued job. The job page reloads itself every 5 s with a CSP-nonced inline script - not a meta refresh, which fails the accessibility checks. | admin |
+| **Admin: legacy clean-up** (`/admin/prisons/:agencyId/cleanup`) | `admin/cleanup.ts` | Preview what the fixed 13-month retention rule would mark as removed of a prison's NOMIS backlog (people released, died, escaped or absconded, or moved on more than 13 months ago; confiscated property and future disposal dates left alone), run it, and follow the queued job. The archived records then read "Legacy property record archived following DPS migration" in both histories (`utils/legacyCleanup.ts`). The job page reloads itself every 5 s with a CSP-nonced inline script - not a meta refresh, which fails the accessibility checks. | admin |
 
 All three person tabs share `partials/personHeader.njk`, which is where the *Add property* button lives.
 Any handler rendering one of them has to compute `canManage` the same way, or the button appears on a tab

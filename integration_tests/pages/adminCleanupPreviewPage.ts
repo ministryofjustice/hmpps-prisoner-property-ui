@@ -4,13 +4,11 @@ import AbstractPage from './abstractPage'
 export default class AdminCleanupPreviewPage extends AbstractPage {
   readonly heading: Locator
 
-  readonly olderThanDays: Locator
+  readonly cutoff: Locator
 
-  readonly updatePreview: Locator
+  readonly toRemove: Locator
 
-  readonly toReturn: Locator
-
-  readonly toTransfer: Locator
+  readonly removalReasons: Locator
 
   readonly dueForReturnNow: Locator
 
@@ -24,24 +22,20 @@ export default class AdminCleanupPreviewPage extends AbstractPage {
 
   readonly errorBanner: Locator
 
-  readonly errorSummary: Locator
-
   readonly jobsTable: Locator
 
   private constructor(page: Page) {
     super(page)
     this.heading = page.getByRole('heading', { name: 'Clean up legacy property' })
-    this.olderThanDays = page.getByTestId('older-than-days')
-    this.updatePreview = page.getByTestId('update-preview')
-    this.toReturn = page.getByTestId('to-return')
-    this.toTransfer = page.getByTestId('to-transfer')
+    this.cutoff = page.getByTestId('cutoff')
+    this.toRemove = page.getByTestId('to-remove')
+    this.removalReasons = page.getByTestId('removal-reasons')
     this.dueForReturnNow = page.getByTestId('due-for-return-now')
     this.dueForTransferOutNow = page.getByTestId('due-for-transfer-out-now')
     this.warning = page.getByTestId('warning')
     this.runCleanup = page.getByTestId('run-cleanup')
     this.inFlight = page.getByTestId('in-flight')
     this.errorBanner = page.getByTestId('error-banner')
-    this.errorSummary = page.getByTestId('error-summary')
     this.jobsTable = page.getByTestId('jobs-table')
   }
 

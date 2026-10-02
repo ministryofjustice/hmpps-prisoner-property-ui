@@ -104,6 +104,42 @@ test.describe('Container history timeline', () => {
     await expect(historyPage.timeline).not.toContainText('by AUSER')
   })
 
+  test('words a legacy record the clean-up archived', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [{ ...container, currentStatus: 'REMOVED', removalOutcome: 'REMOVED', locationDescription: null }],
+      priority: 1,
+    })
+    await prisonerPropertyApi.stubGetContainerEvents({
+      id: 'c1',
+      events: [
+        {
+          ...baseEvent,
+          id: 'e2',
+          eventType: 'REMOVED',
+          eventDateTime: '2026-10-02T09:00:00',
+          eventUserId: 'LEGACY_CLEANUP',
+          legacyCleanup: true,
+          eventDate: '2024-06-01',
+        },
+        events[events.length - 1],
+      ],
+      priority: 1,
+    })
+    await manageUsersApi.stubGetUser({ username: 'AUSER', name: 'John Doe' })
+    await page.goto('/prisoner/A1234BC/container/c1')
+
+    const historyPage = await ContainerHistoryPage.verifyOnPage(page)
+    await expect(historyPage.timeline).toContainText(
+      'Seal SN0001 - Legacy property record archived following DPS migration',
+    )
+    await expect(historyPage.timeline).toContainText(
+      'This record was automatically archived because it exceeded the applicable retention period before migration to DPS and no further property action was required.',
+    )
+    await expect(historyPage.timeline).toContainText('Legacy property clean-up')
+  })
+
   test('shows an empty state when the container has no events', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPropertyForPrisoner({

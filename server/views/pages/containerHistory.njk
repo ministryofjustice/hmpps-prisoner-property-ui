@@ -26,7 +26,7 @@
       {% for event in events %}
         <div class="moj-timeline__item">
           <div class="moj-timeline__header">
-            <h2 class="moj-timeline__title">{{ event.eventType | eventTypeLabel }}</h2>
+            <h2 class="moj-timeline__title">{{ event | eventTitle(container.currentSealNumber) }}</h2>
             <p class="moj-timeline__byline">
               {%- if event.eventUserId == "PRISONER_PROPERTY_API" -%}
                 System generated
