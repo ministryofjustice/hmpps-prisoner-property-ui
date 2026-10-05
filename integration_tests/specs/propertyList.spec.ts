@@ -262,13 +262,56 @@ test.describe('Establishment property list', () => {
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for return' })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer out' })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for disposal' })).toBeEnabled()
-    // Removed/returned/disposed is wired to the API's includeRemoved flag.
-    await expect(listPage.filters.getByRole('checkbox', { name: 'Removed, returned or disposed of' })).toBeEnabled()
+    // Property no longer held, by how it left - sent to the API as statuses.
+    for (const name of ['Returned', 'Disposed', 'Transferred out', 'Created in error', 'Removed']) {
+      // eslint-disable-next-line no-await-in-loop
+      await expect(listPage.filters.getByRole('checkbox', { name, exact: true })).toBeEnabled()
+    }
+    await expect(listPage.filters.getByRole('checkbox', { name: 'Removed, returned or disposed of' })).toHaveCount(0)
     // Person-location filters are enabled.
     await expect(listPage.filters.getByRole('checkbox', { name: 'In this establishment', exact: true })).toBeEnabled()
     await expect(listPage.filters.getByRole('checkbox', { name: 'No longer in this establishment' })).toBeEnabled()
     // "Due for transfer in" is now backed by the API's receiving-prison view.
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for transfer in' })).toBeEnabled()
+  })
+
+  test('filters property no longer held by how it left, and tags each row with its status', async ({ page }) => {
+    const removed = (id: string, seal: string, status: 'RETURNED' | 'REMOVED') => ({
+      ...group.containers[0],
+      id,
+      currentSealNumber: seal,
+      currentStatus: status,
+      currentLocationType: null,
+      removalOutcome: status,
+      removalDate: '2026-09-01',
+    })
+    const noLongerHeld: PrisonerPropertyGroup = {
+      ...group,
+      containers: [removed('c1', 'SN0001', 'RETURNED'), removed('c2', 'SN0002', 'REMOVED')],
+    }
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [noLongerHeld], priority: 1 })
+    await page.goto('/')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await listPage.filters.locator('summary').click()
+    await listPage.filters.getByRole('checkbox', { name: 'Returned', exact: true }).check()
+    await listPage.filters.getByRole('checkbox', { name: 'Removed', exact: true }).check()
+    await listPage.applyFilters.click()
+
+    await expect(page).toHaveURL(/status=RETURNED&status=REMOVED/)
+    await expect(listPage.selectedFilterTags).toHaveText([/No longer held: Returned/, /No longer held: Removed/])
+    await expect(listPage.table.locator('.govuk-tag', { hasText: 'Returned' })).toHaveClass(/govuk-tag--magenta/)
+    await expect(listPage.table.locator('.govuk-tag', { hasText: 'Removed' })).toHaveClass(/moj-tag--grey/)
+  })
+
+  test('says so when nothing matches the chosen filter', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [], priority: 1 })
+    await page.goto('/?status=CREATED_IN_ERROR')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await expect(listPage.noResults).toHaveText('No records found for the selected filter.')
   })
 
   test('surfaces incoming property with a Due for transfer in tag when the filter is applied', async ({ page }) => {

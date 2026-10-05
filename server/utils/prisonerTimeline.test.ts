@@ -185,7 +185,7 @@ describe('buildPrisonerTimeline', () => {
 
   it('maps the event status to a tag, and leaves movement items untagged', () => {
     const [event] = buildPrisonerTimeline([containerEvent({ eventStatus: 'TRANSFER' })], 'A1234BC')
-    expect(event.tag).toEqual({ text: 'Transferred out', classes: 'govuk-tag--grey' })
+    expect(event.tag).toEqual({ text: 'Transferred out', classes: 'govuk-tag--blue' })
 
     const [move] = buildPrisonerTimeline([movement()], 'A1234BC')
     expect(move.tag).toBeNull()
