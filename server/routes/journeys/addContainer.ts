@@ -10,6 +10,7 @@ import {
   validatePreviousSealNumbers,
 } from '../../utils/addContainer'
 import requireManageRole from '../../middleware/requireManageRole'
+import { requirePrisonerAtThisPrison } from '../../middleware/requirePrisonerAccess'
 import {
   BOX_PAGE_SIZE,
   isoToParts,
@@ -20,11 +21,14 @@ import {
 
 // ---- Add property container(s) journey: search for a person, then add one or more (manage role) ----
 
-export default function addContainerRoutes(
-  { auditService, prisonerPropertyService, prisonerService, userService }: Services,
-  requireActivePrisonMw: RequestHandler,
-): Router {
+export default function addContainerRoutes(services: Services, requireActivePrisonMw: RequestHandler): Router {
+  const { auditService, prisonerPropertyService, prisonerService, userService } = services
   const router = Router()
+
+  // Property can only be added for someone held at the user's prison or who already has property there. The
+  // search entry point is limited to the user's prison, but every step takes the prison number from the URL,
+  // so each one checks it.
+  const requirePrisonerHere = requirePrisonerAtThisPrison(services)
 
   type AddContainerJourney = NonNullable<import('express-session').SessionData['addContainerJourney']>
   type AddContainerDraft = AddContainerJourney['containers'][number]
@@ -136,6 +140,7 @@ export default function addContainerRoutes(
     '/prisoner/:prisonerNumber/add-container',
     requireManageRole,
     requireActivePrisonMw,
+    requirePrisonerHere,
     async (req, res, next) => {
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined
@@ -149,6 +154,7 @@ export default function addContainerRoutes(
     '/prisoner/:prisonerNumber/add-container/details',
     requireManageRole,
     requireActivePrisonMw,
+    requirePrisonerHere,
     async (req, res, next) => {
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined
@@ -164,6 +170,7 @@ export default function addContainerRoutes(
     '/prisoner/:prisonerNumber/add-container/details',
     requireManageRole,
     requireActivePrisonMw,
+    requirePrisonerHere,
     async (req, res, next) => {
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined
@@ -222,6 +229,7 @@ export default function addContainerRoutes(
     '/prisoner/:prisonerNumber/add-container/where-stored/:index',
     requireManageRole,
     requireActivePrisonMw,
+    requirePrisonerHere,
     async (req, res, next) => {
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined
@@ -246,6 +254,7 @@ export default function addContainerRoutes(
     '/prisoner/:prisonerNumber/add-container/where-stored/:index',
     requireManageRole,
     requireActivePrisonMw,
+    requirePrisonerHere,
     async (req, res, next) => {
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined
@@ -280,6 +289,7 @@ export default function addContainerRoutes(
     '/prisoner/:prisonerNumber/add-container/location/:index',
     requireManageRole,
     requireActivePrisonMw,
+    requirePrisonerHere,
     async (req, res, next) => {
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined
@@ -342,6 +352,7 @@ export default function addContainerRoutes(
     '/prisoner/:prisonerNumber/add-container/location/:index',
     requireManageRole,
     requireActivePrisonMw,
+    requirePrisonerHere,
     async (req, res, next) => {
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined
@@ -366,6 +377,7 @@ export default function addContainerRoutes(
     '/prisoner/:prisonerNumber/add-container/check',
     requireManageRole,
     requireActivePrisonMw,
+    requirePrisonerHere,
     async (req, res, next) => {
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined
@@ -408,6 +420,7 @@ export default function addContainerRoutes(
     '/prisoner/:prisonerNumber/add-container/confirm',
     requireManageRole,
     requireActivePrisonMw,
+    requirePrisonerHere,
     async (req, res, next) => {
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined

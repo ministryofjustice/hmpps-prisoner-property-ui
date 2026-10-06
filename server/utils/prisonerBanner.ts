@@ -17,6 +17,9 @@ export interface PrisonerBanner {
   inThisEstablishment: boolean
   // Link to the prisoner's DPS profile.
   profileUrl: string
+  // Whether to offer that link. Set by the route from the user's access: only someone with full access to the
+  // prisoner would be let into the profile.
+  showProfileLink?: boolean
 }
 
 /**

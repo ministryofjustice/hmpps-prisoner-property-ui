@@ -1054,6 +1054,7 @@ describe('GET /prisoner/:prisonerNumber/image', () => {
   })
 
   it('returns 404 for an invalid prisoner number', async () => {
+    withActiveCaseload()
     return request(app)
       .get('/prisoner/not-a-number/image')
       .expect(404)
@@ -1465,6 +1466,257 @@ const locationAdminManageApp = () =>
     services: { auditService, prisonerPropertyService, prisonerService, userService, activeAgenciesService },
     userSupplier: () => locationAdminManageUser,
   })
+
+describe('Prisoner access rules (MAPB-942)', () => {
+  const releasedViewingApp = () =>
+    appWithAllRoutes({
+      services: { auditService, prisonerPropertyService, prisonerService, userService, activeAgenciesService },
+      userSupplier: () => ({ ...user, userRoles: ['INACTIVE_BOOKINGS'] }),
+    })
+
+  // A prisoner now held at Leeds, with property at Leeds and some left behind here at Moorland.
+  const atLeedsWithPropertyHere = () => {
+    prisonerService.getPrisonerDetails.mockResolvedValue(
+      prisoner({ prisonId: 'LEI', prisonName: 'Leeds (HMP)', cellLocation: 'L-1-001' }),
+    )
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'here', prisonId: 'MDI', currentSealNumber: 'SNHERE', prisonerCurrentPrisonId: 'LEI' }),
+      container({
+        id: 'leeds',
+        prisonId: 'LEI',
+        prisonName: 'Leeds (HMP)',
+        currentSealNumber: 'SNLEEDS',
+        prisonerCurrentPrisonId: 'LEI',
+      }),
+    ])
+  }
+
+  // A prisoner held at Leeds with no property here: someone the user has no reason to see.
+  const unrelatedPrisoner = () => {
+    prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonId: 'LEI', prisonName: 'Leeds (HMP)' }))
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'leeds', prisonId: 'LEI', prisonerCurrentPrisonId: 'LEI' }),
+    ])
+  }
+
+  describe('a prisoner with no link to the user prison', () => {
+    it.each([
+      '/prisoner/A1234BC',
+      '/prisoner/A1234BC/history',
+      '/prisoner/A1234BC/returned',
+      '/prisoner/A1234BC/container/leeds',
+    ])('refuses %s as not found', async path => {
+      withActiveCaseload()
+      unrelatedPrisoner()
+
+      return request(app)
+        .get(path)
+        .expect(404)
+        .expect(res => {
+          expect(res.text).not.toContain('Smith')
+          expect(prisonerPropertyService.getPrisonerPropertyHistory).not.toHaveBeenCalled()
+          expect(prisonerPropertyService.getContainerEvents).not.toHaveBeenCalled()
+        })
+    })
+
+    it('does not return their photo', async () => {
+      withActiveCaseload()
+      unrelatedPrisoner()
+
+      return request(app)
+        .get('/prisoner/A1234BC/image')
+        .expect(404)
+        .expect(() => expect(prisonerService.getPrisonerImage).not.toHaveBeenCalled())
+    })
+
+    it('refuses a released prisoner without the released prisoner viewing role', async () => {
+      withActiveCaseload()
+      prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonId: 'OUT', prisonName: null }))
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([])
+
+      return request(app).get('/prisoner/A1234BC').expect(404)
+    })
+
+    it('refuses when the current prison cannot be found and there is no property here', async () => {
+      withActiveCaseload()
+      prisonerService.getPrisonerDetails.mockRejectedValue(new Error('prisoner-search down'))
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([])
+
+      return request(app).get('/prisoner/A1234BC').expect(404)
+    })
+
+    it('refuses to start adding property for them', async () => {
+      withActiveCaseload()
+      unrelatedPrisoner()
+
+      return request(manageApp())
+        .get('/prisoner/A1234BC/add-container')
+        .expect(404)
+        .expect(() => expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled())
+    })
+  })
+
+  describe('full access', () => {
+    beforeEach(() => prisonerPropertyService.getContainerEvents.mockResolvedValue([]))
+
+    it('is given when the prisoner is in any of the user caseloads, not only the active one', async () => {
+      userService.getActiveCaseload.mockResolvedValue({
+        activeCaseloadId: 'MDI',
+        activeCaseloadName: 'Moorland (HMP & YOI)',
+        caseloadIds: ['MDI', 'LEI'],
+      })
+      atLeedsWithPropertyHere()
+      prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([
+        timelineItem({ eventId: 'e-leeds', containerId: 'leeds', sealNumber: 'SNLEEDS' }),
+        timelineItem({
+          eventId: 'move',
+          itemType: 'PRISONER_MOVEMENT',
+          movementKind: 'TRANSFER_IN',
+          containerId: null,
+          eventType: null,
+          toPrisonName: 'Leeds (HMP)',
+        }),
+      ])
+
+      await request(app).get('/prisoner/A1234BC/container/leeds').expect(200)
+      return request(app)
+        .get('/prisoner/A1234BC/history')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('SNLEEDS')
+          expect(res.text).toContain('Transferred in to')
+          expect(res.text).toMatch(/<a [^>]*data-qa="banner-name"/)
+        })
+    })
+
+    it.each(['OUT', 'TRN'])(
+      'is given for a prisoner at %s to a user with the released prisoner viewing role',
+      async id => {
+        withActiveCaseload()
+        prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonId: id, prisonName: null }))
+        prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+          container({ id: 'leeds', prisonId: 'LEI', prisonerCurrentPrisonId: id }),
+        ])
+        prisonerService.getPrisonerImage.mockResolvedValue(Readable.from(['image-bytes']))
+
+        await request(releasedViewingApp()).get('/prisoner/A1234BC/container/leeds').expect(200)
+        return request(releasedViewingApp()).get('/prisoner/A1234BC/image').expect(200)
+      },
+    )
+
+    it('falls back to the prison on the property records when prisoner search fails', async () => {
+      withActiveCaseload()
+      prisonerService.getPrisonerDetails.mockRejectedValue(new Error('prisoner-search down'))
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+        container({ id: 'leeds', prisonId: 'LEI', prisonerCurrentPrisonId: 'MDI' }),
+      ])
+
+      return request(app).get('/prisoner/A1234BC/container/leeds').expect(200)
+    })
+  })
+
+  describe('access only because property is held here', () => {
+    it('shows only the property held at this prison, with no link to the prisoner profile', async () => {
+      withActiveCaseload()
+      atLeedsWithPropertyHere()
+
+      return request(app)
+        .get('/prisoner/A1234BC')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('SNHERE')
+          expect(res.text).not.toContain('SNLEEDS')
+          expect(res.text).not.toContain('L-1-001')
+          expect(res.text).not.toMatch(/<a [^>]*data-qa="banner-name"/)
+          expect(res.text).toContain('data-qa="banner-name"')
+        })
+    })
+
+    it('counts property no longer held here, so links from the establishment list still work', async () => {
+      withActiveCaseload()
+      prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonId: 'OUT', prisonName: null }))
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+        container({
+          id: 'returned',
+          prisonId: 'MDI',
+          removalOutcome: 'RETURNED',
+          removalDate: '2026-09-01',
+          currentStatus: 'RETURNED',
+          currentSealNumber: 'SNRETURNED',
+          prisonerCurrentPrisonId: 'OUT',
+        }),
+        container({ id: 'leeds', prisonId: 'LEI', removalOutcome: 'RETURNED', currentSealNumber: 'SNLEEDS' }),
+      ])
+
+      return request(app)
+        .get('/prisoner/A1234BC/returned')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('SNRETURNED')
+          expect(res.text).not.toContain('SNLEEDS')
+        })
+    })
+
+    it('limits the history to this prison property and leaves out the prisoner movements', async () => {
+      withActiveCaseload()
+      atLeedsWithPropertyHere()
+      prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([
+        timelineItem({ eventId: 'e-here', containerId: 'here', sealNumber: 'SNHERE', containerSealNumber: 'SNHERE' }),
+        timelineItem({
+          eventId: 'e-leeds',
+          containerId: 'leeds',
+          sealNumber: 'SNLEEDS',
+          containerSealNumber: 'SNLEEDS',
+        }),
+        timelineItem({
+          eventId: 'move',
+          itemType: 'PRISONER_MOVEMENT',
+          movementKind: 'TRANSFER_IN',
+          containerId: null,
+          eventType: null,
+          toPrisonName: 'Leeds (HMP)',
+        }),
+      ])
+
+      return request(app)
+        .get('/prisoner/A1234BC/history')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('SNHERE')
+          expect(res.text).not.toContain('SNLEEDS')
+          expect(res.text).not.toContain('Transferred in to')
+        })
+    })
+
+    it('refuses the history of a container held at another prison', async () => {
+      withActiveCaseload()
+      atLeedsWithPropertyHere()
+
+      return request(app)
+        .get('/prisoner/A1234BC/container/leeds')
+        .expect(404)
+        .expect(() => expect(prisonerPropertyService.getContainerEvents).not.toHaveBeenCalled())
+    })
+
+    it('returns the photo', async () => {
+      withActiveCaseload()
+      atLeedsWithPropertyHere()
+      prisonerService.getPrisonerImage.mockResolvedValue(Readable.from(['image-bytes']))
+
+      return request(app).get('/prisoner/A1234BC/image').expect(200)
+    })
+
+    it('allows adding property here for them', async () => {
+      withActiveCaseload()
+      atLeedsWithPropertyHere()
+
+      return request(manageApp())
+        .get('/prisoner/A1234BC/add-container')
+        .expect(302)
+        .expect('Location', '/prisoner/A1234BC/add-container/details')
+    })
+  })
+})
 
 describe('Add container journey - access control', () => {
   it('renders the Add property button on the person view for a user with the manage role', async () => {
@@ -3562,6 +3814,8 @@ describe('Admin - manage storage locations', () => {
   })
 
   it('removes an empty storage location and redirects with a success message', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
     prisonerPropertyService.removePropertyLocation.mockResolvedValue(locations[0])
 
     return request(locationAdminApp())
@@ -3575,6 +3829,8 @@ describe('Admin - manage storage locations', () => {
   })
 
   it('flashes an error when removing a location that still holds property', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
     prisonerPropertyService.removePropertyLocation.mockRejectedValue({ responseStatus: 409 })
 
     return request(locationAdminApp())
@@ -3583,6 +3839,21 @@ describe('Admin - manage storage locations', () => {
       .expect('location', '/admin/locations')
       .expect(() => {
         expect(flashProvider).toHaveBeenCalledWith('error', expect.stringContaining('cannot be removed'))
+      })
+  })
+
+  it('refuses to remove a storage location that is not at the user prison (MAPB-942)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyLocations.mockResolvedValue(locations)
+
+    return request(locationAdminApp())
+      .post('/admin/locations/loc-at-another-prison/remove')
+      .expect(302)
+      .expect('location', '/admin/locations')
+      .expect(() => {
+        expect(prisonerPropertyService.getPropertyLocations).toHaveBeenCalledWith('MDI', 'user1')
+        expect(prisonerPropertyService.removePropertyLocation).not.toHaveBeenCalled()
+        expect(flashProvider).toHaveBeenCalledWith('error', 'That storage location could not be found.')
       })
   })
 

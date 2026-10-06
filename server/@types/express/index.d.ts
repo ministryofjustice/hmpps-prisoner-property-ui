@@ -1,6 +1,7 @@
 import type { AuditEvent } from '@ministryofjustice/hmpps-audit-client'
 import { HmppsUser } from '../../interfaces/hmppsUser'
 import { ContainerType, RemovalOutcome } from '../../data/prisonerPropertyApiTypes'
+import type { PrisonerAccessContext } from '../../middleware/requirePrisonerAccess'
 
 // One container being added within the multi-add journey. Excess property can be stored either off-site at
 // Branston (storageChoice 'branston', no internalLocationId) or in a prison location (storageChoice
@@ -116,6 +117,8 @@ export declare global {
       appInsightsConnectionString?: string
       appInsightsApplicationName?: string
       buildNumber?: string
+      // Set by the prisoner access guards for the route that follows.
+      prisonerAccess?: PrisonerAccessContext
     }
   }
 }

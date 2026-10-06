@@ -9,7 +9,11 @@
   <dl class="prisoner-banner__details">
     <div class="prisoner-banner__detail prisoner-banner__detail--name">
       <dt>
-        <a class="govuk-link" href="{{ banner.profileUrl }}" data-qa="banner-name">{{ banner.name }}</a>
+        {% if banner.showProfileLink %}
+          <a class="govuk-link" href="{{ banner.profileUrl }}" data-qa="banner-name">{{ banner.name }}</a>
+        {% else %}
+          <span data-qa="banner-name">{{ banner.name }}</span>
+        {% endif %}
       </dt>
       <dd data-qa="banner-prisoner-number">{{ banner.prisonerNumber }}</dd>
     </div>

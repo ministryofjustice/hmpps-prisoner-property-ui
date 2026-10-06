@@ -218,8 +218,19 @@ export default function adminLocationsRoutes({ prisonerPropertyService, userServ
     requireLocationAdminRole,
     captureManageLocationsReturnTo,
     async (req, res) => {
-      const { username } = res.locals.user
+      const { token, username } = res.locals.user
+      const { activeCaseloadId } = await userService.getActiveCaseload(token)
+      if (!activeCaseloadId) return res.render('pages/noCaseload')
+
+      // The API removes a location by id alone, so check it is one of this prison's before asking it to.
       const id = String(req.params.id)
+      const isOurs = (await prisonerPropertyService.getPropertyLocations(activeCaseloadId, username)).some(
+        candidate => candidate.id === id,
+      )
+      if (!isOurs) {
+        req.flash('error', 'That storage location could not be found.')
+        return res.redirect('/admin/locations')
+      }
 
       try {
         await prisonerPropertyService.removePropertyLocation(id, username)

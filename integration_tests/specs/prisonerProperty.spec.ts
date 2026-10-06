@@ -308,4 +308,74 @@ test.describe('Person property view', () => {
     await expect(prisonerPage.bannerCell).toBeHidden()
     await expect(prisonerPage.bannerStatus).toBeHidden()
   })
+
+  test('refuses a prisoner with no link to this prison when their number is typed into the address bar (MAPB-942)', async ({
+    page,
+  }) => {
+    await login(page)
+    await prisonerSearchApi.stubGetPrisoner({
+      prisoner: {
+        prisonerNumber: 'A1234BC',
+        firstName: 'John',
+        lastName: 'Smith',
+        dateOfBirth: '2001-01-01',
+        prisonId: 'LEI',
+        prisonName: 'Leeds (HMP)',
+        cellLocation: 'A-1-001',
+        status: 'ACTIVE IN',
+      },
+      priority: 1,
+    })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [transferInContainer],
+      priority: 1,
+    })
+    await prisonerSearchApi.stubGetPrisonerImage({ prisonerNumber: 'A1234BC', priority: 1 }, 200)
+
+    const pageResponse = await page.goto('/prisoner/A1234BC')
+    expect(pageResponse?.status()).toBe(404)
+    // Nothing about the prisoner or their property is shown. (The signed-in stub user is also a Smith.)
+    await expect(page.getByTestId('prisoner-banner')).toHaveCount(0)
+    await expect(page.locator('body')).not.toContainText('Smith, John')
+    await expect(page.locator('body')).not.toContainText('SN0002')
+
+    const imageResponse = await page.goto('/prisoner/A1234BC/image')
+    expect(imageResponse?.status()).toBe(404)
+  })
+
+  test('shows only the property held here for a released prisoner, without the released prisoner viewing role (MAPB-942)', async ({
+    page,
+  }) => {
+    await login(page)
+    await prisonerSearchApi.stubGetPrisoner({
+      prisoner: {
+        prisonerNumber: 'A1234BC',
+        firstName: 'John',
+        lastName: 'Smith',
+        dateOfBirth: '2001-01-01',
+        prisonId: 'OUT',
+        prisonName: null,
+        cellLocation: null,
+        status: 'INACTIVE OUT',
+      },
+      priority: 1,
+    })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [
+        { ...inEstablishmentContainer, prisonerCurrentPrisonId: 'OUT', prisonerMovementStatus: 'RELEASED' },
+        { ...transferInContainer, prisonerCurrentPrisonId: 'OUT', prisonerMovementStatus: 'RELEASED' },
+      ],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC')
+
+    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(prisonerPage.inEstablishment.getByRole('cell', { name: 'SN0001' })).toBeVisible()
+    await expect(page.locator('body')).not.toContainText('SN0002')
+    // The DPS prisoner profile would refuse this user, so the name is not a link to it.
+    await expect(prisonerPage.bannerName).toContainText('Smith, John')
+    await expect(page.getByRole('link', { name: 'Smith, John' })).toHaveCount(0)
+  })
 })

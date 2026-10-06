@@ -2,24 +2,26 @@ import { Router } from 'express'
 import createError from 'http-errors'
 
 import type { Services } from '../services'
-import { isPrisonerNumber, movementEstablishmentLabel } from '../utils/propertyList'
+import { movementEstablishmentLabel } from '../utils/propertyList'
 import { buildPersonPropertyView, buildReturnedOrTransferredView } from '../utils/personProperty'
-import { buildPrisonerBanner, fallbackPrisonerBanner } from '../utils/prisonerBanner'
+import { buildPrisonerBanner, fallbackPrisonerBanner, type PrisonerBanner } from '../utils/prisonerBanner'
 import { buildPrisonerTimeline } from '../utils/prisonerTimeline'
-import type { Prisoner } from '../data/prisonerSearchApiTypes'
+import { scopeTimeline } from '../utils/prisonerAccess'
 import { canManageProperty } from '../middleware/requireManageRole'
+import { type PrisonerAccessContext, requirePrisonerAccess } from '../middleware/requirePrisonerAccess'
 import logger from '../../logger'
 
 // The prisoner image placeholder shown when prison-api has no photo (or the call fails).
 const PRISONER_IMAGE_PLACEHOLDER = '/assets/images/prisoner-image-withheld.svg'
 
-export default function prisonerPropertyRoutes({
-  prisonerPropertyService,
-  prisonerService,
-  userService,
-  activeAgenciesService,
-}: Services): Router {
+export default function prisonerPropertyRoutes(services: Services): Router {
+  const { prisonerPropertyService, prisonerService, userService, activeAgenciesService } = services
   const router = Router()
+
+  // Every prisoner route, the photo included, goes through the access rules first. The guard also loads the
+  // property and prisoner-search details, already limited to what this user may see, into
+  // res.locals.prisonerAccess.
+  const requireAccess = requirePrisonerAccess(services)
 
   // Edits are gated on both the manage role and the establishment being switched on in DPS; a role-holder
   // on a NOMIS-managed prison sees the property read-only with a "view only" banner. Every person tab needs
@@ -31,30 +33,19 @@ export default function prisonerPropertyRoutes({
     return { canManage: hasManageRole && isActivePrison, showNomisBanner: hasManageRole && !isActivePrison }
   }
 
-  router.get('/prisoner/:prisonerNumber', async (req, res, next) => {
-    const { token, username } = res.locals.user
-    const { prisonerNumber } = req.params
+  // The shared header's banner. The link to the DPS prisoner profile is only offered with full access: someone
+  // here only for property at their prison would be refused by the profile.
+  const bannerFor = (access: PrisonerAccessContext): PrisonerBanner => {
+    const { prisonerNumber, prisoner, containers, activeCaseloadId } = access
+    const banner = prisoner
+      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, containers[0]?.prisonerMovementStatus)
+      : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
+    return { ...banner, showProfileLink: access.level === 'FULL' }
+  }
 
-    // Caseload protection: a user without an active caseload has no establishment context, so they
-    // shouldn't reach person-level property. Consistent with the establishment list guard.
-    const { activeCaseloadId } = await userService.getActiveCaseload(token)
-    if (!activeCaseloadId) {
-      return res.render('pages/noCaseload')
-    }
-
-    if (!isPrisonerNumber(prisonerNumber)) {
-      return next(createError(404, 'Prisoner not found'))
-    }
-
-    // Fetch property and prisoner details together. Prisoner-search feeds the banner but is not
-    // essential to the page, so a failure there falls back to a minimal banner rather than 500ing.
-    const [containers, prisoner] = await Promise.all([
-      prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username),
-      prisonerService.getPrisonerDetails(prisonerNumber, username).catch((error: Error): Prisoner | null => {
-        logger.warn(`Failed to load prisoner-search details for ${prisonerNumber}: ${error.message}`)
-        return null
-      }),
-    ])
+  router.get('/prisoner/:prisonerNumber', requireAccess, async (req, res) => {
+    const access = res.locals.prisonerAccess!
+    const { prisonerNumber, activeCaseloadId, containers } = access
 
     // Movement status is a prisoner-level attribute mirrored on every container; use it so the banner
     // and the "Establishment" column read "Transferring"/"Released" rather than "Not known", and so the
@@ -63,9 +54,7 @@ export default function prisonerPropertyRoutes({
 
     const { inEstablishment, dueToTransferIn, elsewhereInTransit, hasLeft, prisonerCurrentPrisonName } =
       buildPersonPropertyView(containers, activeCaseloadId, prisonerMovementStatus)
-    const banner = prisoner
-      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, prisonerMovementStatus)
-      : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
+    const banner = bannerFor(access)
 
     return res.render('pages/prisonerProperty', {
       prisonerNumber,
@@ -84,33 +73,20 @@ export default function prisonerPropertyRoutes({
     })
   })
 
-  router.get('/prisoner/:prisonerNumber/history', async (req, res, next) => {
-    const { token, username } = res.locals.user
-    const { prisonerNumber } = req.params
+  router.get('/prisoner/:prisonerNumber/history', requireAccess, async (req, res) => {
+    const { username } = res.locals.user
+    const access = res.locals.prisonerAccess!
+    const { prisonerNumber, activeCaseloadId, containers, level } = access
 
-    const { activeCaseloadId } = await userService.getActiveCaseload(token)
-    if (!activeCaseloadId) {
-      return res.render('pages/noCaseload')
-    }
+    // The timeline is the tab's own data, limited to the containers this user may see; the property list from
+    // the guard feeds only the shared header (name + banner fallback).
+    const timelineItems = scopeTimeline(
+      await prisonerPropertyService.getPrisonerPropertyHistory(prisonerNumber, username),
+      level,
+      containers,
+    )
 
-    if (!isPrisonerNumber(prisonerNumber)) {
-      return next(createError(404, 'Prisoner not found'))
-    }
-
-    // The timeline is the tab's own data; the property list is fetched only for the shared header
-    // (name + banner fallback), and prisoner-search feeds the banner but is not essential to the page.
-    const [timelineItems, containers, prisoner] = await Promise.all([
-      prisonerPropertyService.getPrisonerPropertyHistory(prisonerNumber, username),
-      prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username),
-      prisonerService.getPrisonerDetails(prisonerNumber, username).catch((error: Error): Prisoner | null => {
-        logger.warn(`Failed to load prisoner-search details for ${prisonerNumber}: ${error.message}`)
-        return null
-      }),
-    ])
-
-    const banner = prisoner
-      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, containers[0]?.prisonerMovementStatus)
-      : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
+    const banner = bannerFor(access)
 
     const nameByUsername = await userService.getUserDisplayNames(
       timelineItems.map(item => item.eventUserId),
@@ -128,33 +104,13 @@ export default function prisonerPropertyRoutes({
     })
   })
 
-  router.get('/prisoner/:prisonerNumber/returned', async (req, res, next) => {
-    const { token, username } = res.locals.user
-    const { prisonerNumber } = req.params
+  router.get('/prisoner/:prisonerNumber/returned', requireAccess, async (req, res) => {
+    const access = res.locals.prisonerAccess!
+    const { prisonerNumber, activeCaseloadId, containers } = access
 
-    const { activeCaseloadId } = await userService.getActiveCaseload(token)
-    if (!activeCaseloadId) {
-      return res.render('pages/noCaseload')
-    }
-
-    if (!isPrisonerNumber(prisonerNumber)) {
-      return next(createError(404, 'Prisoner not found'))
-    }
-
-    // The person's containers already include their removed/returned/disposed/transferred property, so
-    // one call feeds both this tab's list and the shared header (name + banner fallback). Prisoner-search
-    // feeds the banner but is not essential to the page.
-    const [containers, prisoner] = await Promise.all([
-      prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username),
-      prisonerService.getPrisonerDetails(prisonerNumber, username).catch((error: Error): Prisoner | null => {
-        logger.warn(`Failed to load prisoner-search details for ${prisonerNumber}: ${error.message}`)
-        return null
-      }),
-    ])
-
-    const banner = prisoner
-      ? buildPrisonerBanner(prisonerNumber, prisoner, activeCaseloadId, containers[0]?.prisonerMovementStatus)
-      : fallbackPrisonerBanner(prisonerNumber, containers[0]?.prisonerName ?? null)
+    // The person's containers already include their removed/returned/disposed/transferred property, so the
+    // guard's list feeds both this tab and the shared header (name + banner fallback).
+    const banner = bannerFor(access)
 
     return res.render('pages/prisonerPropertyReturned', {
       prisonerNumber,
@@ -167,13 +123,9 @@ export default function prisonerPropertyRoutes({
     })
   })
 
-  router.get('/prisoner/:prisonerNumber/image', async (req, res, next) => {
+  router.get('/prisoner/:prisonerNumber/image', requireAccess, async (req, res) => {
     const { username } = res.locals.user
-    const { prisonerNumber } = req.params
-
-    if (!isPrisonerNumber(prisonerNumber)) {
-      return next(createError(404, 'Prisoner not found'))
-    }
+    const { prisonerNumber } = res.locals.prisonerAccess!
 
     // Proxy the prisoner's photo from prison-api. When there is no image (or the call fails) redirect
     // to the "Photo withheld for security reasons" placeholder so the banner always renders.
@@ -188,22 +140,14 @@ export default function prisonerPropertyRoutes({
     }
   })
 
-  router.get('/prisoner/:prisonerNumber/container/:id', async (req, res, next) => {
-    const { token, username } = res.locals.user
-    const { prisonerNumber, id } = req.params
+  router.get('/prisoner/:prisonerNumber/container/:id', requireAccess, async (req, res, next) => {
+    const { username } = res.locals.user
+    const id = String(req.params.id)
+    const { prisonerNumber, containers } = res.locals.prisonerAccess!
 
-    const { activeCaseloadId } = await userService.getActiveCaseload(token)
-    if (!activeCaseloadId) {
-      return res.render('pages/noCaseload')
-    }
-
-    if (!isPrisonerNumber(prisonerNumber)) {
-      return next(createError(404, 'Prisoner not found'))
-    }
-
-    // Resolve the container from the prisoner's own property so the URL is coherent (the container
-    // belongs to this prisoner) and we have its details for the page heading. 404 otherwise.
-    const containers = await prisonerPropertyService.getPropertyForPrisoner(prisonerNumber, username)
+    // Resolve the container from the property this user may see of this prisoner's, so the URL is coherent (the
+    // container belongs to this prisoner) and a container at another prison is refused when access comes only
+    // from property here. 404 otherwise.
     const container = containers.find(c => c.id === id)
     if (!container) {
       return next(createError(404, 'Property container not found'))
