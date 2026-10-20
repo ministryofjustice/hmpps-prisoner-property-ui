@@ -1,4 +1,5 @@
-import express from 'express'
+import express, { Request } from 'express'
+import { telemetryMiddleware } from '@ministryofjustice/hmpps-azure-telemetry'
 
 import createError from 'http-errors'
 
@@ -52,6 +53,12 @@ export default function createApp(services: Services): express.Application {
         environmentName: config.environmentName,
         authUrl: config.apis.hmppsAuth.externalUrl,
       },
+    }),
+  )
+
+  app.use(
+    telemetryMiddleware.addUserMetadataToTelemetry({
+      getAttributes: (req: Request) => ({ username: req.user?.username }),
     }),
   )
 
