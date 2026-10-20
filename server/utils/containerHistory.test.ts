@@ -63,7 +63,13 @@ describe('eventDescription', () => {
 
   it('describes an added-to-storage event with its seal number', () => {
     expect(eventDescription(event({ eventType: 'CREATED_SEALED', sealNumber: 'SN0001' }))).toBe(
-      'Added to storage with seal number SN0001.',
+      'Added to storage with seal number SN0001. Matched to a previous property record with no seal number recorded.',
+    )
+  })
+
+  it('explains that a matched previous property record had no recorded seal number', () => {
+    expect(eventDescription(event({ eventType: 'CREATED_SEALED' }))).toBe(
+      'Added to storage. Matched to a previous property record with no seal number recorded.',
     )
   })
 
@@ -79,16 +85,18 @@ describe('eventDescription', () => {
     // A NOMIS record with no seal mark is synced with a generated MISSING-<nomis id>, which names nothing a
     // reader can act on.
     expect(eventDescription(event({ eventType: 'CREATED_SEALED', sealNumber: 'MISSING-1234567' }))).toBe(
-      'Added to storage.',
+      'Added to storage. Matched to a previous property record with no seal number recorded.',
     )
   })
 
-  it('drops the matched-seal clause when the other record only has a placeholder', () => {
+  it('describes a matched previous property record without a real seal number', () => {
     expect(
       eventDescription(
         event({ eventType: 'CREATED_SEALED', sealNumber: 'SN0001', relatedContainerSealNumber: 'MISSING-42' }),
       ),
-    ).toBe('Added to storage with seal number SN0001.')
+    ).toBe(
+      'Added to storage with seal number SN0001. Matched to a previous property record with no seal number recorded.',
+    )
   })
 
   it('describes a seal change', () => {
@@ -170,7 +178,9 @@ describe('eventDescription', () => {
   it('describes returned, disposed and combined events', () => {
     expect(eventDescription(event({ eventType: 'RETURNED' }))).toBe('Returned to the person.')
     expect(eventDescription(event({ eventType: 'DISPOSED' }))).toBe('Disposed of.')
-    expect(eventDescription(event({ eventType: 'COMBINED' }))).toBe('Combined into another container.')
+    expect(eventDescription(event({ eventType: 'COMBINED' }))).toBe(
+      'Combined into property container with no seal number.',
+    )
     expect(eventDescription(event({ eventType: 'COMBINED', relatedContainerSealNumber: 'SN991234' }))).toBe(
       'Combined into property container SN991234.',
     )
