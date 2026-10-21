@@ -81,6 +81,39 @@ test.describe('Combine property containers', () => {
     await expect(backPage.successBanner).toContainText('Property containers combined')
   })
 
+  test('puts the combined container back where one of the sources is stored', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [
+        { ...source('c1', 'BOX635'), currentLocation: 'loc-230', locationDescription: 'Shelf 230' },
+        { ...source('c2', 'BOX447'), currentLocation: 'loc-201', locationDescription: 'Shelf 201' },
+      ],
+      priority: 1,
+    })
+    await prisonerPropertyApi.stubCombineContainers({ container: source('newC', 'BOX442'), priority: 1 })
+
+    await page.goto('/prisoner/A1234BC')
+    const personPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await page.locator('#select-c1').check()
+    await page.locator('#select-c2').check()
+    await personPage.combineButton.click()
+
+    const detailsPage = await CombineDetailsPage.verifyOnPage(page)
+    await expect(page.getByLabel('A new storage location', { exact: true })).toBeVisible()
+    await detailsPage.completeWith({ seal: 'BOX442', type: 'Standard', location: 'Shelf 230' })
+
+    // Choosing a source's location skips the "Select a storage location" step.
+    const checkPage = await CombineCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.containerSummary).toContainText('Shelf 230')
+    await checkPage.confirm.click()
+
+    await expect(page).toHaveURL(/\/prisoner\/A1234BC$/)
+    await expect((await PrisonerPropertyPage.verifyOnPage(page)).successBanner).toContainText(
+      'Property containers combined',
+    )
+  })
+
   test('skips the storage-location step for excess (off-site) property', async ({ page }) => {
     await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
     await prisonerPropertyApi.stubGetPropertyForPrisoner({
