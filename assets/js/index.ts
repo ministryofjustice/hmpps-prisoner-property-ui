@@ -4,7 +4,7 @@ import * as mojFrontend from '@ministryofjustice/frontend'
 govukFrontend.initAll()
 mojFrontend.initAll()
 
-// On the change-container details page, excess property is held off-site at Branston and never picks a
+// On the change-container and combine details pages, excess property is held off-site at Branston and never picks a
 // storage location, so hide the storage-location choice when the Excess property type is selected. The
 // server enforces this regardless; this is just progressive enhancement of the form.
 function initExcessLocationToggle(): void {
