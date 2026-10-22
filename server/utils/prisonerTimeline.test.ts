@@ -86,6 +86,25 @@ describe('buildPrisonerTimeline', () => {
     expect(titleFor('CREATED_SEALED', { sealNumber: null })).toBe('Property container added to storage at Leeds (HMP)')
   })
 
+  it.each([null, '', '  ', 'MISSING-1234567'])(
+    'identifies a combined source with no recorded seal when its seal is "%s"',
+    sealNumber => {
+      expect(
+        titleFor('COMBINED', {
+          sealNumber,
+          relatedContainerId: 'combined',
+          relatedContainerSealNumber: 'SN991234',
+        }),
+      ).toBe('Property container with no seal number recorded combined into property container SN991234')
+    },
+  )
+
+  it('worst case with no recorded seal and no related seal', () => {
+    expect(titleFor('COMBINED', { sealNumber: null })).toBe(
+      'Property container with no seal number recorded combined into another container',
+    )
+  })
+
   it('omits a placeholder seal from the title, as it would an unknown one', () => {
     expect(titleFor('CREATED_SEALED', { sealNumber: 'MISSING-1234567' })).toBe(
       'Property container added to storage at Leeds (HMP)',

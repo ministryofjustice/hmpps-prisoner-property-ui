@@ -95,10 +95,12 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
       return `${container} due for disposal`
     case 'DISPOSED':
       return `${container} disposed of`
-    case 'COMBINED':
+    case 'COMBINED': {
+      const source = seal ? container : `${container} with no seal number recorded`
       return relatedSeal
-        ? `${container} combined into property container ${relatedSeal}`
-        : `${container} combined into another container`
+        ? `${source} combined into property container ${relatedSeal}`
+        : `${source} combined into another container`
+    }
     case 'CREATED_IN_ERROR':
       return `${container} removed — created in error`
     case 'REMOVED':
