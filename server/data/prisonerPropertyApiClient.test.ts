@@ -2,7 +2,11 @@ import nock from 'nock'
 import type { AuthenticationClient } from '@ministryofjustice/hmpps-auth-clients'
 import PrisonerPropertyApiClient from './prisonerPropertyApiClient'
 import config from '../config'
-import type { PrisonerPropertyContainer, PrisonerPropertyGroup } from './prisonerPropertyApiTypes'
+import type {
+  PrisonerPropertyContainer,
+  PrisonerPropertyGroup,
+  ReceiveContainerRequest,
+} from './prisonerPropertyApiTypes'
 
 describe('PrisonerPropertyApiClient', () => {
   let prisonerPropertyApiClient: PrisonerPropertyApiClient
@@ -19,6 +23,40 @@ describe('PrisonerPropertyApiClient', () => {
   afterEach(() => {
     nock.cleanAll()
     jest.resetAllMocks()
+  })
+
+  describe('receiveContainer', () => {
+    it.each<ReceiveContainerRequest>([
+      { receivingPrisonId: 'MDI', sealNumber: '0000', internalLocationId: 'location-1' },
+      { receivingPrisonId: 'MDI', sealNumber: '0000', locationType: 'BRANSTON' },
+    ])('should POST receipt details using a system token and return the existing container', async body => {
+      const container = { id: 'container-1', prisonId: 'MDI', currentSealNumber: '0000' }
+      const request = nock(config.apis.prisonerPropertyApi.url)
+        .post('/property-containers/container-1/receive', { ...body })
+        .matchHeader('authorization', 'Bearer test-system-token')
+        .reply(200, container)
+
+      const response = await prisonerPropertyApiClient.receiveContainer('container-1', body, 'AUSER_GEN')
+
+      expect(response).toEqual(container)
+      expect(mockAuthenticationClient.getToken).toHaveBeenCalledWith('AUSER_GEN')
+      expect(request.isDone()).toBe(true)
+    })
+
+    it('should propagate receipt conflicts to the caller', async () => {
+      const body: ReceiveContainerRequest = {
+        receivingPrisonId: 'MDI',
+        sealNumber: '0000',
+        internalLocationId: 'location-1',
+      }
+      nock(config.apis.prisonerPropertyApi.url)
+        .post('/property-containers/container-1/receive', { ...body })
+        .reply(409, { status: 409, userMessage: 'Container cannot be received' })
+
+      await expect(prisonerPropertyApiClient.receiveContainer('container-1', body, 'AUSER_GEN')).rejects.toMatchObject({
+        responseStatus: 409,
+      })
+    })
   })
 
   describe('getPropertyForPrisoner', () => {
