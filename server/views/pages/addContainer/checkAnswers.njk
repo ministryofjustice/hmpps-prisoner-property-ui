@@ -37,7 +37,7 @@
       </span>
     </h2>
 
-    {# The previous seal is only shown when one was entered - it decides whether this record gets matched to
+    {# The previous seal is shown when entered or matched automatically - it decides whether this record gets matched to
        the property's record at the establishment it came from, so staff need to see it before confirming. #}
     {% set sealRows = [
       { key: { text: "Seal number" }, value: { text: container.sealNumber } }

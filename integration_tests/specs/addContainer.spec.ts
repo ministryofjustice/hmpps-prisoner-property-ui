@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { login, resetStubs } from '../testUtils'
 import prisonerPropertyApi from '../mockApis/prisonerPropertyApi'
 import prisonerSearchApi from '../mockApis/prisonerSearchApi'
+import { getMatchingRequests } from '../mockApis/wiremock'
 import PrisonerPropertyPage from '../pages/prisonerPropertyPage'
 import PropertyListPage from '../pages/propertyListPage'
 import AddContainerDetailsPage from '../pages/addContainerDetailsPage'
@@ -140,6 +141,205 @@ test.describe('Add a property container', () => {
 
     // Confirm creates both and returns to the establishment list with the banner.
     await expect(page.getByTestId('success-banner')).toContainText('2 property containers added')
+  })
+
+  test('receives incoming property with a matching seal', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    const incoming: PrisonerPropertyContainer = {
+      ...existingContainer,
+      id: 'incoming',
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      prisonerCurrentPrisonId: 'MDI',
+      inPrisonersCurrentPrison: false,
+      currentSealNumber: 'INCOMING1',
+      currentStatus: 'DUE_FOR_TRANSFER_OUT',
+      receivingPrisonId: 'MDI',
+    }
+    const received: PrisonerPropertyContainer = {
+      ...existingContainer,
+      id: 'receiving',
+      prisonerCurrentPrisonId: 'MDI',
+      currentSealNumber: 'INCOMING1',
+      locationDescription: box.name,
+    }
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [incoming], priority: 2 })
+    await prisonerPropertyApi.stubGetBoxLocations({ locations: [box], priority: 1 })
+    await prisonerPropertyApi.stubCreateContainer({ container: received, priority: 1 })
+
+    await page.goto('/prisoner/A1234BC')
+    const personPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(personPage.dueTransferIn).toContainText('INCOMING1')
+    await expect(personPage.dueTransferIn).toContainText('Due for transfer in')
+    await personPage.addProperty.click()
+
+    const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    await expect(page.locator('#containers-0-previousSealNumber')).toBeEmpty()
+    await detailsPage.completeWith({ seal: 'INCOMING1', type: 'Standard' })
+    const locationPage = await AddContainerLocationPage.verifyOnPage(page)
+    await locationPage.selectFirstLocation()
+    const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
+    const previousSealRow = checkPage.containerSummary.locator('.govuk-summary-list__row').filter({
+      has: page.locator('.govuk-summary-list__key', { hasText: 'Previous seal number' }),
+    })
+    await expect(checkPage.containerSummary).toContainText('INCOMING1')
+    await expect(previousSealRow.locator('.govuk-summary-list__value')).toHaveText('INCOMING1')
+
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      containers: [received, { ...incoming, removalOutcome: 'TRANSFERRED', receivingPrisonId: null }],
+      priority: 1,
+    })
+    await checkPage.confirm.click()
+    await expect(page).toHaveURL('/prisoner/A1234BC')
+    const backPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(backPage.successBanner).toContainText('Property container added')
+    await expect(backPage.inEstablishment).toContainText('INCOMING1')
+    await expect(backPage.dueTransferIn).toHaveCount(0)
+
+    const requests = await getMatchingRequests({
+      method: 'POST',
+      urlPath: '/prisoner-property-api/property-containers',
+    })
+    expect(requests).toHaveLength(1)
+    expect(JSON.parse(requests[0].body)).toEqual({
+      prisonerNumber: prisoner.prisonerNumber,
+      prisonId: 'MDI',
+      containerType: 'STANDARD',
+      sealNumber: 'INCOMING1',
+      previousSealNumber: 'INCOMING1',
+      internalLocationId: box.id,
+    })
+  })
+
+  test('receives incoming property with a matching seal (ignore case and whitespace)', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    const incoming: PrisonerPropertyContainer = {
+      ...existingContainer,
+      id: 'incoming',
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      prisonerCurrentPrisonId: 'MDI',
+      inPrisonersCurrentPrison: false,
+      currentSealNumber: 'INCOMING1',
+      currentStatus: 'TRANSFER',
+      removalOutcome: 'TRANSFERRED',
+      receivingPrisonId: 'MDI',
+    }
+    const received: PrisonerPropertyContainer = {
+      ...existingContainer,
+      id: 'receiving',
+      prisonerCurrentPrisonId: 'MDI',
+      currentSealNumber: 'incoming1',
+      locationDescription: box.name,
+    }
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [incoming], priority: 2 })
+    await prisonerPropertyApi.stubGetBoxLocations({ locations: [box], priority: 1 })
+    await prisonerPropertyApi.stubCreateContainer({ container: received, priority: 1 })
+
+    await page.goto('/prisoner/A1234BC')
+    const personPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(personPage.dueTransferIn).toContainText('INCOMING1')
+    await expect(personPage.dueTransferIn).toContainText('In transit')
+    await personPage.addProperty.click()
+
+    const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    await expect(page.locator('#containers-0-previousSealNumber')).toBeEmpty()
+    await detailsPage.completeWith({ seal: ' incoming1 ', type: 'Standard' })
+    const locationPage = await AddContainerLocationPage.verifyOnPage(page)
+    await locationPage.selectFirstLocation()
+    const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
+    const previousSealRow = checkPage.containerSummary.locator('.govuk-summary-list__row').filter({
+      has: page.locator('.govuk-summary-list__key', { hasText: 'Previous seal number' }),
+    })
+    await expect(checkPage.containerSummary).toContainText('incoming1')
+    await expect(previousSealRow.locator('.govuk-summary-list__value')).toHaveText('INCOMING1')
+
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      containers: [received, { ...incoming, receivingPrisonId: null }],
+      priority: 1,
+    })
+    await checkPage.confirm.click()
+    await expect(page).toHaveURL('/prisoner/A1234BC')
+    const backPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(backPage.successBanner).toContainText('Property container added')
+    await expect(backPage.inEstablishment).toContainText('incoming1')
+    await expect(backPage.dueTransferIn).toHaveCount(0)
+
+    const requests = await getMatchingRequests({
+      method: 'POST',
+      urlPath: '/prisoner-property-api/property-containers',
+    })
+    expect(requests).toHaveLength(1)
+    expect(JSON.parse(requests[0].body)).toEqual({
+      prisonerNumber: prisoner.prisonerNumber,
+      prisonId: 'MDI',
+      containerType: 'STANDARD',
+      sealNumber: 'incoming1',
+      previousSealNumber: 'INCOMING1',
+      internalLocationId: box.id,
+    })
+  })
+
+  test('incoming property is not received when when the entered seal does not match', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    const incoming: PrisonerPropertyContainer = {
+      ...existingContainer,
+      id: 'incoming',
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      prisonerCurrentPrisonId: 'MDI',
+      inPrisonersCurrentPrison: false,
+      currentSealNumber: 'INCOMING1',
+      currentStatus: 'DUE_FOR_TRANSFER_OUT',
+      receivingPrisonId: 'MDI',
+    }
+    const added: PrisonerPropertyContainer = {
+      ...existingContainer,
+      id: 'new',
+      prisonerCurrentPrisonId: 'MDI',
+      currentSealNumber: 'NEW1',
+      locationDescription: box.name,
+    }
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [incoming], priority: 2 })
+    await prisonerPropertyApi.stubGetBoxLocations({ locations: [box], priority: 1 })
+    await prisonerPropertyApi.stubCreateContainer({ container: added, priority: 1 })
+
+    await page.goto('/prisoner/A1234BC')
+    const personPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(personPage.dueTransferIn).toContainText('INCOMING1')
+    await expect(personPage.dueTransferIn).toContainText('Due for transfer in')
+    await personPage.addProperty.click()
+
+    const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    await expect(page.locator('#containers-0-previousSealNumber')).toBeEmpty()
+    await detailsPage.completeWith({ seal: 'NEW1', type: 'Standard' })
+    const locationPage = await AddContainerLocationPage.verifyOnPage(page)
+    await locationPage.selectFirstLocation()
+    const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.containerSummary).toContainText('NEW1')
+    await expect(checkPage.containerSummary.getByText('Previous seal number', { exact: true })).toHaveCount(0)
+
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [added, incoming], priority: 1 })
+    await checkPage.confirm.click()
+    await expect(page).toHaveURL('/prisoner/A1234BC')
+    const backPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await expect(backPage.successBanner).toContainText('Property container added')
+    await expect(backPage.inEstablishment).toContainText('NEW1')
+    await expect(backPage.dueTransferIn).toContainText('INCOMING1')
+    await expect(backPage.dueTransferIn).toContainText('Due for transfer in')
+
+    const requests = await getMatchingRequests({
+      method: 'POST',
+      urlPath: '/prisoner-property-api/property-containers',
+    })
+    expect(requests).toHaveLength(1)
+    expect(JSON.parse(requests[0].body)).toEqual({
+      prisonerNumber: prisoner.prisonerNumber,
+      prisonId: 'MDI',
+      containerType: 'STANDARD',
+      sealNumber: 'NEW1',
+      internalLocationId: box.id,
+    })
   })
 
   test('refuses the search entry for a user without the manage role', async ({ page }) => {

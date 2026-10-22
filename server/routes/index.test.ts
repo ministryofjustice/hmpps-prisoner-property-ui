@@ -2048,6 +2048,99 @@ describe('Add container journey - steps', () => {
     )
   })
 
+  it.each([null, 'TRANSFERRED'] as const)(
+    'automatically links a matching incoming seal through confirmation (removal outcome %s)',
+    async removalOutcome => {
+      withActiveCaseload()
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+        container({
+          prisonId: 'LEI',
+          prisonerCurrentPrisonId: 'MDI',
+          currentSealNumber: 'IncomingSeal',
+          removalOutcome,
+          receivingPrisonId: 'MDI',
+        }),
+      ])
+      prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'receiving' }))
+
+      const agent = request.agent(manageApp())
+      await agent
+        .get('/prisoner/A1234BC')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('Property due to be transferred in')
+          expect(res.text).toContain('IncomingSeal')
+        })
+      await startJourney(agent)
+      await agent
+        .post('/prisoner/A1234BC/add-container/details')
+        .type('form')
+        .send({ 'containers[0][sealNumber]': ' incomingseal ', 'containers[0][containerType]': 'STANDARD' })
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/add-container/location/0')
+      await agent
+        .post('/prisoner/A1234BC/add-container/location/0')
+        .type('form')
+        .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+        .expect(302)
+      await agent
+        .get('/prisoner/A1234BC/add-container/check')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('Previous seal number')
+          expect(res.text).toContain('IncomingSeal')
+        })
+      await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledTimes(1)
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sealNumber: 'incomingseal',
+          previousSealNumber: 'IncomingSeal',
+          prisonId: 'MDI',
+          internalLocationId: 'box1',
+        }),
+        user.username,
+      )
+    },
+  )
+
+  it('does not automatically link property already held here or removed property', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ currentSealNumber: 'LOCAL' }),
+      container({ prisonId: 'LEI', currentSealNumber: 'REMOVED', removalOutcome: 'RETURNED' }),
+    ])
+    prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'newC' }))
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({
+        'containers[0][sealNumber]': 'LOCAL',
+        'containers[0][containerType]': 'STANDARD',
+        'containers[1][sealNumber]': 'REMOVED',
+        'containers[1][containerType]': 'STANDARD',
+      })
+      .expect(302)
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/0')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/1')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+    await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+    expect(prisonerPropertyService.createContainer).toHaveBeenCalledTimes(2)
+    for (const [body] of prisonerPropertyService.createContainer.mock.calls) {
+      expect(body.previousSealNumber).toBeUndefined()
+    }
+  })
+
   it('shows a Manage storage locations button on the location page for a location admin, returning here', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
