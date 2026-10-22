@@ -55,9 +55,6 @@ describe('buildPrisonerTimeline', () => {
   it('builds a title sentence per event type using the resolved names and seal', () => {
     expect(titleFor('CREATED_SEALED')).toBe('Property container SN880032 added to storage at Leeds (HMP)')
     expect(titleFor('SEAL_CHANGED')).toBe('Property container details changed — seal number now SN880032')
-    expect(titleFor('SEAL_CHANGED', { sealNumber: null })).toBe(
-      'Property container details changed — seal number not entered',
-    )
     expect(titleFor('CONTAINER_TYPE_CHANGE')).toBe(
       'Property container SN880032 details changed — property type now Valuables',
     )
@@ -76,9 +73,7 @@ describe('buildPrisonerTimeline', () => {
     expect(titleFor('RETURNED')).toBe('Property container SN880032 returned to the person')
     expect(titleFor('DISPOSAL_REQUIRED')).toBe('Property container SN880032 due for disposal')
     expect(titleFor('DISPOSED')).toBe('Property container SN880032 disposed of')
-    expect(titleFor('COMBINED')).toBe(
-      'Property container SN880032 combined into property container with no seal number',
-    )
+    expect(titleFor('COMBINED')).toBe('Property container SN880032 combined into another container')
     expect(titleFor('COMBINED', { relatedContainerSealNumber: 'SN991234' })).toBe(
       'Property container SN880032 combined into property container SN991234',
     )

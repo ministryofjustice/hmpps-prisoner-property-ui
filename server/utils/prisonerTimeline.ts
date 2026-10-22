@@ -67,7 +67,7 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
       // The container is identified by its (new) seal, so avoid repeating it as a prefix.
       return seal
         ? `Property container details changed — seal number now ${seal}`
-        : 'Property container details changed — seal number not entered'
+        : 'Property container details changed — seal number'
     case 'CONTAINER_TYPE_CHANGE': {
       // Mirrors the "seal number now X" idiom above. The API supplies what the type was changed from where
       // it can determine it; where it cannot, the title just names the new type.
@@ -98,7 +98,7 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
     case 'COMBINED':
       return relatedSeal
         ? `${container} combined into property container ${relatedSeal}`
-        : `${container} combined into property container with no seal number`
+        : `${container} combined into another container`
     case 'CREATED_IN_ERROR':
       return `${container} removed — created in error`
     case 'REMOVED':
