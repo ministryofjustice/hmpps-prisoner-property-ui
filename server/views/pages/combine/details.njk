@@ -96,6 +96,25 @@
       ]
     }) }}
 
+    {% set locationItems = [] %}
+    {% for location in sourceLocations %}
+      {% set locationItems = (locationItems.push({ value: location.id, text: location.name, checked: data.locationChoice == location.id }), locationItems) %}
+    {% endfor %}
+    {% set locationItems = (locationItems.push({ value: "new", text: "A new storage location", checked: (data.locationChoice == "new") or (not sourceLocations.length) }), locationItems) %}
+
+    {# The new container can go back where one of the sources is stored, or to a new location. Hidden for
+       excess, which is stored off-site at Branston (server-rendered for no-JS; toggled by the container-type
+       radios via assets/js). #}
+    <div id="location-choice-group" data-qa="location-choice-group"{{ " hidden" if data.containerType == "EXCESS" }}>
+      {{ govukRadios({
+        idPrefix: "locationChoice",
+        name: "locationChoice",
+        fieldset: { legend: { text: "Storage location", classes: "govuk-fieldset__legend--m" } },
+        items: locationItems,
+        errorMessage: { text: errors.locationChoice.text } if errors.locationChoice else undefined
+      }) }}
+    </div>
+
     {{ govukButton({ text: "Save and continue" }) }}
   </form>
 

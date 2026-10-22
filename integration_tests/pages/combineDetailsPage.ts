@@ -18,9 +18,10 @@ export default class CombineDetailsPage extends AbstractPage {
     this.saveAndContinue = page.getByRole('button', { name: 'Save and continue' })
   }
 
-  async completeWith({ seal, type }: { seal: string; type: string }) {
+  async completeWith({ seal, type, location }: { seal: string; type: string; location?: string }) {
     await this.sealNumber.fill(seal)
     await this.page.getByLabel(type, { exact: true }).check()
+    if (location) await this.page.getByLabel(location, { exact: true }).check()
     await this.saveAndContinue.click()
   }
 
