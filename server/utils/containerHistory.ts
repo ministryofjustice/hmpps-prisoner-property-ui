@@ -62,9 +62,7 @@ export const eventDescription = (event: PropertyEvent): string => {
       const added = seal ? `Added to storage with seal number ${seal}.` : 'Added to storage.'
       // Set when the container was logged as property arriving on transfer and matched to the record it was
       // held under at the sending prison - so the history shows the two records were joined up.
-      return relatedSeal
-        ? `${added} Matched to previous seal number ${relatedSeal}.`
-        : `${added} Matched to a previous property record with no seal number recorded.`
+      return relatedSeal ? `${added} Matched to previous seal number ${relatedSeal}.` : added
     }
     case 'SEAL_CHANGED':
       return seal ? `Seal number changed to ${seal}.` : 'Seal number changed.'
@@ -103,9 +101,7 @@ export const eventDescription = (event: PropertyEvent): string => {
     case 'DISPOSED':
       return 'Disposed of.'
     case 'COMBINED':
-      return relatedSeal
-        ? `Combined into property container ${relatedSeal}.`
-        : 'Combined into property container with no seal number.'
+      return relatedSeal ? `Combined into property container ${relatedSeal}.` : 'Combined into another container.'
     case 'CREATED_IN_ERROR':
       return 'Removed because the record was created in error.'
     case 'REMOVED':
