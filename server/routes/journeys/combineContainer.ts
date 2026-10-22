@@ -49,6 +49,11 @@ export default function combineContainerRoutes(
     ).values(),
   ]
 
+  // Branston, or one of the sources' own locations, is picked on the details page; anything else on the
+  // "Select a storage location" page.
+  const locationChosenOnDetails = (journey: NonNullable<import('express-session').SessionData['combineJourney']>) =>
+    journey.locationType === 'BRANSTON' || journey.locationChoice === 'source'
+
   const renderCombineDetails = async (
     req: Request,
     res: Response,
@@ -274,7 +279,6 @@ export default function combineContainerRoutes(
       const { username } = res.locals.user
       const { containers, sources } = await combineSourceRows(ctx, journey.sourceContainerIds, username)
       const branston = journey.locationType === 'BRANSTON'
-      const locationChosenOnDetails = branston || journey.locationChoice === 'source'
       return res.render('pages/combine/checkAnswers', {
         prisonerNumber: ctx.prisonerNumber,
         prisonerName: containers[0]?.prisonerName ?? null,
@@ -282,7 +286,7 @@ export default function combineContainerRoutes(
         sources,
         journey,
         storageLocation: branston ? 'Branston (offsite)' : journey.locationName,
-        backUrl: locationChosenOnDetails
+        backUrl: locationChosenOnDetails(journey)
           ? `/prisoner/${ctx.prisonerNumber}/combine/details`
           : `/prisoner/${ctx.prisonerNumber}/combine/location`,
       })
@@ -343,8 +347,7 @@ export default function combineContainerRoutes(
         }
         if (status === 400) {
           req.flash('error', 'That storage location could not be used. Select a different location.')
-          const step =
-            journey.locationType === 'BRANSTON' || journey.locationChoice === 'source' ? 'details' : 'location'
+          const step = locationChosenOnDetails(journey) ? 'details' : 'location'
           return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/${step}`)
         }
         return next(error)
