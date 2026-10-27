@@ -26,6 +26,7 @@ const inEstablishmentContainer: PrisonerPropertyContainer = {
   removalOutcome: null,
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
+  lastUpdatedDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
 }
 
@@ -224,12 +225,15 @@ test.describe('Person property view', () => {
       id: 'c-old',
       currentSealNumber: 'SN-OLD',
       createDateTime: '2020-01-01T10:00:00',
+      lastUpdatedDateTime: '2021-01-01T10:00:00',
     }
     const newer: PrisonerPropertyContainer = {
       ...inEstablishmentContainer,
       id: 'c-new',
       currentSealNumber: 'SN-NEW',
-      createDateTime: '2026-12-31T10:00:00',
+      // Created first but changed most recently, so sorting by creation would put it first instead.
+      createDateTime: '2019-01-01T10:00:00',
+      lastUpdatedDateTime: '2026-12-31T10:00:00',
     }
     await login(page)
     await prisonerPropertyApi.stubGetPropertyForPrisoner({

@@ -47,6 +47,9 @@ export interface PrisonerPropertyContainer {
   removalOutcome: RemovalOutcome | null
   removalDate: string | null
   createDateTime: string
+  // When a person last changed the container, in DPS or NOMIS. Automatic changes (due for return or
+  // transfer when the prisoner moves) do not move it. Shown as "Last updated".
+  lastUpdatedDateTime: string
   createdByUserId: string
 }
 
