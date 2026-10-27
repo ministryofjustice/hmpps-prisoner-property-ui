@@ -91,7 +91,7 @@
           { text: row.container.containerType | containerTypeLabel },
           { text: row.container | containerLocation },
           { text: (row.container.proposedDisposalDate | formatShortDate) or "No date set", attributes: { "data-sort-value": row.container.proposedDisposalDate or "" } },
-          { text: row.container.createDateTime | formatShortDate, attributes: { "data-sort-value": row.container.createDateTime } },
+          { text: row.container.lastUpdatedDateTime | formatShortDate, attributes: { "data-sort-value": row.container.lastUpdatedDateTime } },
           { html: govukTag({ text: row.status.text, classes: row.status.classes }), attributes: { "data-sort-value": row.status.text } }
         ), cells) %}
         {% if canManage %}
@@ -131,7 +131,7 @@
           { text: row.container.containerType | containerTypeLabel },
           { text: row.container.prisonName or "-" },
           { text: (row.container.proposedDisposalDate | formatShortDate) or "No date set", attributes: { "data-sort-value": row.container.proposedDisposalDate or "" } },
-          { text: row.container.createDateTime | formatShortDate, attributes: { "data-sort-value": row.container.createDateTime } },
+          { text: row.container.lastUpdatedDateTime | formatShortDate, attributes: { "data-sort-value": row.container.lastUpdatedDateTime } },
           { html: govukTag({ text: row.status.text, classes: row.status.classes }), attributes: { "data-sort-value": row.status.text } }
         ]), transferInRows) %}
       {% endfor %}
@@ -165,7 +165,7 @@
           { text: row.container | sealNumberCell(viewedPrisonId) },
           { text: row.container.containerType | containerTypeLabel },
           { text: row.container.prisonName or "-" },
-          { text: row.container.createDateTime | formatShortDate, attributes: { "data-sort-value": row.container.createDateTime } },
+          { text: row.container.lastUpdatedDateTime | formatShortDate, attributes: { "data-sort-value": row.container.lastUpdatedDateTime } },
           { html: govukTag({ text: row.status.text, classes: row.status.classes }), attributes: { "data-sort-value": row.status.text } }
         ]), inTransitRows) %}
       {% endfor %}

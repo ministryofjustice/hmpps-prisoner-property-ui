@@ -108,6 +108,7 @@ describe('GET /', () => {
               removalOutcome: null,
               removalDate: null,
               createDateTime: '2026-06-01T10:00:00',
+              lastUpdatedDateTime: '2026-07-15T10:00:00',
               createdByUserId: 'AUSER',
             },
           ],
@@ -120,6 +121,9 @@ describe('GET /', () => {
       .expect('Content-Type', /html/)
       .expect(200)
       .expect(res => {
+        // "Last updated" is when someone last changed the container, not when it was created (MAPB-989).
+        expect(res.text).toContain('15/7/2026')
+        expect(res.text).not.toContain('1/6/2026')
         // The heading is just "Prisoner property" - the establishment name is no longer appended (MAPB-642).
         expect(res.text).toContain('<h1 class="govuk-heading-xl govuk-!-margin-bottom-4">Prisoner property</h1>')
         expect(res.text).not.toContain('Moorland (HMP &amp; YOI)')
@@ -172,6 +176,7 @@ describe('GET /', () => {
               removalOutcome: null,
               removalDate: null,
               createDateTime: '2026-06-01T10:00:00',
+              lastUpdatedDateTime: '2026-06-01T10:00:00',
               createdByUserId: 'AUSER',
             },
             {
@@ -191,6 +196,7 @@ describe('GET /', () => {
               removalOutcome: null,
               removalDate: null,
               createDateTime: '2026-06-02T10:00:00',
+              lastUpdatedDateTime: '2026-06-02T10:00:00',
               createdByUserId: 'AUSER',
             },
           ],
@@ -247,6 +253,7 @@ describe('GET /', () => {
               removalOutcome: null,
               removalDate: null,
               createDateTime: '2026-06-01T10:00:00',
+              lastUpdatedDateTime: '2026-06-01T10:00:00',
               createdByUserId: 'AUSER',
             },
             {
@@ -266,6 +273,7 @@ describe('GET /', () => {
               removalOutcome: 'DISPOSED',
               removalDate: '2026-06-05T10:00:00',
               createDateTime: '2026-06-02T10:00:00',
+              lastUpdatedDateTime: '2026-06-02T10:00:00',
               createdByUserId: 'AUSER',
             },
           ],
@@ -717,6 +725,7 @@ const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPrope
   removalOutcome: null,
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
+  lastUpdatedDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
   ...overrides,
 })
