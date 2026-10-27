@@ -28,7 +28,7 @@
   }) }}
 
   <h2 class="govuk-heading-m govuk-!-margin-top-6">
-    Property container {{ journey.sealNumber }}
+    Property container {{ journey.sealNumber | realSealNumber }}
     <span class="govuk-!-font-weight-regular govuk-!-font-size-19 govuk-!-margin-left-3">
       <a class="govuk-link" href="{{ detailsUrl }}" data-qa="change-details">Change<span class="govuk-visually-hidden"> the property container details</span></a>
     </span>
@@ -37,7 +37,7 @@
   {{ govukSummaryList({
     attributes: { "data-qa": "container-summary" },
     rows: [
-      { key: { text: "Seal number" }, value: { text: journey.sealNumber } },
+      { key: { text: "Seal number" }, value: { text: (journey.sealNumber | realSealNumber) or "Not entered" } },
       { key: { text: "Property type" }, value: { text: journey.containerType | containerTypeLabel } },
       { key: { text: "Disposal date" }, value: { text: (journey.proposedDisposalDate | formatDate) if journey.proposedDisposalDate else "Not provided" } },
       { key: { text: "Storage location" }, value: { text: storageLocation or "Not set" } },
