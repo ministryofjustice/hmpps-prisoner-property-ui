@@ -5,6 +5,8 @@ export type ContainerStatus =
   | 'STORED'
   | 'DUE_FOR_TRANSFER_OUT'
   | 'DUE_FOR_RETURN'
+  // The person was admitted while this property was held from before; staff must confirm where it is.
+  | 'REVIEW_REQUIRED'
   | 'DISPOSAL_REQUIRED'
   | 'DISPOSED'
   | 'RETURNED'
@@ -47,6 +49,9 @@ export interface PrisonerPropertyContainer {
   removalOutcome: RemovalOutcome | null
   removalDate: string | null
   createDateTime: string
+  // When a person last changed the container, in DPS or NOMIS. Automatic changes (due for return or
+  // transfer when the prisoner moves) do not move it. Shown as "Last updated".
+  lastUpdatedDateTime: string
   createdByUserId: string
 }
 
@@ -79,6 +84,9 @@ export type PropertyEventType =
   | 'PRISONER_RECEIVED'
   | 'PRISONER_RELEASED'
   | 'DIED_IN_CUSTODY'
+  // The person was admitted while the property was held from before, and staff later confirmed where it is.
+  | 'PRISONER_ADMITTED'
+  | 'LOCATION_CONFIRMED'
   | 'TRANSFERRED'
   | 'RETURNED'
   | 'DISPOSAL_REQUIRED'

@@ -184,8 +184,12 @@ const transferInStatus = (container: PrisonerPropertyContainer, viewedPrisonId: 
   // An in-transit container has already left the sending prison, so its own status is a historical
   // "Transferred out" - the fact that matters here is that it is on its way and still needs storing.
   if (isInTransitTo(container, viewedPrisonId)) return IN_TRANSIT_TAG
-  // Disposal and return are instructions about the property itself, so they outrank "it is coming here".
-  if (container.currentStatus === 'DISPOSAL_REQUIRED' || container.currentStatus === 'DUE_FOR_RETURN') {
+  // Disposal, return and review are instructions about the property itself, so they outrank "it is coming here".
+  if (
+    container.currentStatus === 'DISPOSAL_REQUIRED' ||
+    container.currentStatus === 'DUE_FOR_RETURN' ||
+    container.currentStatus === 'REVIEW_REQUIRED'
+  ) {
     return containerStatusTag(container.currentStatus)
   }
   return DUE_FOR_TRANSFER_IN_TAG

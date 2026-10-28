@@ -108,6 +108,7 @@ describe('GET /', () => {
               removalOutcome: null,
               removalDate: null,
               createDateTime: '2026-06-01T10:00:00',
+              lastUpdatedDateTime: '2026-07-15T10:00:00',
               createdByUserId: 'AUSER',
             },
           ],
@@ -120,6 +121,9 @@ describe('GET /', () => {
       .expect('Content-Type', /html/)
       .expect(200)
       .expect(res => {
+        // "Last updated" is when someone last changed the container, not when it was created (MAPB-989).
+        expect(res.text).toContain('15/7/2026')
+        expect(res.text).not.toContain('1/6/2026')
         // The heading is just "Prisoner property" - the establishment name is no longer appended (MAPB-642).
         expect(res.text).toContain('<h1 class="govuk-heading-xl govuk-!-margin-bottom-4">Prisoner property</h1>')
         expect(res.text).not.toContain('Moorland (HMP &amp; YOI)')
@@ -172,6 +176,7 @@ describe('GET /', () => {
               removalOutcome: null,
               removalDate: null,
               createDateTime: '2026-06-01T10:00:00',
+              lastUpdatedDateTime: '2026-06-01T10:00:00',
               createdByUserId: 'AUSER',
             },
             {
@@ -191,6 +196,7 @@ describe('GET /', () => {
               removalOutcome: null,
               removalDate: null,
               createDateTime: '2026-06-02T10:00:00',
+              lastUpdatedDateTime: '2026-06-02T10:00:00',
               createdByUserId: 'AUSER',
             },
           ],
@@ -247,6 +253,7 @@ describe('GET /', () => {
               removalOutcome: null,
               removalDate: null,
               createDateTime: '2026-06-01T10:00:00',
+              lastUpdatedDateTime: '2026-06-01T10:00:00',
               createdByUserId: 'AUSER',
             },
             {
@@ -266,6 +273,7 @@ describe('GET /', () => {
               removalOutcome: 'DISPOSED',
               removalDate: '2026-06-05T10:00:00',
               createDateTime: '2026-06-02T10:00:00',
+              lastUpdatedDateTime: '2026-06-02T10:00:00',
               createdByUserId: 'AUSER',
             },
           ],
@@ -595,6 +603,22 @@ describe('GET /', () => {
         })
     })
 
+    it('offers property that requires review as a status filter and passes it to the API (MAPB-849)', async () => {
+      await request(app)
+        .get('/?status=REVIEW_REQUIRED')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('value="REVIEW_REQUIRED" checked')
+          expect(res.text).toContain('Status: Property requires review')
+        })
+
+      expect(prisonerPropertyService.getPrisonProperty).toHaveBeenCalledWith(
+        'MDI',
+        expect.objectContaining({ status: ['REVIEW_REQUIRED'] }),
+        user.username,
+      )
+    })
+
     it('says nothing when the list is not filtered', async () => {
       return request(app)
         .get('/')
@@ -717,6 +741,7 @@ const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPrope
   removalOutcome: null,
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
+  lastUpdatedDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
   ...overrides,
 })
@@ -3010,6 +3035,62 @@ describe('Change container journey', () => {
         expect(res.text).toContain('Manage property container<')
         expect(res.text).toContain('value=""')
       })
+  })
+
+  it('explains a review and shows the seal without letting it be changed (MAPB-849)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ currentSealNumber: 'SN0001', currentStatus: 'REVIEW_REQUIRED', proposedDisposalDate: '2020-01-01' }),
+    ])
+
+    return request(manageApp())
+      .get('/prisoner/A1234BC/change-container/c1')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Property requires review')
+        expect(res.text).toContain('data-qa="review-warning"')
+        expect(res.text).toContain("recorded before the prisoner's previous release")
+        expect(res.text).toContain(
+          'href="/prisoner/A1234BC/remove-container/c1?from=person">remove this container record',
+        )
+        expect(res.text).toContain('data-qa="seal-number-fixed"')
+        expect(res.text).not.toContain('name="sealNumber"')
+        // Review outranks disposal, so only the review instruction is given.
+        expect(res.text).not.toContain('data-qa="disposal-banner"')
+      })
+  })
+
+  it('confirms the location of property under review, keeping its seal whatever is posted (MAPB-849)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ currentSealNumber: 'MISSING-1234567', currentStatus: 'REVIEW_REQUIRED' }),
+    ])
+    prisonerPropertyService.updateContainer.mockResolvedValue(container({}))
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    await agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ sealNumber: 'TAMPERED', containerType: 'STANDARD', locationChoice: 'current' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/check')
+
+    await agent
+      .get('/prisoner/A1234BC/change-container/c1/check')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).not.toContain('MISSING-1234567')
+        expect(res.text).toContain('Not entered')
+      })
+
+    await agent.post('/prisoner/A1234BC/change-container/c1/confirm').type('form').send({}).expect(302)
+
+    expect(prisonerPropertyService.updateContainer).toHaveBeenCalledWith(
+      'c1',
+      expect.objectContaining({ sealNumber: 'MISSING-1234567', containerType: 'STANDARD' }),
+      user.username,
+    )
   })
 
   it('re-renders the change form with an error when the seal number is missing', async () => {

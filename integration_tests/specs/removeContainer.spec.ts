@@ -25,6 +25,7 @@ const existingContainer: PrisonerPropertyContainer = {
   removalOutcome: null,
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
+  lastUpdatedDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
 }
 

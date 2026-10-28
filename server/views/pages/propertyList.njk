@@ -197,7 +197,7 @@
           { text: container | sealNumberCell(viewedPrisonId) },
           { text: container.containerType | containerTypeLabel },
           { text: container | containerLocation },
-          { text: container.createDateTime | formatShortDate },
+          { text: container.lastUpdatedDateTime | formatShortDate },
           { html: govukTag({ text: statusData.text, classes: statusData.classes }) }
         ), cells) %}
         {% if canManage %}

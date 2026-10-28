@@ -14,10 +14,14 @@ export interface StatusTag {
 // filter (MAPB-934): returned magenta, disposed orange, transferred out blue (the default tag colour), created in
 // error light grey (an operational error) and removed dark grey (legacy data - marked inactive in NOMIS, or
 // archived by the legacy clean-up).
+//
+// Property requires review (MAPB-849) is purple, a colour no other status uses, so it stands out wherever it is
+// shown.
 const STATUS_TAGS: Record<ContainerStatus, StatusTag> = {
   STORED: { text: 'Stored', classes: 'govuk-tag--green' },
   DUE_FOR_TRANSFER_OUT: { text: 'Due for transfer out', classes: 'govuk-tag--grey' },
   DUE_FOR_RETURN: { text: 'Due for return', classes: 'govuk-tag--yellow' },
+  REVIEW_REQUIRED: { text: 'Property requires review', classes: 'govuk-tag--purple' },
   DISPOSAL_REQUIRED: { text: 'Due for disposal', classes: 'govuk-tag--orange' },
   DISPOSED: { text: 'Disposed', classes: 'govuk-tag--orange' },
   RETURNED: { text: 'Returned', classes: 'govuk-tag--magenta' },

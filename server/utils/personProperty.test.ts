@@ -25,6 +25,7 @@ const container = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPrope
   removalOutcome: null,
   removalDate: null,
   createDateTime: '2026-06-01T10:00:00',
+  lastUpdatedDateTime: '2026-06-01T10:00:00',
   createdByUserId: 'AUSER',
   ...overrides,
 })
@@ -257,6 +258,7 @@ describe('buildPersonPropertyView', () => {
     ['DUE_FOR_RETURN', 'Due for return'],
     ['DUE_FOR_TRANSFER_OUT', 'Due for transfer out'],
     ['DISPOSAL_REQUIRED', 'Due for disposal'],
+    ['REVIEW_REQUIRED', 'Property requires review'],
   ] as const)('renders the API status %s for property held here, whoever the owner is', (status, text) => {
     const forEachOwner = ['MDI', 'IWI', 'OUT', 'TRN', null].map(prisonerCurrentPrisonId =>
       buildPersonPropertyView([container({ prisonId: 'MDI', prisonerCurrentPrisonId, currentStatus: status })], 'MDI'),

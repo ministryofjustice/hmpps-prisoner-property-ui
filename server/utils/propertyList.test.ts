@@ -1,6 +1,7 @@
 import type { ParsedQs } from 'qs'
 import type { PrisonerPropertyContainer, PrisonerPropertyGroup } from '../data/prisonerPropertyApiTypes'
 import {
+  ALL_STATUSES,
   appliedFilterTags,
   buildPagination,
   containerLocation,
@@ -36,6 +37,15 @@ describe('propertyList utils', () => {
       expect(statusTag('DISPOSAL_REQUIRED')).toEqual({ text: 'Due for disposal', classes: 'govuk-tag--orange' })
       expect(statusTag('DUE_FOR_TRANSFER_OUT')).toEqual({ text: 'Due for transfer out', classes: 'govuk-tag--grey' })
       expect(statusTag('DUE_FOR_RETURN')).toEqual({ text: 'Due for return', classes: 'govuk-tag--yellow' })
+    })
+
+    it('gives property that requires review a colour no other status uses (MAPB-849)', () => {
+      const review = statusTag('REVIEW_REQUIRED')
+      expect(review).toEqual({ text: 'Property requires review', classes: 'govuk-tag--purple' })
+      const others = ALL_STATUSES.filter(status => status !== 'REVIEW_REQUIRED').map(
+        status => statusTag(status).classes,
+      )
+      expect(others).not.toContain(review.classes)
     })
 
     it('colours the statuses property leaves storage with as design set them', () => {
