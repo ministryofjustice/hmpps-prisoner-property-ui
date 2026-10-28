@@ -239,6 +239,15 @@ export interface CombineContainersRequest {
   locationType?: StorageLocationType
 }
 
+// Proposed receipt payload (POST /property-containers/{id}/receive). The API derives the sending
+// prison, confirming user and timestamp; the existing container is received rather than created.
+export interface ReceiveContainerRequest {
+  receivingPrisonId: string
+  sealNumber: string
+  internalLocationId?: string
+  locationType?: StorageLocationType
+}
+
 // Filters + paging for the establishment-wide list (GET /property-containers/prison/{prisonId}).
 // `query` is a free-text OR match over prisoner number, seal number and storage location; the other
 // filters are exact-match. Omit a field to leave it unfiltered.

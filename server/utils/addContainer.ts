@@ -163,6 +163,23 @@ export const matchableContainers = (
 ): PrisonerPropertyContainer[] => containers.filter(container => isIncomingTo(container, viewedPrisonId))
 
 /**
+ * An unchanged seal still identifies arriving property. Supply its recorded seal to the API's existing
+ * transfer-linking flow when staff have not entered a previous seal themselves.
+ */
+export const resolvePreviousSealNumbers = (
+  values: ParsedDetails[],
+  matchable: PrisonerPropertyContainer[],
+): ParsedDetails[] =>
+  values.map(value => {
+    if (value.previousSealNumber) return value
+    const seal = trim(value.sealNumber).toLowerCase()
+    const source = seal
+      ? matchable.find(container => trim(container.currentSealNumber ?? '').toLowerCase() === seal)
+      : undefined
+    return { ...value, previousSealNumber: source?.currentSealNumber?.trim() || undefined }
+  })
+
+/**
  * Check each previous seal number names property the person actually holds at another establishment.
  *
  * The API enforces this too and is the authority; doing it here as well is what puts the error next to the

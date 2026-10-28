@@ -2,6 +2,7 @@ import {
   errorCodeOf,
   matchableContainers,
   parseOptionalDate,
+  resolvePreviousSealNumbers,
   validateDetails,
   validatePreviousSealNumbers,
 } from './addContainer'
@@ -151,6 +152,32 @@ describe('previous seal numbers', () => {
 
       expect(matchableContainers(containers, 'MDI').map(c => c.id)).toEqual(shown)
       expect(shown).toEqual(['awaiting', 'in-transit', 'redirected'])
+    })
+  })
+
+  describe('resolvePreviousSealNumbers', () => {
+    it('matches an unchanged current seal, ignoring case and whitespace, using the recorded seal', () => {
+      expect(
+        resolvePreviousSealNumbers(
+          [{ ...details(), sealNumber: ' oldseal ' }],
+          [held({ currentSealNumber: ' OldSeal ' })],
+        ),
+      ).toEqual([{ ...details('OldSeal'), sealNumber: ' oldseal ' }])
+    })
+
+    it('preserves an explicitly entered previous seal', () => {
+      expect(resolvePreviousSealNumbers([details('OTHER')], [held({ currentSealNumber: 'NEW' })])).toEqual([
+        details('OTHER'),
+      ])
+    })
+
+    it('leaves unmatched and seal-less property unlinked in a mixed batch', () => {
+      expect(
+        resolvePreviousSealNumbers(
+          [details(), { ...details(), sealNumber: '124744' }],
+          [held({}), held({ id: 'no-seal', currentSealNumber: null })],
+        ),
+      ).toEqual([details(), { ...details('124744'), sealNumber: '124744' }])
     })
   })
 
