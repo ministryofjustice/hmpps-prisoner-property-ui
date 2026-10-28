@@ -49,10 +49,13 @@ export default function combineContainerRoutes(
     ).values(),
   ]
 
-  // Branston, or one of the sources' own locations, is picked on the details page; anything else on the
-  // "Select a storage location" page.
-  const locationChosenOnDetails = (journey: NonNullable<import('express-session').SessionData['combineJourney']>) =>
-    journey.locationType === 'BRANSTON' || journey.locationChoice === 'source'
+  // The step where the storage location was picked, for back links and errors: a new location on "Select a
+  // storage location"; otherwise Branston or a source's location, on "Where is this excess property stored?"
+  // for excess and on the details page for anything else.
+  const locationStep = (journey: NonNullable<import('express-session').SessionData['combineJourney']>) => {
+    if (journey.locationChoice === 'new') return 'location'
+    return journey.containerType === 'EXCESS' ? 'where-stored' : 'details'
+  }
 
   const renderCombineDetails = async (
     req: Request,
@@ -166,19 +169,22 @@ export default function combineContainerRoutes(
         )
       }
 
-      // Excess property is stored off-site at Branston, so there is no internal storage-location step.
+      // Excess property chooses where it is stored (off-site at Branston or a prison location) on a separate
+      // step, as in the add and change journeys. Keep any prior storage decision only while the container is
+      // still excess (editing from CYA); changing the type into excess resets it.
       if (values.containerType === 'EXCESS') {
+        const wasExcess = journey.containerType === 'EXCESS'
         req.session.combineJourney = {
           ...journey,
           sealNumber: values.sealNumber,
           containerType: values.containerType,
           proposedDisposalDate: values.proposedDisposalDate,
-          locationChoice: undefined,
-          locationType: 'BRANSTON',
-          internalLocationId: undefined,
-          locationName: undefined,
+          locationChoice: wasExcess ? journey.locationChoice : undefined,
+          locationType: wasExcess ? journey.locationType : undefined,
+          internalLocationId: wasExcess ? journey.internalLocationId : undefined,
+          locationName: wasExcess ? journey.locationName : undefined,
         }
-        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/check`)
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/where-stored`)
       }
 
       // Back to a source's location goes straight to CYA. A new location keeps one already picked (editing
@@ -195,6 +201,84 @@ export default function combineContainerRoutes(
         locationName: sourceLocation?.name ?? keptNewLocation?.locationName,
       }
 
+      const next2 = req.session.combineJourney.internalLocationId ? 'check' : 'location'
+      return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/${next2}`)
+    },
+  )
+
+  // Excess property only: choose whether it is stored off-site at Branston, back in one of the sources' prison
+  // locations, or in a new prison location.
+  router.get(
+    '/prisoner/:prisonerNumber/combine/where-stored',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(userService, req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.combineJourney
+      if (!journey?.sealNumber || journey.containerType !== 'EXCESS') {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
+      }
+
+      const { username } = res.locals.user
+      const { sources } = await combineSourceRows(ctx, journey.sourceContainerIds, username)
+      let storageChoice: string | undefined
+      if (journey.locationType === 'BRANSTON') storageChoice = 'branston'
+      else if (journey.locationChoice === 'source') storageChoice = journey.internalLocationId
+      else storageChoice = journey.locationChoice
+
+      return res.render('pages/combine/whereStored', {
+        prisonerNumber: ctx.prisonerNumber,
+        sealNumber: journey.sealNumber,
+        sourceLocations: sourceLocationsOf(sources),
+        storageChoice,
+        backUrl: `/prisoner/${ctx.prisonerNumber}/combine/details`,
+        errorBanner: req.flash('error')[0],
+      })
+    },
+  )
+
+  router.post(
+    '/prisoner/:prisonerNumber/combine/where-stored',
+    requireManageRole,
+    requireActivePrisonMw,
+    async (req, res, next) => {
+      const ctx = await resolveContext(userService, req, res, next)
+      if (!ctx) return undefined
+      const journey = req.session.combineJourney
+      if (!journey?.sealNumber || journey.containerType !== 'EXCESS') {
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/details`)
+      }
+
+      if (req.body.storageChoice === 'branston') {
+        req.session.combineJourney = {
+          ...journey,
+          locationChoice: undefined,
+          locationType: 'BRANSTON',
+          internalLocationId: undefined,
+          locationName: undefined,
+        }
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/check`)
+      }
+
+      const { username } = res.locals.user
+      const { sources } = await combineSourceRows(ctx, journey.sourceContainerIds, username)
+      const sourceLocation = sourceLocationsOf(sources).find(location => location.id === req.body.storageChoice)
+      if (!sourceLocation && req.body.storageChoice !== 'new') {
+        req.flash('error', 'Select where this property is stored')
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/where-stored`)
+      }
+
+      // Back to a source's location goes straight to CYA. A new location keeps one already picked (editing
+      // from CYA), otherwise goes on to choose it.
+      const keptNewLocation = journey.locationChoice === 'new' ? journey : undefined
+      req.session.combineJourney = {
+        ...journey,
+        locationChoice: sourceLocation ? 'source' : 'new',
+        locationType: 'INTERNAL',
+        internalLocationId: sourceLocation?.id ?? keptNewLocation?.internalLocationId,
+        locationName: sourceLocation?.name ?? keptNewLocation?.locationName,
+      }
       const next2 = req.session.combineJourney.internalLocationId ? 'check' : 'location'
       return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/${next2}`)
     },
@@ -233,7 +317,7 @@ export default function combineContainerRoutes(
         locations: result.content,
         pagination: buildPagination(page, result.totalPages, result.totalElements, result.size, baseQuery.toString()),
         errorBanner: req.flash('error')[0],
-        backUrl: `/prisoner/${ctx.prisonerNumber}/combine/details`,
+        backUrl: `/prisoner/${ctx.prisonerNumber}/combine/${journey.containerType === 'EXCESS' ? 'where-stored' : 'details'}`,
         manageLocationsHref: manageLocationsHrefFor(req, res.locals.user.userRoles),
       })
     },
@@ -286,9 +370,7 @@ export default function combineContainerRoutes(
         sources,
         journey,
         storageLocation: branston ? 'Branston (offsite)' : journey.locationName,
-        backUrl: locationChosenOnDetails(journey)
-          ? `/prisoner/${ctx.prisonerNumber}/combine/details`
-          : `/prisoner/${ctx.prisonerNumber}/combine/location`,
+        backUrl: `/prisoner/${ctx.prisonerNumber}/combine/${locationStep(journey)}`,
       })
     },
   )
@@ -347,8 +429,7 @@ export default function combineContainerRoutes(
         }
         if (status === 400) {
           req.flash('error', 'That storage location could not be used. Select a different location.')
-          const step = locationChosenOnDetails(journey) ? 'details' : 'location'
-          return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/${step}`)
+          return res.redirect(`/prisoner/${ctx.prisonerNumber}/combine/${locationStep(journey)}`)
         }
         return next(error)
       }

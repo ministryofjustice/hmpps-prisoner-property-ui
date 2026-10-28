@@ -103,8 +103,8 @@
     {% set locationItems = (locationItems.push({ value: "new", text: "A new storage location", checked: (data.locationChoice == "new") or (not sourceLocations.length) }), locationItems) %}
 
     {# The new container can go back where one of the sources is stored, or to a new location. Hidden for
-       excess, which is stored off-site at Branston (server-rendered for no-JS; toggled by the container-type
-       radios via assets/js). #}
+       excess, which chooses where it is stored on the next step (server-rendered for no-JS; toggled by the
+       container-type radios via assets/js). #}
     <div id="location-choice-group" data-qa="location-choice-group"{{ " hidden" if data.containerType == "EXCESS" }}>
       {{ govukRadios({
         idPrefix: "locationChoice",
