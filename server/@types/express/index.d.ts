@@ -85,6 +85,9 @@ export declare module 'express-session' {
     // looking at rather than resetting to an unfiltered page 1. Scoped to the prison it was set for, so
     // switching caseload does not inherit another establishment's filters.
     propertyListQuery?: PropertyListQuery
+    // The prisoner whose property was opened from the DPS prisoner profile (?returnToService=prisonerProfile), so
+    // their person tabs offer a breadcrumb back to the profile. Cleared when the establishment list is opened.
+    profileReturnPrisonerNumber?: string
   }
 }
 
