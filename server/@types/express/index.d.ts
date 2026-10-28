@@ -56,8 +56,9 @@ export interface ChangeContainerJourney {
 
 // Working state for the multi-step "combine property containers" journey. Cleared on confirm/cancel.
 // The sources are the ticked containers from the person view; the rest describe the new combined
-// container. `locationType` is BRANSTON (off-site) for excess property, otherwise INTERNAL.
-// `locationChoice` is whether the new container goes back to one of the sources' locations or a new one.
+// container. `locationType` is BRANSTON when excess property is stored off-site, otherwise INTERNAL.
+// `locationChoice` is whether the new container goes back to one of the sources' prison locations or a new one
+// (unset for Branston).
 export interface CombineJourney {
   prisonerNumber: string
   sourceContainerIds: string[]
