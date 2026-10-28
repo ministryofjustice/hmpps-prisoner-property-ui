@@ -25,6 +25,10 @@ import {
 
 // ---- Change a property container journey (gated on the manage role) ----
 
+// Property put under review when its owner returned to custody (MAPB-849). Saving the journey confirms where it
+// is, which clears the review; the seal number cannot be changed until then, so the stored one is kept as is.
+const requiresReview = (container: PrisonerPropertyContainer): boolean => container.currentStatus === 'REVIEW_REQUIRED'
+
 export default function changeContainerRoutes(
   { auditService, prisonerPropertyService, userService }: Services,
   requireActivePrisonMw: RequestHandler,
@@ -46,9 +50,11 @@ export default function changeContainerRoutes(
       prisonerEstablishment: container.prisonerCurrentPrisonName || container.prisonName || null,
       status: statusTag(container.currentStatus),
       container,
+      requiresReview: requiresReview(container),
       hasCurrentLocation: container.currentLocationType != null,
       currentLocationName: containerLocation(container),
-      disposal: disposalBanner(container.proposedDisposalDate),
+      // Review outranks disposal, so the page gives the one instruction the status shows.
+      disposal: requiresReview(container) ? null : disposalBanner(container.proposedDisposalDate),
       removeUrl: `/prisoner/${ctx.prisonerNumber}/remove-container/${container.id}?from=${journey.origin}`,
       data,
       containerTypes: ALL_CONTAINER_TYPES.map(type => ({
@@ -95,7 +101,10 @@ export default function changeContainerRoutes(
         origin,
         // A NOMIS placeholder is not a seal anyone can confirm, so the field starts empty and the required-
         // field validation makes the user enter the real one - which is what the placeholder was asking for.
-        sealNumber: realSealNumber(container.currentSealNumber) ?? undefined,
+        // Property under review keeps the seal it has, placeholder or not: it cannot be changed until then.
+        sealNumber: requiresReview(container)
+          ? container.currentSealNumber
+          : (realSealNumber(container.currentSealNumber) ?? undefined),
         containerType: container.containerType,
         proposedDisposalDate: container.proposedDisposalDate ?? undefined,
         locationChoice: 'current',
@@ -135,7 +144,9 @@ export default function changeContainerRoutes(
       )
       if (!container) return next(createError(404, 'Property container not found'))
 
-      const { values, errors } = validateDetails(req.body)
+      // The seal is shown but not editable under review, so the stored one is what is validated and sent.
+      const body = requiresReview(container) ? { ...req.body, sealNumber: container.currentSealNumber } : req.body
+      const { values, errors } = validateDetails(body)
       if (!values) {
         return renderChangeDetails(
           req,

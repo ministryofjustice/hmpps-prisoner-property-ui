@@ -9,6 +9,7 @@
 {% from "govuk/components/button/macro.njk" import govukButton %}
 {% from "govuk/components/error-summary/macro.njk" import govukErrorSummary %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
+{% from "govuk/components/warning-text/macro.njk" import govukWarningText %}
 
 {% set pageTitle = applicationName + " - Manage a property container" %}
 {% set mainClasses = "govuk-body" %}
@@ -46,6 +47,14 @@
     ]
   }) }}
 
+  {% if requiresReview %}
+    {{ govukWarningText({
+      html: "This property was recorded before the prisoner's previous release. Confirm the property's current location, or <a class=\"govuk-link\" href=\"" + removeUrl + "\">remove this container record</a> if the property cannot be accounted for.",
+      iconFallbackText: "Warning",
+      attributes: { "data-qa": "review-warning" }
+    }) }}
+  {% endif %}
+
   {% if disposal %}
     <div class="app-disposal-banner{{ ' app-disposal-banner--overdue' if disposal.overdue }}" data-qa="disposal-banner">
       {% if disposal.overdue %}
@@ -75,6 +84,11 @@
   <form method="post" novalidate>
     <input type="hidden" name="_csrf" value="{{ csrfToken }}">
 
+    {% if requiresReview %}
+      {# The seal cannot be changed while the property requires review, so it is shown rather than offered. #}
+      <h2 class="govuk-heading-m">Seal number</h2>
+      <p class="govuk-body" data-qa="seal-number-fixed">{{ (container.currentSealNumber | realSealNumber) or "Not entered" }}</p>
+    {% else %}
     {{ govukInput({
       label: { text: "Seal number", classes: "govuk-label--m" },
       hint: { text: "The number on the seal currently fitted to the container." },
@@ -84,6 +98,7 @@
       classes: "govuk-input--width-20",
       errorMessage: { text: errors.sealNumber.text } if errors.sealNumber else undefined
     }) }}
+    {% endif %}
 
     {{ govukRadios({
       idPrefix: "containerType",

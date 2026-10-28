@@ -11,6 +11,8 @@ const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
   PRISONER_RECEIVED: 'Due for transfer out',
   PRISONER_RELEASED: 'Due for return',
   DIED_IN_CUSTODY: 'Due for return – death in custody',
+  PRISONER_ADMITTED: 'Property requires review',
+  LOCATION_CONFIRMED: 'Storage location confirmed',
   TRANSFERRED: 'Removed – transferred out',
   RETURNED: 'Removed – returned',
   DISPOSAL_REQUIRED: 'Due for disposal',
@@ -80,6 +82,10 @@ export const eventDescription = (event: PropertyEvent): string => {
       return 'The person was released, so this property is due to be returned.'
     case 'DIED_IN_CUSTODY':
       return "Following the person's death in custody, this property is due to be returned."
+    case 'PRISONER_ADMITTED':
+      return 'The person returned to custody while this property was held from before, so its location needs to be confirmed.'
+    case 'LOCATION_CONFIRMED':
+      return 'The storage location of this property was confirmed after review.'
     case 'TRANSFERRED': {
       // Prefer the resolved prison name; fall back to the id if the API hasn't resolved it yet.
       const destination = event.toPrisonName ?? event.toPrisonId
