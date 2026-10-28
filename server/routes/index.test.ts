@@ -2004,6 +2004,25 @@ describe('Add container journey - steps', () => {
       })
   })
 
+  it('re-renders the details form with an error when the seal number is longer than NOMIS allows (MAPB-1054)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    return agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({ 'containers[0][sealNumber]': 'A'.repeat(21), 'containers[0][containerType]': 'STANDARD' })
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+        expect(res.text).toContain('Seal number must be 20 characters or less')
+        expect(res.text).toContain('href="#containers-0-sealNumber"')
+        expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+      })
+  })
+
   it('walks details -> location -> check -> confirm and adds the container, returning to the list', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
@@ -2663,6 +2682,28 @@ describe('Combine containers journey', () => {
     )
   })
 
+  it('re-renders the combine form with an error when the seal number is longer than NOMIS allows (MAPB-1054)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(twoContainers())
+
+    const agent = request.agent(manageApp())
+    await agent
+      .post('/prisoner/A1234BC/combine')
+      .type('form')
+      .send({ containerIds: ['c1', 'c2'] })
+      .expect(302)
+
+    return agent
+      .post('/prisoner/A1234BC/combine/details')
+      .type('form')
+      .send({ sealNumber: 'A'.repeat(21), containerType: 'STANDARD' })
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+        expect(res.text).toContain('Seal number must be 20 characters or less')
+      })
+  })
+
   describe('returning the combined container to a source location', () => {
     // Three sources across two locations: 230 holds two of them, 201 the third.
     const locatedSources = () => [
@@ -3209,6 +3250,39 @@ describe('Change container journey', () => {
       .expect(res => {
         expect(res.text).toContain('There is a problem')
       })
+  })
+
+  it('re-renders the change form with an error when the seal number is longer than NOMIS allows (MAPB-1054)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    return agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ sealNumber: 'A'.repeat(21), containerType: 'STANDARD', locationChoice: 'current' })
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+        expect(res.text).toContain('Seal number must be 20 characters or less')
+      })
+  })
+
+  it('does not block property under review on a long seal number staff cannot change (MAPB-1054)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ currentSealNumber: 'A'.repeat(21), currentStatus: 'REVIEW_REQUIRED' }),
+    ])
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    return agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ containerType: 'STANDARD', locationChoice: 'current' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/check')
   })
 
   it('keeps the current location and updates the container', async () => {
