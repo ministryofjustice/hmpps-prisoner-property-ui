@@ -110,6 +110,11 @@ export default function establishmentListRoutes({
       // "Due for transfer in" stays a disabled placeholder until the API models the receiving-prison view.
       statusItems: [
         {
+          value: 'REVIEW_REQUIRED',
+          text: statusTag('REVIEW_REQUIRED').text,
+          checked: statuses.includes('REVIEW_REQUIRED'),
+        },
+        {
           value: 'DUE_FOR_RETURN',
           text: statusTag('DUE_FOR_RETURN').text,
           checked: statuses.includes('DUE_FOR_RETURN'),

@@ -28,6 +28,8 @@ describe('eventTypeLabel', () => {
     expect(eventTypeLabel('MOVED')).toBe('Storage location changed')
     expect(eventTypeLabel('DISPOSED')).toBe('Removed – disposed')
     expect(eventTypeLabel('DIED_IN_CUSTODY')).toBe('Due for return – death in custody')
+    expect(eventTypeLabel('PRISONER_ADMITTED')).toBe('Property requires review')
+    expect(eventTypeLabel('LOCATION_CONFIRMED')).toBe('Storage location confirmed')
   })
 
   it('labels the "details changed" events the same and groups removals', () => {
@@ -115,6 +117,12 @@ describe('eventDescription', () => {
     )
     expect(eventDescription(event({ eventType: 'DIED_IN_CUSTODY' }))).toBe(
       "Following the person's death in custody, this property is due to be returned.",
+    )
+    expect(eventDescription(event({ eventType: 'PRISONER_ADMITTED' }))).toBe(
+      'The person returned to custody while this property was held from before, so its location needs to be confirmed.',
+    )
+    expect(eventDescription(event({ eventType: 'LOCATION_CONFIRMED' }))).toBe(
+      'The storage location of this property was confirmed after review.',
     )
   })
 
