@@ -113,6 +113,13 @@ export default function establishmentListRoutes({
       })),
       // "Due for transfer in" stays a disabled placeholder until the API models the receiving-prison view.
       statusItems: [
+        // Ticking any status drops the removed property a seal search would otherwise bring back, so "Stored"
+        // narrows a location search to what is on the shelf now (MAPB-1053).
+        {
+          value: 'STORED',
+          text: statusTag('STORED').text,
+          checked: statuses.includes('STORED'),
+        },
         {
           value: 'REVIEW_REQUIRED',
           text: statusTag('REVIEW_REQUIRED').text,
