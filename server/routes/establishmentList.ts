@@ -38,6 +38,10 @@ export default function establishmentListRoutes({
       return res.render('pages/noCaseload')
     }
 
+    // Opening the list ends a visit that began on the prisoner profile, so the person tabs go back to their usual
+    // breadcrumb. Only touched when set, so read-only users who never came from the profile get no session.
+    if (req.session.profileReturnPrisonerNumber) req.session.profileReturnPrisonerNumber = undefined
+
     // Clearing has to be an explicit signal, because a bare "/" now means "restore what I had" - the
     // "Clear search" and "Clear filters" links would otherwise re-apply the very filters they remove.
     if (req.query.clear) {
