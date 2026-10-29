@@ -1,6 +1,5 @@
 {% extends "../partials/layout.njk" %}
 
-{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
 {% from "govuk/components/tag/macro.njk" import govukTag %}
 {% from "govuk/components/details/macro.njk" import govukDetails %}
 {% from "govuk/components/notification-banner/macro.njk" import govukNotificationBanner %}
@@ -9,10 +8,7 @@
 {% set mainClasses = "govuk-body app-property-page" %}
 
 {% block beforeContent %}
-  {{ govukBreadcrumbs({ items: [
-    { text: "Digital Prison Services", href: dpsUrl },
-    { text: "Prisoner property", href: "/" }
-  ] }) }}
+  {% include "../partials/personBreadcrumbs.njk" %}
 {% endblock %}
 
 {% block content %}

@@ -1348,6 +1348,111 @@ describe('GET /prisoner/:prisonerNumber/returned', () => {
   })
 })
 
+// The profile's Property card links here with ?returnToService=prisonerProfile. These need request.agent, which
+// carries the session cookie, as the visit is remembered across the person tabs.
+describe('Breadcrumb back to the prisoner profile (MAPB-1055)', () => {
+  const profileCrumb = /<a [^>]*data-qa="breadcrumb-profile"/
+  const listCrumb = /<a class="govuk-breadcrumbs__link" href="\/">Prisoner property<\/a>/
+
+  beforeEach(() => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([])
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+  })
+
+  it('leads back to the prisoner profile when the user came from it', async () => {
+    return request(app)
+      .get('/prisoner/A1234BC?returnToService=prisonerProfile')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(profileCrumb)
+        expect(res.text).toMatch(/data-qa="breadcrumb-profile">Smith, John<\/a>/)
+        expect(res.text).toMatch(/href="[^"]*\/prisoner\/A1234BC"\s+data-qa="breadcrumb-profile"/)
+        expect(res.text).not.toMatch(listCrumb)
+      })
+  })
+
+  it('keeps leading back to the profile on every person tab', async () => {
+    const agent = request.agent(app)
+    await agent.get('/prisoner/A1234BC?returnToService=prisonerProfile').expect(200)
+
+    for (const path of ['/prisoner/A1234BC/history', '/prisoner/A1234BC/returned', '/prisoner/A1234BC']) {
+      // eslint-disable-next-line no-await-in-loop
+      await agent
+        .get(path)
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toMatch(profileCrumb)
+          expect(res.text).not.toMatch(listCrumb)
+        })
+    }
+  })
+
+  it('keeps the usual breadcrumb for someone who came from the establishment list', async () => {
+    return request(app)
+      .get('/prisoner/A1234BC/history')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(listCrumb)
+        expect(res.text).not.toMatch(profileCrumb)
+      })
+  })
+
+  it('goes back to the usual breadcrumb once the establishment list is opened', async () => {
+    const agent = request.agent(app)
+    await agent.get('/prisoner/A1234BC?returnToService=prisonerProfile').expect(200)
+    await agent.get('/').expect(200)
+
+    return agent
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(listCrumb)
+        expect(res.text).not.toMatch(profileCrumb)
+      })
+  })
+
+  it('does not carry over to another prisoner', async () => {
+    const agent = request.agent(app)
+    await agent.get('/prisoner/A1234BC?returnToService=prisonerProfile').expect(200)
+
+    prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonerNumber: 'B5678CD' }))
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerNumber: 'B5678CD' })])
+
+    return agent
+      .get('/prisoner/B5678CD')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(listCrumb)
+        expect(res.text).not.toMatch(profileCrumb)
+      })
+  })
+
+  it('ignores any other returnToService value', async () => {
+    return request(app)
+      .get('/prisoner/A1234BC?returnToService=somewhereElse')
+      .expect(200)
+      .expect(res => expect(res.text).not.toMatch(profileCrumb))
+  })
+
+  it('does not offer the profile to someone here only for property held at this prison', async () => {
+    // Held at Leeds with property left here: the profile would refuse this user, so the banner has no link either.
+    prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonId: 'LEI', prisonName: 'Leeds (HMP)' }))
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'here', prisonId: 'MDI', prisonerCurrentPrisonId: 'LEI' }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC?returnToService=prisonerProfile')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(listCrumb)
+        expect(res.text).not.toMatch(profileCrumb)
+      })
+  })
+})
+
 describe('GET /prisoner/:prisonerNumber/container/:id', () => {
   it("renders the container's history timeline and audits the view", async () => {
     withActiveCaseload()
