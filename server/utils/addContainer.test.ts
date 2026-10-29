@@ -70,6 +70,26 @@ describe('validateDetails', () => {
     expect(errors.sealNumber).toBeDefined()
   })
 
+  it('accepts a seal number of up to 20 characters, counted after trimming (MAPB-1054)', () => {
+    expect(validateDetails({ sealNumber: 'A'.repeat(20), containerType: 'STANDARD' }).errors).toEqual({})
+    expect(validateDetails({ sealNumber: `  ${'A'.repeat(20)}  `, containerType: 'STANDARD' }).errors).toEqual({})
+  })
+
+  it('rejects a seal number longer than 20 characters, which NOMIS cannot hold (MAPB-1054)', () => {
+    const { values, errors } = validateDetails({ sealNumber: 'A'.repeat(21), containerType: 'STANDARD' })
+    expect(values).toBeUndefined()
+    expect(errors.sealNumber).toEqual({ text: 'Seal number must be 20 characters or less', href: '#sealNumber' })
+  })
+
+  it('does not check the length of a seal number that cannot be changed (MAPB-1054)', () => {
+    const { values, errors } = validateDetails(
+      { sealNumber: 'A'.repeat(21), containerType: 'STANDARD' },
+      { sealEditable: false },
+    )
+    expect(errors).toEqual({})
+    expect(values?.sealNumber).toEqual('A'.repeat(21))
+  })
+
   it('requires a valid container type', () => {
     expect(validateDetails({ sealNumber: 'SN1' }).errors.containerType).toBeDefined()
     expect(validateDetails({ sealNumber: 'SN1', containerType: 'NOPE' }).errors.containerType).toBeDefined()

@@ -34,6 +34,9 @@ export interface ContainerBlock {
 
 const trim = (value?: string): string => (value ?? '').trim()
 
+// NOMIS holds at most 20 characters for a seal number; a longer one cannot be synced to it.
+export const MAX_SEAL_NUMBER_LENGTH = 20
+
 /**
  * Assemble an optional GOV.UK 3-part date into an ISO yyyy-mm-dd string.
  * - all three parts blank -> { iso: undefined } (no date, which is valid, the field is optional)
@@ -68,13 +71,24 @@ export const parseOptionalDate = (day?: string, month?: string, year?: string): 
 /**
  * Validate the "add container details" form. Returns the parsed values when valid, or a list of
  * GOV.UK error-summary entries (keyed by field) when not.
+ *
+ * `sealEditable` is false when the form shows the stored seal number without letting it be changed; its
+ * length is then not checked, as an error there could not be put right.
  */
-export const validateDetails = (form: DetailsForm): { values?: ParsedDetails; errors: Record<string, FieldError> } => {
+export const validateDetails = (
+  form: DetailsForm,
+  { sealEditable = true }: { sealEditable?: boolean } = {},
+): { values?: ParsedDetails; errors: Record<string, FieldError> } => {
   const errors: Record<string, FieldError> = {}
 
   const sealNumber = trim(form.sealNumber)
   if (!sealNumber) {
     errors.sealNumber = { text: "Enter the property container's current seal number", href: '#sealNumber' }
+  } else if (sealEditable && sealNumber.length > MAX_SEAL_NUMBER_LENGTH) {
+    errors.sealNumber = {
+      text: `Seal number must be ${MAX_SEAL_NUMBER_LENGTH} characters or less`,
+      href: '#sealNumber',
+    }
   }
 
   const containerType = trim(form.containerType)
