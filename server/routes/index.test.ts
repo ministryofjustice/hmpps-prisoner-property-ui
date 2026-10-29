@@ -619,6 +619,23 @@ describe('GET /', () => {
       )
     })
 
+    it('offers stored property as a status filter and passes it to the API with the search (MAPB-1053)', async () => {
+      await request(app)
+        .get('/?q=174&status=STORED')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toMatch(/id="status" name="status" type="checkbox" value="STORED" checked/)
+          expect(res.text).toContain('Status: Stored')
+          expect(res.text).toContain('href="/?q=174"')
+        })
+
+      expect(prisonerPropertyService.getPrisonProperty).toHaveBeenCalledWith(
+        'MDI',
+        expect.objectContaining({ query: '174', status: ['STORED'] }),
+        user.username,
+      )
+    })
+
     it('says nothing when the list is not filtered', async () => {
       return request(app)
         .get('/')
