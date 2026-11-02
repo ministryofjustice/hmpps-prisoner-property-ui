@@ -14,6 +14,7 @@ import type {
   PrisonPropertySummary,
   PropertyEvent,
   PropertyLocationAdmin,
+  ReceiveContainerRequest,
   RemoveContainerRequest,
   RestPage,
   UpdateContainerRequest,
@@ -69,6 +70,10 @@ export default class PrisonerPropertyService {
 
   updateContainer(id: string, body: UpdateContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
     return this.prisonerPropertyApiClient.updateContainer(id, body, username)
+  }
+
+  receiveContainer(id: string, body: ReceiveContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
+    return this.prisonerPropertyApiClient.receiveContainer(id, body, username)
   }
 
   getAllAgencies(username: string): Promise<AgencyStatus[]> {

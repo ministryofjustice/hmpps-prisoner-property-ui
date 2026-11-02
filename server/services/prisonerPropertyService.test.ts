@@ -1,7 +1,7 @@
 import type { AuthenticationClient } from '@ministryofjustice/hmpps-auth-clients'
 import PrisonerPropertyApiClient from '../data/prisonerPropertyApiClient'
 import PrisonerPropertyService from './prisonerPropertyService'
-import type { PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
+import type { PrisonerPropertyContainer, ReceiveContainerRequest } from '../data/prisonerPropertyApiTypes'
 
 jest.mock('../data/prisonerPropertyApiClient')
 
@@ -13,6 +13,21 @@ describe('PrisonerPropertyService', () => {
 
   beforeEach(() => {
     prisonerPropertyService = new PrisonerPropertyService(prisonerPropertyApiClient)
+  })
+
+  it('should delegate receiveContainer to the api client and return its result', async () => {
+    const container = { id: 'container-1', prisonId: 'MDI' } as PrisonerPropertyContainer
+    const body: ReceiveContainerRequest = {
+      receivingPrisonId: 'MDI',
+      sealNumber: '0000',
+      internalLocationId: 'location-1',
+    }
+    prisonerPropertyApiClient.receiveContainer.mockResolvedValue(container)
+
+    const result = await prisonerPropertyService.receiveContainer('container-1', body, 'AUSER_GEN')
+
+    expect(prisonerPropertyApiClient.receiveContainer).toHaveBeenCalledWith('container-1', body, 'AUSER_GEN')
+    expect(result).toEqual(container)
   })
 
   it('should call getPropertyForPrisoner on the api client and return its result', async () => {

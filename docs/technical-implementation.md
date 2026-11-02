@@ -115,6 +115,12 @@ every step runs first. **Combine is the exception to how you enter one**: its en
 the person page (it carries the selected containers), so it is the one journey you cannot reach by typing
 a URL.
 
+When adding property, a current seal matching a container in "Property due to be transferred in"
+automatically supplies that container's seal as the previous seal, unless staff entered one explicitly.
+Matching ignores case and surrounding whitespace and includes property already in transit. The match is
+shown on the "Check your answers" page and sent through the API's existing transfer-linking flow: it creates a linked
+receiving-prison record and reconciles the sending record, rather than adding unrelated new property.
+
 ### The establishment list
 
 Two behaviours on that page are worth knowing before changing it:

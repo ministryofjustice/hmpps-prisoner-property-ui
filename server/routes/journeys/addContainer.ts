@@ -5,6 +5,7 @@ import { ALL_CONTAINER_TYPES, buildPagination, containerTypeLabel, DEFAULT_PAGE_
 import {
   errorCodeOf,
   matchableContainers,
+  resolvePreviousSealNumbers,
   toContainerBlocks,
   validateContainers,
   validatePreviousSealNumbers,
@@ -194,18 +195,18 @@ export default function addContainerRoutes(services: Services, requireActivePris
       // A previous seal number must name property the person actually holds elsewhere, or the two records
       // never get matched and the same box ends up recorded twice. Checked here, against the person's own
       // property, so the error lands on the field rather than after the whole journey is submitted.
-      if (values.some(v => v.previousSealNumber)) {
-        const held = await prisonerPropertyService.getPropertyForPrisoner(ctx.prisonerNumber, res.locals.user.username)
-        const sealErrors = validatePreviousSealNumbers(values, matchableContainers(held, ctx.activeCaseloadId))
-        if (sealErrors.length) {
-          return renderAddDetails(req, res, ctx, journey.origin, blocks, sealErrors)
-        }
+      const held = await prisonerPropertyService.getPropertyForPrisoner(ctx.prisonerNumber, res.locals.user.username)
+      const matchable = matchableContainers(held, ctx.activeCaseloadId)
+      const resolved = resolvePreviousSealNumbers(values, matchable)
+      const sealErrors = validatePreviousSealNumbers(resolved, matchable)
+      if (sealErrors.length) {
+        return renderAddDetails(req, res, ctx, journey.origin, blocks, sealErrors)
       }
 
       // Keep the storage decision already made for a container at the same index (editing from Check your
       // answers), but only while its type is unchanged - changing the type (e.g. to/from Excess) resets the
       // storage choice so the correct steps are taken again.
-      const containers: AddContainerDraft[] = values.map((v, i) => {
+      const containers: AddContainerDraft[] = resolved.map((v, i) => {
         const previous = journey.containers[i]
         const keep = previous?.containerType === v.containerType
         return {
@@ -401,7 +402,7 @@ export default function addContainerRoutes(services: Services, requireActivePris
         containers: journey.containers.map((c, index) => ({
           index,
           sealNumber: c.sealNumber,
-          // Shown only when entered - it decides whether this record gets matched to the property's record
+          // Entered or inferred from an unchanged incoming seal - it links this record to the property's record
           // at the establishment it came from, so staff should see it before confirming.
           previousSealNumber: c.previousSealNumber,
           containerType: c.containerType,
