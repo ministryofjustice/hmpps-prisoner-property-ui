@@ -165,6 +165,25 @@ test.describe('Person property view', () => {
     await expect(prisonerPage.breadcrumbs.getByRole('link', { name: 'Prisoner property' })).toHaveAttribute('href', '/')
   })
 
+  test('leads back to the prisoner profile, on every tab, for someone who came from it', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [inEstablishmentContainer],
+      priority: 1,
+    })
+    await prisonerPropertyApi.stubGetPrisonerPropertyHistory()
+    await page.goto('/prisoner/A1234BC?returnToService=prisonerProfile')
+
+    const prisonerPage = await PrisonerPropertyPage.verifyOnPage(page)
+    const profileCrumb = prisonerPage.breadcrumbs.locator('[data-qa="breadcrumb-profile"]')
+    await expect(profileCrumb).toHaveAttribute('href', /\/prisoner\/A1234BC$/)
+    await expect(prisonerPage.breadcrumbs.getByRole('link', { name: 'Prisoner property' })).toHaveCount(0)
+
+    await page.getByTestId('tab-history').click()
+    await expect(profileCrumb).toHaveAttribute('href', /\/prisoner\/A1234BC$/)
+  })
+
   test('shows selection, per-row actions and the combine button for a user with the manage role', async ({ page }) => {
     await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
     // two containers, because the selection controls only appear when combining is possible

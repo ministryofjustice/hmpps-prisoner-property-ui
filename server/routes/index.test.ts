@@ -619,6 +619,23 @@ describe('GET /', () => {
       )
     })
 
+    it('offers stored property as a status filter and passes it to the API with the search (MAPB-1053)', async () => {
+      await request(app)
+        .get('/?q=174&status=STORED')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toMatch(/id="status" name="status" type="checkbox" value="STORED" checked/)
+          expect(res.text).toContain('Status: Stored')
+          expect(res.text).toContain('href="/?q=174"')
+        })
+
+      expect(prisonerPropertyService.getPrisonProperty).toHaveBeenCalledWith(
+        'MDI',
+        expect.objectContaining({ query: '174', status: ['STORED'] }),
+        user.username,
+      )
+    })
+
     it('says nothing when the list is not filtered', async () => {
       return request(app)
         .get('/')
@@ -1331,6 +1348,111 @@ describe('GET /prisoner/:prisonerNumber/returned', () => {
   })
 })
 
+// The profile's Property card links here with ?returnToService=prisonerProfile. These need request.agent, which
+// carries the session cookie, as the visit is remembered across the person tabs.
+describe('Breadcrumb back to the prisoner profile (MAPB-1055)', () => {
+  const profileCrumb = /<a [^>]*data-qa="breadcrumb-profile"/
+  const listCrumb = /<a class="govuk-breadcrumbs__link" href="\/">Prisoner property<\/a>/
+
+  beforeEach(() => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+    prisonerPropertyService.getPrisonerPropertyHistory.mockResolvedValue([])
+    prisonerPropertyService.getPrisonProperty.mockResolvedValue(emptyPage)
+  })
+
+  it('leads back to the prisoner profile when the user came from it', async () => {
+    return request(app)
+      .get('/prisoner/A1234BC?returnToService=prisonerProfile')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(profileCrumb)
+        expect(res.text).toMatch(/data-qa="breadcrumb-profile">Smith, John<\/a>/)
+        expect(res.text).toMatch(/href="[^"]*\/prisoner\/A1234BC"\s+data-qa="breadcrumb-profile"/)
+        expect(res.text).not.toMatch(listCrumb)
+      })
+  })
+
+  it('keeps leading back to the profile on every person tab', async () => {
+    const agent = request.agent(app)
+    await agent.get('/prisoner/A1234BC?returnToService=prisonerProfile').expect(200)
+
+    for (const path of ['/prisoner/A1234BC/history', '/prisoner/A1234BC/returned', '/prisoner/A1234BC']) {
+      // eslint-disable-next-line no-await-in-loop
+      await agent
+        .get(path)
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toMatch(profileCrumb)
+          expect(res.text).not.toMatch(listCrumb)
+        })
+    }
+  })
+
+  it('keeps the usual breadcrumb for someone who came from the establishment list', async () => {
+    return request(app)
+      .get('/prisoner/A1234BC/history')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(listCrumb)
+        expect(res.text).not.toMatch(profileCrumb)
+      })
+  })
+
+  it('goes back to the usual breadcrumb once the establishment list is opened', async () => {
+    const agent = request.agent(app)
+    await agent.get('/prisoner/A1234BC?returnToService=prisonerProfile').expect(200)
+    await agent.get('/').expect(200)
+
+    return agent
+      .get('/prisoner/A1234BC')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(listCrumb)
+        expect(res.text).not.toMatch(profileCrumb)
+      })
+  })
+
+  it('does not carry over to another prisoner', async () => {
+    const agent = request.agent(app)
+    await agent.get('/prisoner/A1234BC?returnToService=prisonerProfile').expect(200)
+
+    prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonerNumber: 'B5678CD' }))
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerNumber: 'B5678CD' })])
+
+    return agent
+      .get('/prisoner/B5678CD')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(listCrumb)
+        expect(res.text).not.toMatch(profileCrumb)
+      })
+  })
+
+  it('ignores any other returnToService value', async () => {
+    return request(app)
+      .get('/prisoner/A1234BC?returnToService=somewhereElse')
+      .expect(200)
+      .expect(res => expect(res.text).not.toMatch(profileCrumb))
+  })
+
+  it('does not offer the profile to someone here only for property held at this prison', async () => {
+    // Held at Leeds with property left here: the profile would refuse this user, so the banner has no link either.
+    prisonerService.getPrisonerDetails.mockResolvedValue(prisoner({ prisonId: 'LEI', prisonName: 'Leeds (HMP)' }))
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'here', prisonId: 'MDI', prisonerCurrentPrisonId: 'LEI' }),
+    ])
+
+    return request(app)
+      .get('/prisoner/A1234BC?returnToService=prisonerProfile')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toMatch(listCrumb)
+        expect(res.text).not.toMatch(profileCrumb)
+      })
+  })
+})
+
 describe('GET /prisoner/:prisonerNumber/container/:id', () => {
   it("renders the container's history timeline and audits the view", async () => {
     withActiveCaseload()
@@ -2001,6 +2123,25 @@ describe('Add container journey - steps', () => {
       .expect(res => {
         expect(res.text).toContain('There is a problem')
         expect(res.text).toContain('Enter the property container')
+      })
+  })
+
+  it('re-renders the details form with an error when the seal number is longer than NOMIS allows (MAPB-1054)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    return agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({ 'containers[0][sealNumber]': 'A'.repeat(21), 'containers[0][containerType]': 'STANDARD' })
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+        expect(res.text).toContain('Seal number must be 20 characters or less')
+        expect(res.text).toContain('href="#containers-0-sealNumber"')
+        expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
       })
   })
 
@@ -2756,6 +2897,28 @@ describe('Combine containers journey', () => {
     )
   })
 
+  it('re-renders the combine form with an error when the seal number is longer than NOMIS allows (MAPB-1054)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(twoContainers())
+
+    const agent = request.agent(manageApp())
+    await agent
+      .post('/prisoner/A1234BC/combine')
+      .type('form')
+      .send({ containerIds: ['c1', 'c2'] })
+      .expect(302)
+
+    return agent
+      .post('/prisoner/A1234BC/combine/details')
+      .type('form')
+      .send({ sealNumber: 'A'.repeat(21), containerType: 'STANDARD' })
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+        expect(res.text).toContain('Seal number must be 20 characters or less')
+      })
+  })
+
   describe('returning the combined container to a source location', () => {
     // Three sources across two locations: 230 holds two of them, 201 the third.
     const locatedSources = () => [
@@ -2901,48 +3064,243 @@ describe('Combine containers journey', () => {
         })
     })
 
-    it('does not ask for a storage location for excess property', async () => {
+    it('does not ask for a storage location on the details page for excess property', async () => {
       const agent = await startCombine()
 
+      // Excess chooses where it is stored on the next step instead.
       await agent
         .post('/prisoner/A1234BC/combine/details')
         .type('form')
         .send({ sealNumber: 'NEW9', containerType: 'EXCESS' })
         .expect(302)
-        .expect('location', '/prisoner/A1234BC/combine/check')
+        .expect('location', '/prisoner/A1234BC/combine/where-stored')
     })
   })
 
-  it('skips the storage-location step for excess (off-site) property', async () => {
-    withActiveCaseload()
-    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(twoContainers())
-    prisonerPropertyService.combineContainers.mockResolvedValue(container({ id: 'newC' }))
+  describe('excess property', () => {
+    // Two sources: c1 on Shelf 230, c2 off-site at Branston (no prison location to go back to).
+    const excessSources = () => [
+      container({
+        id: 'c1',
+        currentSealNumber: 'SN0001',
+        currentLocation: 'loc-230',
+        locationDescription: 'Shelf 230',
+      }),
+      container({ id: 'c2', currentSealNumber: 'SN0002', currentLocation: null, currentLocationType: 'BRANSTON' }),
+    ]
 
-    const agent = request.agent(manageApp())
-    await agent
-      .post('/prisoner/A1234BC/combine')
-      .type('form')
-      .send({ containerIds: ['c1', 'c2'] })
+    const storageChoiceValues = (html: string) =>
+      [...html.matchAll(/name="storageChoice" type="radio" value="([^"]+)"/g)].map(m => m[1])
+    const checkedStorageChoice = (html: string) =>
+      html.match(/name="storageChoice" type="radio" value="([^"]+)" checked/)?.[1]
 
-    await agent
-      .post('/prisoner/A1234BC/combine/details')
-      .type('form')
-      .send({ sealNumber: 'NEW9', containerType: 'EXCESS' })
-      .expect(302)
-      .expect('location', '/prisoner/A1234BC/combine/check')
+    const startExcessCombine = async () => {
+      const agent = request.agent(manageApp())
+      await agent
+        .post('/prisoner/A1234BC/combine')
+        .type('form')
+        .send({ containerIds: ['c1', 'c2'] })
+      await agent
+        .post('/prisoner/A1234BC/combine/details')
+        .type('form')
+        .send({ sealNumber: 'NEW9', containerType: 'EXCESS' })
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/combine/where-stored')
+      return agent
+    }
 
-    await agent.post('/prisoner/A1234BC/combine/confirm').type('form').send({}).expect(302)
+    beforeEach(() => {
+      withActiveCaseload()
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue(excessSources())
+      prisonerPropertyService.combineContainers.mockResolvedValue(container({ id: 'newC' }))
+    })
 
-    expect(prisonerPropertyService.combineContainers).toHaveBeenCalledWith(
-      {
-        sourceContainerIds: ['c1', 'c2'],
-        containerType: 'EXCESS',
-        sealNumber: 'NEW9',
-        internalLocationId: undefined,
-        locationType: 'BRANSTON',
-      },
-      user.username,
-    )
+    it('asks where it is stored: Branston, a source prison location, or a new one', async () => {
+      const agent = await startExcessCombine()
+
+      await agent
+        .get('/prisoner/A1234BC/combine/where-stored')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('Where is excess property container NEW9 stored?')
+          expect(storageChoiceValues(res.text)).toEqual(['branston', 'loc-230', 'new'])
+          expect(res.text).toContain('A new storage location')
+          expect(checkedStorageChoice(res.text)).toBeUndefined()
+        })
+    })
+
+    it('offers "A location in this prison" when no source is held in a prison location', async () => {
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+        container({ id: 'c1', currentSealNumber: 'SN0001', currentLocation: null, currentLocationType: 'BRANSTON' }),
+        container({ id: 'c2', currentSealNumber: 'SN0002', currentLocation: null, currentLocationType: 'BRANSTON' }),
+      ])
+      const agent = await startExcessCombine()
+
+      await agent
+        .get('/prisoner/A1234BC/combine/where-stored')
+        .expect(200)
+        .expect(res => {
+          expect(storageChoiceValues(res.text)).toEqual(['branston', 'new'])
+          expect(res.text).toContain('A location in this prison')
+        })
+    })
+
+    it('combines off-site at Branston', async () => {
+      const agent = await startExcessCombine()
+
+      await agent
+        .post('/prisoner/A1234BC/combine/where-stored')
+        .type('form')
+        .send({ storageChoice: 'branston' })
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/combine/check')
+      await agent
+        .get('/prisoner/A1234BC/combine/check')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('Branston (offsite)')
+          expect(res.text).toMatch(/<a href="\/prisoner\/A1234BC\/combine\/where-stored" class="govuk-back-link">/)
+        })
+      await agent.post('/prisoner/A1234BC/combine/confirm').type('form').send({}).expect(302)
+
+      expect(prisonerPropertyService.combineContainers).toHaveBeenCalledWith(
+        {
+          sourceContainerIds: ['c1', 'c2'],
+          containerType: 'EXCESS',
+          sealNumber: 'NEW9',
+          internalLocationId: undefined,
+          locationType: 'BRANSTON',
+        },
+        user.username,
+      )
+    })
+
+    it("combines into a source's prison location without the location search", async () => {
+      const agent = await startExcessCombine()
+
+      await agent
+        .post('/prisoner/A1234BC/combine/where-stored')
+        .type('form')
+        .send({ storageChoice: 'loc-230' })
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/combine/check')
+      await agent
+        .get('/prisoner/A1234BC/combine/check')
+        .expect(200)
+        .expect(res => expect(res.text).toContain('Shelf 230'))
+      await agent.post('/prisoner/A1234BC/combine/confirm').type('form').send({}).expect(302)
+
+      expect(prisonerPropertyService.combineContainers).toHaveBeenCalledWith(
+        {
+          sourceContainerIds: ['c1', 'c2'],
+          containerType: 'EXCESS',
+          sealNumber: 'NEW9',
+          internalLocationId: 'loc-230',
+          locationType: 'INTERNAL',
+        },
+        user.username,
+      )
+    })
+
+    it('goes on to choose a new prison location, with the back link returning to where it is stored', async () => {
+      prisonerPropertyService.getBoxLocations.mockResolvedValue(boxPage([box({ id: 'loc-999', name: 'Store room' })]))
+      const agent = await startExcessCombine()
+
+      await agent
+        .post('/prisoner/A1234BC/combine/where-stored')
+        .type('form')
+        .send({ storageChoice: 'new' })
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/combine/location')
+      await agent
+        .get('/prisoner/A1234BC/combine/location')
+        .expect(200)
+        .expect(res =>
+          expect(res.text).toMatch(/<a href="\/prisoner\/A1234BC\/combine\/where-stored" class="govuk-back-link">/),
+        )
+      await agent
+        .post('/prisoner/A1234BC/combine/location')
+        .type('form')
+        .send({ internalLocationId: 'loc-999', locationName: 'Store room' })
+        .expect('location', '/prisoner/A1234BC/combine/check')
+      await agent.post('/prisoner/A1234BC/combine/confirm').type('form').send({}).expect(302)
+
+      expect(prisonerPropertyService.combineContainers).toHaveBeenCalledWith(
+        expect.objectContaining({ containerType: 'EXCESS', internalLocationId: 'loc-999', locationType: 'INTERNAL' }),
+        user.username,
+      )
+    })
+
+    it('asks again when nothing, or a location that is not a source, is chosen', async () => {
+      const agent = await startExcessCombine()
+
+      await agent
+        .post('/prisoner/A1234BC/combine/where-stored')
+        .type('form')
+        .send({})
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/combine/where-stored')
+      await agent
+        .post('/prisoner/A1234BC/combine/where-stored')
+        .type('form')
+        .send({ storageChoice: 'loc-elsewhere' })
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/combine/where-stored')
+      expect(flashProvider).toHaveBeenCalledTimes(2)
+      expect(flashProvider).toHaveBeenNthCalledWith(2, 'error', 'Select where this property is stored')
+      expect(prisonerPropertyService.combineContainers).not.toHaveBeenCalled()
+    })
+
+    it('keeps the storage choice when the details are edited, and resets it when the type changes', async () => {
+      const agent = await startExcessCombine()
+      await agent.post('/prisoner/A1234BC/combine/where-stored').type('form').send({ storageChoice: 'loc-230' })
+
+      // Still excess: the earlier choice is preselected.
+      await agent
+        .post('/prisoner/A1234BC/combine/details')
+        .type('form')
+        .send({ sealNumber: 'NEW9', containerType: 'EXCESS' })
+        .expect('location', '/prisoner/A1234BC/combine/where-stored')
+      await agent
+        .get('/prisoner/A1234BC/combine/where-stored')
+        .expect(res => expect(checkedStorageChoice(res.text)).toBe('loc-230'))
+
+      // Changed to standard and back to excess: nothing is preselected.
+      await agent
+        .post('/prisoner/A1234BC/combine/details')
+        .type('form')
+        .send({ sealNumber: 'NEW9', containerType: 'STANDARD', locationChoice: 'new' })
+      await agent
+        .post('/prisoner/A1234BC/combine/details')
+        .type('form')
+        .send({ sealNumber: 'NEW9', containerType: 'EXCESS' })
+      await agent
+        .get('/prisoner/A1234BC/combine/where-stored')
+        .expect(res => expect(checkedStorageChoice(res.text)).toBeUndefined())
+    })
+
+    it('sends a non-excess container back to the details page', async () => {
+      const agent = request.agent(manageApp())
+      await agent
+        .post('/prisoner/A1234BC/combine')
+        .type('form')
+        .send({ containerIds: ['c1', 'c2'] })
+      await agent
+        .post('/prisoner/A1234BC/combine/details')
+        .type('form')
+        .send({ sealNumber: 'NEW9', containerType: 'STANDARD', locationChoice: 'loc-230' })
+
+      await agent
+        .get('/prisoner/A1234BC/combine/where-stored')
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/combine/details')
+      await agent
+        .post('/prisoner/A1234BC/combine/where-stored')
+        .type('form')
+        .send({ storageChoice: 'branston' })
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/combine/details')
+    })
   })
 
   it('redirects back to details with an error when the new seal number is already in use (409)', async () => {
@@ -3107,6 +3465,39 @@ describe('Change container journey', () => {
       .expect(res => {
         expect(res.text).toContain('There is a problem')
       })
+  })
+
+  it('re-renders the change form with an error when the seal number is longer than NOMIS allows (MAPB-1054)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({})])
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    return agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ sealNumber: 'A'.repeat(21), containerType: 'STANDARD', locationChoice: 'current' })
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('There is a problem')
+        expect(res.text).toContain('Seal number must be 20 characters or less')
+      })
+  })
+
+  it('does not block property under review on a long seal number staff cannot change (MAPB-1054)', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ currentSealNumber: 'A'.repeat(21), currentStatus: 'REVIEW_REQUIRED' }),
+    ])
+
+    const agent = request.agent(manageApp())
+    await agent.get('/prisoner/A1234BC/change-container/c1')
+    return agent
+      .post('/prisoner/A1234BC/change-container/c1')
+      .type('form')
+      .send({ containerType: 'STANDARD', locationChoice: 'current' })
+      .expect(302)
+      .expect('location', '/prisoner/A1234BC/change-container/c1/check')
   })
 
   it('keeps the current location and updates the container', async () => {

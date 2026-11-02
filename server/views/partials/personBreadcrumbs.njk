@@ -1,0 +1,14 @@
+{% from "govuk/components/breadcrumbs/macro.njk" import govukBreadcrumbs %}
+
+{# Shared by the person tabs. Someone who came from the prisoner profile is led back to that prisoner, not the establishment list. #}
+{% if backToProfile %}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: banner.name, href: banner.profileUrl, attributes: { "data-qa": "breadcrumb-profile" } }
+  ] }) }}
+{% else %}
+  {{ govukBreadcrumbs({ items: [
+    { text: "Digital Prison Services", href: dpsUrl },
+    { text: "Prisoner property", href: "/" }
+  ] }) }}
+{% endif %}

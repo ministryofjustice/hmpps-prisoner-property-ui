@@ -175,6 +175,23 @@ test.describe('Establishment property list', () => {
     await expect(listPage.filters.getByRole('checkbox', { name: 'Due for return' })).toBeChecked()
   })
 
+  // A location search also brings back removed boxes whose seal contains the term; ticking "Stored" narrows it
+  // to what is on the shelf now (MAPB-1053).
+  test('narrows a location search to stored property', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPrisonProperty({ prisonId: 'MDI', groups: [group], priority: 1 })
+    await page.goto('/?q=174')
+
+    const listPage = await PropertyListPage.verifyOnPage(page)
+    await listPage.filters.locator('summary').click()
+    await listPage.filters.getByRole('checkbox', { name: 'Stored', exact: true }).check()
+    await listPage.applyFilters.click()
+
+    await expect(page).toHaveURL(/q=174/)
+    await expect(page).toHaveURL(/status=STORED/)
+    await expect(listPage.selectedFilterTags).toHaveText([/Status: Stored/])
+  })
+
   // The filters are collapsed by default and now persist between visits, so without this the page gives no
   // sign it is filtered at all - or what it is filtered on.
   test('names the applied filters without the filter section being opened', async ({ page }) => {

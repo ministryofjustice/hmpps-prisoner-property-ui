@@ -38,6 +38,10 @@ export default function establishmentListRoutes({
       return res.render('pages/noCaseload')
     }
 
+    // Opening the list ends a visit that began on the prisoner profile, so the person tabs go back to their usual
+    // breadcrumb. Only touched when set, so read-only users who never came from the profile get no session.
+    if (req.session.profileReturnPrisonerNumber) req.session.profileReturnPrisonerNumber = undefined
+
     // Clearing has to be an explicit signal, because a bare "/" now means "restore what I had" - the
     // "Clear search" and "Clear filters" links would otherwise re-apply the very filters they remove.
     if (req.query.clear) {
@@ -109,6 +113,13 @@ export default function establishmentListRoutes({
       })),
       // "Due for transfer in" stays a disabled placeholder until the API models the receiving-prison view.
       statusItems: [
+        // Ticking any status drops the removed property a seal search would otherwise bring back, so "Stored"
+        // narrows a location search to what is on the shelf now (MAPB-1053).
+        {
+          value: 'STORED',
+          text: statusTag('STORED').text,
+          checked: statuses.includes('STORED'),
+        },
         {
           value: 'REVIEW_REQUIRED',
           text: statusTag('REVIEW_REQUIRED').text,

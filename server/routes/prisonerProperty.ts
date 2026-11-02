@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { type Request, Router } from 'express'
 import createError from 'http-errors'
 
 import type { Services } from '../services'
@@ -13,6 +13,14 @@ import logger from '../../logger'
 
 // The prisoner image placeholder shown when prison-api has no photo (or the call fails).
 const PRISONER_IMAGE_PLACEHOLDER = '/assets/images/prisoner-image-withheld.svg'
+
+// The DPS prisoner profile's Property card adds ?returnToService=prisonerProfile to its link (the profile sends no
+// Referer). Remember which prisoner it was for, so the person tabs lead back to that profile rather than the
+// establishment list - across the tabs and the journeys that return to them - until the user opens the list.
+const cameFromProfile = (req: Request, prisonerNumber: string): boolean => {
+  if (req.query.returnToService === 'prisonerProfile') req.session.profileReturnPrisonerNumber = prisonerNumber
+  return req.session.profileReturnPrisonerNumber === prisonerNumber
+}
 
 export default function prisonerPropertyRoutes(services: Services): Router {
   const { prisonerPropertyService, prisonerService, userService, activeAgenciesService } = services
@@ -43,6 +51,10 @@ export default function prisonerPropertyRoutes(services: Services): Router {
     return { ...banner, showProfileLink: access.level === 'FULL' }
   }
 
+  // Whether the person tabs' breadcrumb leads back to the prisoner's profile. Only when the profile link is offered.
+  const backToProfileFor = (req: Request, banner: PrisonerBanner): boolean =>
+    cameFromProfile(req, banner.prisonerNumber) && banner.showProfileLink === true
+
   router.get('/prisoner/:prisonerNumber', requireAccess, async (req, res) => {
     const access = res.locals.prisonerAccess!
     const { prisonerNumber, activeCaseloadId, containers } = access
@@ -63,6 +75,7 @@ export default function prisonerPropertyRoutes(services: Services): Router {
       prisonerEstablishmentLabel: movementEstablishmentLabel(prisonerMovementStatus, prisonerCurrentPrisonName),
       hasLeft,
       banner,
+      backToProfile: backToProfileFor(req, banner),
       inEstablishment,
       dueToTransferIn,
       elsewhereInTransit,
@@ -97,6 +110,7 @@ export default function prisonerPropertyRoutes(services: Services): Router {
       prisonerNumber,
       prisonerName: containers[0]?.prisonerName ?? null,
       banner,
+      backToProfile: backToProfileFor(req, banner),
       timeline: buildPrisonerTimeline(timelineItems, prisonerNumber, nameByUsername),
       ...(await manageFlags(res.locals.user.userRoles, activeCaseloadId)),
       successMessage: req.flash('success')[0],
@@ -116,6 +130,7 @@ export default function prisonerPropertyRoutes(services: Services): Router {
       prisonerNumber,
       prisonerName: containers[0]?.prisonerName ?? null,
       banner,
+      backToProfile: backToProfileFor(req, banner),
       returned: buildReturnedOrTransferredView(containers),
       ...(await manageFlags(res.locals.user.userRoles, activeCaseloadId)),
       successMessage: req.flash('success')[0],

@@ -5,6 +5,7 @@ import PrisonerPropertyPage from '../pages/prisonerPropertyPage'
 import CombineDetailsPage from '../pages/combineDetailsPage'
 import AddContainerLocationPage from '../pages/addContainerLocationPage'
 import CombineCheckAnswersPage from '../pages/combineCheckAnswersPage'
+import AddContainerWhereStoredPage from '../pages/addContainerWhereStoredPage'
 import type { BoxLocation, PrisonerPropertyContainer } from '../../server/data/prisonerPropertyApiTypes'
 
 const source = (id: string, seal: string): PrisonerPropertyContainer => ({
@@ -115,7 +116,7 @@ test.describe('Combine property containers', () => {
     )
   })
 
-  test('skips the storage-location step for excess (off-site) property', async ({ page }) => {
+  test('asks where excess property is stored and combines it off-site at Branston', async ({ page }) => {
     await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
     await prisonerPropertyApi.stubGetPropertyForPrisoner({
       prisonerNumber: 'A1234BC',
@@ -133,9 +134,50 @@ test.describe('Combine property containers', () => {
     const detailsPage = await CombineDetailsPage.verifyOnPage(page)
     await detailsPage.completeWith({ seal: 'BOX442', type: 'Excess' })
 
-    // Excess goes straight to Check your answers, showing Branston as the storage location.
+    // Neither source is in a prison location, so the choice is Branston or a location in this prison.
+    const whereStoredPage = await AddContainerWhereStoredPage.verifyOnPage(page)
+    await expect(whereStoredPage.heading).toContainText('BOX442')
+    await whereStoredPage.chooseBranston()
+
     const checkPage = await CombineCheckAnswersPage.verifyOnPage(page)
     await expect(checkPage.containerSummary).toContainText('Branston')
+  })
+
+  test("puts combined excess property back in one of the sources' prison locations", async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      prisonerNumber: 'A1234BC',
+      containers: [
+        { ...source('c1', 'BOX635'), currentLocation: 'loc-230', locationDescription: 'Shelf 230' },
+        { ...source('c2', 'BOX447'), currentLocationType: 'BRANSTON' },
+      ],
+      priority: 1,
+    })
+    await prisonerPropertyApi.stubCombineContainers({ container: source('newC', 'BOX442'), priority: 1 })
+
+    await page.goto('/prisoner/A1234BC')
+    const personPage = await PrisonerPropertyPage.verifyOnPage(page)
+    await page.locator('#select-c1').check()
+    await page.locator('#select-c2').check()
+    await personPage.combineButton.click()
+
+    const detailsPage = await CombineDetailsPage.verifyOnPage(page)
+    await detailsPage.completeWith({ seal: 'BOX442', type: 'Excess' })
+
+    const whereStoredPage = await AddContainerWhereStoredPage.verifyOnPage(page)
+    await expect(page.getByLabel('Off-site at Branston')).toBeVisible()
+    await expect(page.getByLabel('A new storage location')).toBeVisible()
+    await page.getByLabel('Shelf 230').check()
+    await whereStoredPage.continueButton.click()
+
+    const checkPage = await CombineCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.containerSummary).toContainText('Shelf 230')
+    await checkPage.confirm.click()
+
+    await expect(page).toHaveURL(/\/prisoner\/A1234BC$/)
+    await expect((await PrisonerPropertyPage.verifyOnPage(page)).successBanner).toContainText(
+      'Property containers combined',
+    )
   })
 
   test('refuses the journey for a user without the manage role', async ({ page }) => {

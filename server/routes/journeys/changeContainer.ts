@@ -145,8 +145,9 @@ export default function changeContainerRoutes(
       if (!container) return next(createError(404, 'Property container not found'))
 
       // The seal is shown but not editable under review, so the stored one is what is validated and sent.
-      const body = requiresReview(container) ? { ...req.body, sealNumber: container.currentSealNumber } : req.body
-      const { values, errors } = validateDetails(body)
+      const underReview = requiresReview(container)
+      const body = underReview ? { ...req.body, sealNumber: container.currentSealNumber } : req.body
+      const { values, errors } = validateDetails(body, { sealEditable: !underReview })
       if (!values) {
         return renderChangeDetails(
           req,
