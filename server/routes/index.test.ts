@@ -2223,6 +2223,7 @@ describe('Add container journey - steps', () => {
           prisonId: 'LEI',
           prisonerCurrentPrisonId: 'MDI',
           currentSealNumber: 'IncomingSeal',
+          prisonName: 'Leeds (HMP)',
           removalOutcome,
           receivingPrisonId: 'MDI',
         }),
@@ -2253,8 +2254,8 @@ describe('Add container journey - steps', () => {
         .get('/prisoner/A1234BC/add-container/check')
         .expect(200)
         .expect(res => {
-          expect(res.text).toContain('Previous seal number')
-          expect(res.text).toContain('IncomingSeal')
+          expect(res.text).toContain('Matched to property due in from Leeds (HMP)')
+          expect(res.text).not.toContain('Previous seal number')
         })
       await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
 
@@ -2270,6 +2271,85 @@ describe('Add container journey - steps', () => {
       )
     },
   )
+
+  it('honours an explicit previous seal even when the current seal matches other incoming property', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'automatic', prisonId: 'LEI', currentSealNumber: 'CURRENT' }),
+      container({ id: 'explicit', prisonId: 'BRI', currentSealNumber: 'PREVIOUS' }),
+    ])
+    prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'received' }))
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({
+        'containers[0][sealNumber]': 'CURRENT',
+        'containers[0][previousSealNumber]': 'PREVIOUS',
+        'containers[0][containerType]': 'STANDARD',
+      })
+      .expect(302)
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/0')
+      .type('form')
+      .send({
+        internalLocationId: 'box1',
+        locationName: 'Reception Store',
+      })
+      .expect(302)
+    await agent
+      .get('/prisoner/A1234BC/add-container/check')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Previous seal number')
+        expect(res.text).toContain('PREVIOUS')
+        expect(res.text).not.toContain('Matched to property due in')
+      })
+    await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+    expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({ sealNumber: 'CURRENT', previousSealNumber: 'PREVIOUS' }),
+      user.username,
+    )
+  })
+
+  it('does not match a container in transit to a different prison', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ prisonId: 'MDI', currentSealNumber: 'LOCAL' }),
+      container({
+        prisonId: 'LEI',
+        currentSealNumber: 'ELSEWHERE',
+        removalOutcome: 'TRANSFERRED',
+        receivingPrisonId: 'IWI',
+        prisonerCurrentPrisonId: 'IWI',
+      }),
+    ])
+    prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'new' }))
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({
+        'containers[0][sealNumber]': 'ELSEWHERE',
+        'containers[0][containerType]': 'STANDARD',
+      })
+      .expect(302)
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/0')
+      .type('form')
+      .send({
+        internalLocationId: 'box1',
+        locationName: 'Reception Store',
+      })
+      .expect(302)
+    await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+    expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({ sealNumber: 'ELSEWHERE', previousSealNumber: undefined }),
+      user.username,
+    )
+  })
 
   it('does not automatically link property already held here or removed property', async () => {
     withActiveCaseload()

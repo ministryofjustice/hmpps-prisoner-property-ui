@@ -3,6 +3,7 @@ import {
   matchableContainers,
   parseOptionalDate,
   resolvePreviousSealNumbers,
+  validateContainers,
   validateDetails,
   validatePreviousSealNumbers,
 } from './addContainer'
@@ -108,6 +109,33 @@ describe('validateDetails', () => {
   })
 })
 
+describe('validateContainers', () => {
+  it('rejects repeated current seals, ignoring case and whitespace', () => {
+    expect(
+      validateContainers([
+        { sealNumber: ' incoming1 ', containerType: 'STANDARD' },
+        { sealNumber: 'INCOMING1', containerType: 'VALUABLES' },
+      ]),
+    ).toEqual({
+      errors: [
+        {
+          text: 'Container 2: Enter a different seal number for each property container',
+          href: '#containers-1-sealNumber',
+        },
+      ],
+    })
+  })
+
+  it('accepts distinct current seals', () => {
+    expect(
+      validateContainers([
+        { sealNumber: 'ONE', containerType: 'STANDARD' },
+        { sealNumber: 'TWO', containerType: 'STANDARD' },
+      ]).errors,
+    ).toEqual([])
+  })
+})
+
 describe('previous seal numbers', () => {
   const held = (overrides: Partial<PrisonerPropertyContainer>): PrisonerPropertyContainer =>
     ({
@@ -176,13 +204,34 @@ describe('previous seal numbers', () => {
   })
 
   describe('resolvePreviousSealNumbers', () => {
+    it('does not select the first container when an incoming seal is ambiguous', () => {
+      expect(
+        resolvePreviousSealNumbers(
+          [details()],
+          [held({ id: 'one', currentSealNumber: 'NEW' }), held({ id: 'two', currentSealNumber: 'new' })],
+        ),
+      ).toEqual([details()])
+    })
+
+    it('records the sending establishment without populating the entered previous seal', () => {
+      expect(
+        resolvePreviousSealNumbers([details()], [held({ currentSealNumber: 'NEW', prisonName: 'Leeds (HMP)' })]),
+      ).toEqual([{ ...details(), automaticMatch: { sealNumber: 'NEW', prisonName: 'Leeds (HMP)' } }])
+    })
+
     it('matches an unchanged current seal, ignoring case and whitespace, using the recorded seal', () => {
       expect(
         resolvePreviousSealNumbers(
           [{ ...details(), sealNumber: ' oldseal ' }],
           [held({ currentSealNumber: ' OldSeal ' })],
         ),
-      ).toEqual([{ ...details('OldSeal'), sealNumber: ' oldseal ' }])
+      ).toEqual([
+        {
+          ...details(),
+          sealNumber: ' oldseal ',
+          automaticMatch: { sealNumber: 'OldSeal', prisonName: 'LEI' },
+        },
+      ])
     })
 
     it('preserves an explicitly entered previous seal', () => {
@@ -197,11 +246,53 @@ describe('previous seal numbers', () => {
           [details(), { ...details(), sealNumber: '124744' }],
           [held({}), held({ id: 'no-seal', currentSealNumber: null })],
         ),
-      ).toEqual([details(), { ...details('124744'), sealNumber: '124744' }])
+      ).toEqual([
+        details(),
+        {
+          ...details(),
+          sealNumber: '124744',
+          automaticMatch: { sealNumber: '124744', prisonName: 'LEI' },
+        },
+      ])
     })
   })
 
   describe('validatePreviousSealNumbers', () => {
+    it.each([undefined, '0000'])('rejects ambiguous incoming seals (previous seal %s)', previousSeal => {
+      const incoming = [held({ id: 'one', currentSealNumber: '0000' }), held({ id: 'two', currentSealNumber: '0000' })]
+      const resolved = resolvePreviousSealNumbers([{ ...details(previousSeal), sealNumber: '0000' }], incoming)
+      expect(validatePreviousSealNumbers(resolved, incoming)).toEqual([
+        {
+          text: 'More than one incoming property container has seal number 0000. Check which container is being received with the sending establishments before continuing',
+          href: `#containers-0-${previousSeal ? 'previousSealNumber' : 'sealNumber'}`,
+        },
+      ])
+    })
+
+    it('rejects two different current seals linked to the same explicit previous seal', () => {
+      expect(
+        validatePreviousSealNumbers([details('124744'), { ...details(' 124744 '), sealNumber: 'OTHER' }], [held({})]),
+      ).toEqual([
+        {
+          text: 'Container 2: This property due in has already been matched to another container in this journey',
+          href: '#containers-1-previousSealNumber',
+        },
+      ])
+    })
+
+    it('rejects an automatic match already used by an explicit previous seal', () => {
+      const resolved = resolvePreviousSealNumbers(
+        [details('oldseal'), { ...details(), sealNumber: 'OLDSEAL' }],
+        [held({ currentSealNumber: 'OldSeal' })],
+      )
+      expect(validatePreviousSealNumbers(resolved, [held({ currentSealNumber: 'OldSeal' })])).toEqual([
+        {
+          text: 'Container 2: This property due in has already been matched to another container in this journey',
+          href: '#containers-1-sealNumber',
+        },
+      ])
+    })
+
     it('accepts a seal held elsewhere, ignoring case and surrounding whitespace', () => {
       const matchable = [held({ currentSealNumber: 'OldSeal' })]
       expect(validatePreviousSealNumbers([details(' oldseal ')], matchable)).toEqual([])

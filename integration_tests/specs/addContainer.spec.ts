@@ -180,11 +180,14 @@ test.describe('Add a property container', () => {
     const locationPage = await AddContainerLocationPage.verifyOnPage(page)
     await locationPage.selectFirstLocation()
     const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
-    const previousSealRow = checkPage.containerSummary.locator('.govuk-summary-list__row').filter({
-      has: page.locator('.govuk-summary-list__key', { hasText: 'Previous seal number' }),
+    const incomingRow = checkPage.containerSummary.locator('.govuk-summary-list__row').filter({
+      has: page.locator('.govuk-summary-list__key', { hasText: 'Incoming property' }),
     })
     await expect(checkPage.containerSummary).toContainText('INCOMING1')
-    await expect(previousSealRow.locator('.govuk-summary-list__value')).toHaveText('INCOMING1')
+    await expect(incomingRow.locator('.govuk-summary-list__value')).toHaveText(
+      'Matched to property due in from Leeds (HMP)',
+    )
+    await expect(checkPage.containerSummary.getByText('Previous seal number', { exact: true })).toHaveCount(0)
 
     await prisonerPropertyApi.stubGetPropertyForPrisoner({
       containers: [received, { ...incoming, removalOutcome: 'TRANSFERRED', receivingPrisonId: null }],
@@ -249,11 +252,13 @@ test.describe('Add a property container', () => {
     const locationPage = await AddContainerLocationPage.verifyOnPage(page)
     await locationPage.selectFirstLocation()
     const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
-    const previousSealRow = checkPage.containerSummary.locator('.govuk-summary-list__row').filter({
-      has: page.locator('.govuk-summary-list__key', { hasText: 'Previous seal number' }),
+    const incomingRow = checkPage.containerSummary.locator('.govuk-summary-list__row').filter({
+      has: page.locator('.govuk-summary-list__key', { hasText: 'Incoming property' }),
     })
     await expect(checkPage.containerSummary).toContainText('incoming1')
-    await expect(previousSealRow.locator('.govuk-summary-list__value')).toHaveText('INCOMING1')
+    await expect(incomingRow.locator('.govuk-summary-list__value')).toHaveText(
+      'Matched to property due in from Leeds (HMP)',
+    )
 
     await prisonerPropertyApi.stubGetPropertyForPrisoner({
       containers: [received, { ...incoming, receivingPrisonId: null }],
@@ -341,6 +346,110 @@ test.describe('Add a property container', () => {
       sealNumber: 'NEW1',
       internalLocationId: box.id,
     })
+  })
+
+  test('re-resolves automatic matches after changing the current seal', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    const incoming = {
+      ...existingContainer,
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      currentSealNumber: 'INCOMING1',
+    }
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      containers: [incoming, { ...incoming, id: 'other', currentSealNumber: 'INCOMING2', prisonName: 'Brixton (HMP)' }],
+      priority: 1,
+    })
+    await prisonerPropertyApi.stubGetBoxLocations({ locations: [box], priority: 1 })
+    await prisonerPropertyApi.stubCreateContainer({ container: existingContainer, priority: 1 })
+
+    await page.goto('/prisoner/A1234BC/add-container')
+    const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    await detailsPage.completeWith({ seal: 'INCOMING1', type: 'Standard' })
+    const locationPage = await AddContainerLocationPage.verifyOnPage(page)
+    await locationPage.selectFirstLocation()
+    const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.containerSummary).toContainText('Matched to property due in from Leeds (HMP)')
+
+    await page.getByTestId('change-0').click()
+    await expect(page.locator('#containers-0-previousSealNumber')).toBeEmpty()
+    await detailsPage.completeWith({ seal: 'INCOMING2', type: 'Standard' })
+    await AddContainerCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.containerSummary).toContainText('Matched to property due in from Brixton (HMP)')
+    await expect(checkPage.containerSummary).not.toContainText('Leeds')
+
+    await page.getByTestId('change-0').click()
+    await expect(page.locator('#containers-0-previousSealNumber')).toBeEmpty()
+    await detailsPage.completeWith({ seal: 'NEW1', type: 'Standard' })
+    await AddContainerCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.containerSummary).not.toContainText('Incoming property')
+    await expect(checkPage.containerSummary).not.toContainText('Previous seal number')
+    await checkPage.confirm.click()
+
+    const requests = await getMatchingRequests({
+      method: 'POST',
+      urlPath: '/prisoner-property-api/property-containers',
+    })
+    expect(requests).toHaveLength(1)
+    expect(JSON.parse(requests[0].body)).toMatchObject({ sealNumber: 'NEW1' })
+    expect(JSON.parse(requests[0].body)).not.toHaveProperty('previousSealNumber')
+  })
+
+  test('rejects duplicate seals on details before creating any containers', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      containers: [{ ...existingContainer, prisonId: 'LEI', prisonName: 'Leeds (HMP)', currentSealNumber: 'SAME' }],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC/add-container')
+    const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    await detailsPage.fillContainer(0, { seal: 'SAME', type: 'Standard' })
+    await detailsPage.addAnother()
+    await detailsPage.fillContainer(1, { seal: ' same ', type: 'Standard' })
+    await detailsPage.saveAndContinue()
+
+    await expect(detailsPage.errorSummary).toContainText('Enter a different seal number for each property container')
+    await expect(detailsPage.errorSummary.getByRole('link')).toHaveAttribute('href', '#containers-1-sealNumber')
+    expect(
+      await getMatchingRequests({ method: 'POST', urlPath: '/prisoner-property-api/property-containers' }),
+    ).toHaveLength(0)
+  })
+
+  test('rejects two incoming containers with the same seal without creating property', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    const incoming = {
+      ...existingContainer,
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      currentSealNumber: '0000',
+      prisonerCurrentPrisonId: 'MDI',
+    }
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({
+      containers: [
+        incoming,
+        {
+          ...incoming,
+          id: 'in-transit',
+          prisonId: 'BRI',
+          prisonName: 'Brixton (HMP)',
+          removalOutcome: 'TRANSFERRED',
+          receivingPrisonId: 'MDI',
+        },
+      ],
+      priority: 1,
+    })
+    await page.goto('/prisoner/A1234BC/add-container')
+    const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    await detailsPage.completeWith({ seal: '0000', type: 'Standard' })
+
+    await expect(detailsPage.errorSummary).toContainText(
+      'More than one incoming property container has seal number 0000',
+    )
+    await expect(detailsPage.errorSummary.getByRole('link')).toHaveAttribute('href', '#containers-0-sealNumber')
+    await expect(page.locator('#containers-0-sealNumber')).toHaveValue('0000')
+    expect(
+      await getMatchingRequests({ method: 'POST', urlPath: '/prisoner-property-api/property-containers' }),
+    ).toHaveLength(0)
   })
 
   test('refuses the search entry for a user without the manage role', async ({ page }) => {

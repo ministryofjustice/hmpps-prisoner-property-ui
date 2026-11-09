@@ -212,6 +212,7 @@ export default function addContainerRoutes(services: Services, requireActivePris
         return {
           sealNumber: v.sealNumber,
           previousSealNumber: v.previousSealNumber,
+          automaticMatch: v.automaticMatch,
           containerType: v.containerType,
           proposedDisposalDate: v.proposedDisposalDate,
           storageChoice: keep ? previous?.storageChoice : undefined,
@@ -402,9 +403,8 @@ export default function addContainerRoutes(services: Services, requireActivePris
         containers: journey.containers.map((c, index) => ({
           index,
           sealNumber: c.sealNumber,
-          // Entered or inferred from an unchanged incoming seal - it links this record to the property's record
-          // at the establishment it came from, so staff should see it before confirming.
           previousSealNumber: c.previousSealNumber,
+          automaticMatch: c.automaticMatch,
           containerType: c.containerType,
           proposedDisposalDate: c.proposedDisposalDate,
           // Excess sent off-site reads "Branston (offsite)"; excess in a prison location (or any other type)
@@ -441,7 +441,7 @@ export default function addContainerRoutes(services: Services, requireActivePris
               prisonId: ctx.activeCaseloadId,
               containerType: c.containerType!,
               sealNumber: c.sealNumber!,
-              previousSealNumber: c.previousSealNumber,
+              previousSealNumber: c.previousSealNumber || c.automaticMatch?.sealNumber,
               internalLocationId: c.internalLocationId,
               // Excess sent off-site is stored at Branston (no internal location); otherwise the API infers
               // INTERNAL from the location id.

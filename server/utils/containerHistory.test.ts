@@ -30,6 +30,7 @@ describe('eventTypeLabel', () => {
     expect(eventTypeLabel('DIED_IN_CUSTODY')).toBe('Due for return – death in custody')
     expect(eventTypeLabel('PRISONER_ADMITTED')).toBe('Property requires review')
     expect(eventTypeLabel('LOCATION_CONFIRMED')).toBe('Storage location confirmed')
+    expect(eventTypeLabel('RECEIVED')).toBe('Confirmed as received')
   })
 
   it('labels the "details changed" events the same and groups removals', () => {
@@ -57,6 +58,16 @@ describe('eventTitle', () => {
 })
 
 describe('eventDescription', () => {
+  it('names the sending establishment for a receipt, falling back to its id or a generic description', () => {
+    expect(eventDescription(event({ eventType: 'RECEIVED', fromPrisonName: 'Leeds (HMP)', fromPrisonId: 'LEI' }))).toBe(
+      'Confirmed as received from Leeds (HMP).',
+    )
+    expect(eventDescription(event({ eventType: 'RECEIVED', fromPrisonId: 'LEI' }))).toBe(
+      'Confirmed as received from LEI.',
+    )
+    expect(eventDescription(event({ eventType: 'RECEIVED' }))).toBe('Confirmed as received from another establishment.')
+  })
+
   it('explains why a legacy record was archived', () => {
     expect(eventDescription(event({ eventType: 'REMOVED', eventUserId: 'LEGACY_CLEANUP', legacyCleanup: true }))).toBe(
       'This record was automatically archived because it exceeded the applicable retention period before migration to DPS and no further property action was required.',

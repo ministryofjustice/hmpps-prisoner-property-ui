@@ -14,6 +14,7 @@ const EVENT_TYPE_LABELS: Record<PropertyEventType, string> = {
   PRISONER_ADMITTED: 'Property requires review',
   LOCATION_CONFIRMED: 'Storage location confirmed',
   TRANSFERRED: 'Removed – transferred out',
+  RECEIVED: 'Confirmed as received',
   RETURNED: 'Removed – returned',
   DISPOSAL_REQUIRED: 'Due for disposal',
   DISPOSED: 'Removed – disposed',
@@ -68,6 +69,8 @@ export const eventDescription = (event: PropertyEvent): string => {
     }
     case 'SEAL_CHANGED':
       return seal ? `Seal number changed to ${seal}.` : 'Seal number changed.'
+    case 'RECEIVED':
+      return `Confirmed as received from ${event.fromPrisonName ?? event.fromPrisonId ?? 'another establishment'}.`
     case 'CONTAINER_TYPE_CHANGE':
       // containerType is snapshotted as at this event, so it names what the type was changed to; the API
       // derives what it was changed from where it can.

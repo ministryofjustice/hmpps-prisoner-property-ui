@@ -88,6 +88,7 @@ export type PropertyEventType =
   | 'PRISONER_ADMITTED'
   | 'LOCATION_CONFIRMED'
   | 'TRANSFERRED'
+  | 'RECEIVED'
   | 'RETURNED'
   | 'DISPOSAL_REQUIRED'
   | 'DISPOSED'

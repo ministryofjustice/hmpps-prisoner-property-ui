@@ -9,6 +9,7 @@ import type { PrisonerAccessContext } from '../../middleware/requirePrisonerAcce
 export interface AddContainerDraft {
   sealNumber?: string
   previousSealNumber?: string
+  automaticMatch?: { sealNumber: string; prisonName: string }
   containerType?: ContainerType
   proposedDisposalDate?: string // ISO yyyy-mm-dd
   storageChoice?: 'branston' | 'internal'
