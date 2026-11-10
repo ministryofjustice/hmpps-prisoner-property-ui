@@ -43,6 +43,18 @@ export default class PrisonerPropertyApiClient extends RestClient {
     )
   }
 
+  findIncomingContainer(
+    prisonerNumber: string,
+    prisonId: string,
+    sealNumber: string,
+    username: string,
+  ): Promise<PrisonerPropertyContainer> {
+    return this.get<PrisonerPropertyContainer>(
+      { path: '/property-containers/incoming', query: { prisonerNumber, prisonId, sealNumber } },
+      asSystem(username),
+    )
+  }
+
   /**
    * Get a container's event history (newest first).
    *

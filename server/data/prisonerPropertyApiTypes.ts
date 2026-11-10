@@ -243,6 +243,7 @@ export interface CombineContainersRequest {
 // Proposed receipt payload (POST /property-containers/{id}/receive). The API derives the sending
 // prison, confirming user and timestamp; the existing container is received rather than created.
 export interface ReceiveContainerRequest {
+  prisonerNumber: string
   receivingPrisonId: string
   sealNumber: string
   internalLocationId?: string

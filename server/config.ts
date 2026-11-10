@@ -35,6 +35,7 @@ export default {
   gitRef: get('GIT_REF', 'xxxxxxxxxxxxxxxxxxx', requiredInProduction),
   branchName: get('GIT_BRANCH', 'xxxxxxxxxxxxxxxxxxx', requiredInProduction),
   production,
+  receiveContainersEnabled: get('RECEIVE_CONTAINERS_ENABLED', 'false') === 'true',
   https: process.env.NO_HTTPS === 'true' ? false : production,
   staticResourceCacheDuration: '1h',
   redis: {

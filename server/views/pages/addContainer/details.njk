@@ -64,7 +64,8 @@
         id: idPrefix + "-previousSealNumber",
         name: prefix + "[previousSealNumber]",
         value: container.previousSealNumber,
-        classes: "govuk-input--width-20"
+        classes: "govuk-input--width-20",
+        errorMessage: { text: fieldErrors[idPrefix + "-previousSealNumber"] } if fieldErrors[idPrefix + "-previousSealNumber"] else undefined
       }) }}
 
       {{ govukDetails({

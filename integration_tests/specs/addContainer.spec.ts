@@ -159,14 +159,15 @@ test.describe('Add a property container', () => {
     }
     const received: PrisonerPropertyContainer = {
       ...existingContainer,
-      id: 'receiving',
+      id: 'incoming',
       prisonerCurrentPrisonId: 'MDI',
       currentSealNumber: 'INCOMING1',
       locationDescription: box.name,
     }
     await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [incoming], priority: 2 })
     await prisonerPropertyApi.stubGetBoxLocations({ locations: [box], priority: 1 })
-    await prisonerPropertyApi.stubCreateContainer({ container: received, priority: 1 })
+    await prisonerPropertyApi.stubFindIncomingContainer({ sealNumber: 'INCOMING1', container: incoming })
+    await prisonerPropertyApi.stubReceiveContainer({ container: received })
 
     await page.goto('/prisoner/A1234BC')
     const personPage = await PrisonerPropertyPage.verifyOnPage(page)
@@ -202,17 +203,18 @@ test.describe('Add a property container', () => {
 
     const requests = await getMatchingRequests({
       method: 'POST',
-      urlPath: '/prisoner-property-api/property-containers',
+      urlPath: '/prisoner-property-api/property-containers/incoming/receive',
     })
     expect(requests).toHaveLength(1)
     expect(JSON.parse(requests[0].body)).toEqual({
       prisonerNumber: prisoner.prisonerNumber,
-      prisonId: 'MDI',
-      containerType: 'STANDARD',
+      receivingPrisonId: 'MDI',
       sealNumber: 'INCOMING1',
-      previousSealNumber: 'INCOMING1',
       internalLocationId: box.id,
     })
+    expect(
+      await getMatchingRequests({ method: 'POST', urlPath: '/prisoner-property-api/property-containers' }),
+    ).toHaveLength(0)
   })
 
   test('receives incoming property with a matching seal (ignore case and whitespace)', async ({ page }) => {
@@ -231,14 +233,15 @@ test.describe('Add a property container', () => {
     }
     const received: PrisonerPropertyContainer = {
       ...existingContainer,
-      id: 'receiving',
+      id: 'incoming',
       prisonerCurrentPrisonId: 'MDI',
       currentSealNumber: 'incoming1',
       locationDescription: box.name,
     }
     await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [incoming], priority: 2 })
     await prisonerPropertyApi.stubGetBoxLocations({ locations: [box], priority: 1 })
-    await prisonerPropertyApi.stubCreateContainer({ container: received, priority: 1 })
+    await prisonerPropertyApi.stubFindIncomingContainer({ sealNumber: 'incoming1', container: incoming })
+    await prisonerPropertyApi.stubReceiveContainer({ container: received })
 
     await page.goto('/prisoner/A1234BC')
     const personPage = await PrisonerPropertyPage.verifyOnPage(page)
@@ -273,17 +276,84 @@ test.describe('Add a property container', () => {
 
     const requests = await getMatchingRequests({
       method: 'POST',
-      urlPath: '/prisoner-property-api/property-containers',
+      urlPath: '/prisoner-property-api/property-containers/incoming/receive',
     })
     expect(requests).toHaveLength(1)
     expect(JSON.parse(requests[0].body)).toEqual({
       prisonerNumber: prisoner.prisonerNumber,
-      prisonId: 'MDI',
-      containerType: 'STANDARD',
+      receivingPrisonId: 'MDI',
       sealNumber: 'incoming1',
-      previousSealNumber: 'INCOMING1',
       internalLocationId: box.id,
     })
+  })
+
+  test('receives a changed seal while retaining the source type and disposal date', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    const incoming: PrisonerPropertyContainer = {
+      ...existingContainer,
+      id: 'incoming',
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      currentSealNumber: 'OLD123',
+      containerType: 'VALUABLES',
+      proposedDisposalDate: '2099-01-01',
+    }
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [incoming], priority: 1 })
+    await prisonerPropertyApi.stubGetBoxLocations({ locations: [box], priority: 1 })
+    await prisonerPropertyApi.stubFindIncomingContainer({ sealNumber: 'OLD123', container: incoming })
+    await prisonerPropertyApi.stubReceiveContainer({
+      container: { ...incoming, prisonId: 'MDI', currentSealNumber: 'NEW123' },
+    })
+
+    await page.goto('/prisoner/A1234BC/add-container')
+    const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    await detailsPage.fillContainer(0, { seal: 'NEW123', type: 'Standard' })
+    await page.locator('#containers-0-previousSealNumber').fill('OLD123')
+    await detailsPage.saveAndContinue()
+    const locationPage = await AddContainerLocationPage.verifyOnPage(page)
+    await locationPage.selectFirstLocation()
+    const checkPage = await AddContainerCheckAnswersPage.verifyOnPage(page)
+    await expect(checkPage.containerSummary).toContainText('Matched to property due in from Leeds (HMP)')
+    await expect(checkPage.containerSummary).toContainText('Valuables')
+    await expect(checkPage.containerSummary).toContainText('1 January 2099')
+    await expect(checkPage.containerSummary).toContainText('OLD123')
+    await expect(checkPage.containerSummary).toContainText('NEW123')
+    await checkPage.confirm.click()
+    await expect(page).toHaveURL('/prisoner/A1234BC')
+
+    const receipts = await getMatchingRequests({
+      method: 'POST',
+      urlPath: '/prisoner-property-api/property-containers/incoming/receive',
+    })
+    expect(receipts).toHaveLength(1)
+    expect(JSON.parse(receipts[0].body)).toEqual({
+      prisonerNumber: 'A1234BC',
+      receivingPrisonId: 'MDI',
+      sealNumber: 'NEW123',
+      internalLocationId: box.id,
+    })
+    expect(
+      await getMatchingRequests({ method: 'POST', urlPath: '/prisoner-property-api/property-containers' }),
+    ).toHaveLength(0)
+  })
+
+  test('shows an unmatched explicit previous seal error without creating property', async ({ page }) => {
+    await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [existingContainer], priority: 1 })
+    await page.goto('/prisoner/A1234BC/add-container')
+    const detailsPage = await AddContainerDetailsPage.verifyOnPage(page)
+    await detailsPage.fillContainer(0, { seal: 'NEW', type: 'Standard' })
+    await page.locator('#containers-0-previousSealNumber').fill('TYPO')
+    await detailsPage.saveAndContinue()
+    await expect(detailsPage.errorSummary).toContainText('There is no incoming property with seal number TYPO')
+    await expect(detailsPage.errorSummary.getByRole('link')).toHaveAttribute('href', '#containers-0-previousSealNumber')
+    await expect(page.locator('#containers-0-previousSealNumber')).toHaveAttribute(
+      'aria-describedby',
+      /\bcontainers-0-previousSealNumber-error\b/,
+    )
+    expect(
+      await getMatchingRequests({ method: 'POST', urlPath: '/prisoner-property-api/property-containers' }),
+    ).toHaveLength(0)
   })
 
   test('incoming property is not received when when the entered seal does not match', async ({ page }) => {
@@ -356,6 +426,11 @@ test.describe('Add a property container', () => {
       prisonName: 'Leeds (HMP)',
       currentSealNumber: 'INCOMING1',
     }
+    await prisonerPropertyApi.stubFindIncomingContainer({ sealNumber: 'INCOMING1', container: incoming })
+    await prisonerPropertyApi.stubFindIncomingContainer({
+      sealNumber: 'INCOMING2',
+      container: { ...incoming, id: 'other', prisonName: 'Brixton (HMP)' },
+    })
     await prisonerPropertyApi.stubGetPropertyForPrisoner({
       containers: [incoming, { ...incoming, id: 'other', currentSealNumber: 'INCOMING2', prisonName: 'Brixton (HMP)' }],
       priority: 1,
@@ -417,6 +492,11 @@ test.describe('Add a property container', () => {
 
   test('rejects two incoming containers with the same seal without creating property', async ({ page }) => {
     await login(page, { roles: ['ROLE_PRISONERPROP__MANAGE'] })
+    await prisonerPropertyApi.stubFindIncomingContainer({
+      sealNumber: '0000',
+      httpStatus: 409,
+      errorCode: 'AMBIGUOUS_INCOMING_CONTAINER',
+    })
     const incoming = {
       ...existingContainer,
       prisonId: 'LEI',

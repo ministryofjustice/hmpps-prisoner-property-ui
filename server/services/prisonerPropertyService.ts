@@ -32,6 +32,15 @@ export default class PrisonerPropertyService {
     return this.prisonerPropertyApiClient.getContainerEvents(id, username)
   }
 
+  findIncomingContainer(
+    prisonerNumber: string,
+    prisonId: string,
+    sealNumber: string,
+    username: string,
+  ): Promise<PrisonerPropertyContainer> {
+    return this.prisonerPropertyApiClient.findIncomingContainer(prisonerNumber, prisonId, sealNumber, username)
+  }
+
   getPrisonerPropertyHistory(prisonerNumber: string, username: string): Promise<PrisonerTimelineItem[]> {
     return this.prisonerPropertyApiClient.getPrisonerPropertyHistory(prisonerNumber, username)
   }

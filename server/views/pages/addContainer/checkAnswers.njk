@@ -46,10 +46,11 @@
         value: { text: container.previousSealNumber },
         actions: { items: [{ href: detailsUrl + "#containers-" + container.index + "-previousSealNumber", text: "Change", visuallyHiddenText: "previous seal number" }] }
       }), sealRows) %}
-    {% elif container.automaticMatch %}
+    {% endif %}
+    {% if container.incomingContainer or container.automaticMatch %}
       {% set sealRows = (sealRows.push({
         key: { text: "Incoming property" },
-        value: { text: "Matched to property due in from " + container.automaticMatch.prisonName },
+        value: { text: "Matched to property due in from " + (container.incomingContainer.prisonName if container.incomingContainer else container.automaticMatch.prisonName) },
         actions: { items: [{ href: detailsUrl + "#containers-" + container.index + "-sealNumber", text: "Change", visuallyHiddenText: "seal number" }] }
       }), sealRows) %}
     {% endif %}
