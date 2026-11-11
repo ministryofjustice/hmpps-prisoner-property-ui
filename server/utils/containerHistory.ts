@@ -30,8 +30,13 @@ export const eventTypeLabel = (type: PropertyEventType): string => EVENT_TYPE_LA
  * The heading for a history event. A legacy record the clean-up archived is titled by its seal - the
  * container's seal, which does not change once it has been archived - rather than by its event type.
  */
-export const eventTitle = (event: PropertyEvent, containerSeal: string | null): string =>
-  isLegacyArchive(event) ? legacyArchiveTitle(realSealNumber(containerSeal)) : eventTypeLabel(event.eventType)
+export const eventTitle = (event: PropertyEvent, containerSeal: string | null): string => {
+  if (isLegacyArchive(event)) return legacyArchiveTitle(realSealNumber(containerSeal))
+  if (event.eventType === 'CREATED_SEALED' && event.relatedContainerSealNumber && event.fromPrisonName) {
+    return 'Confirmed as received'
+  }
+  return eventTypeLabel(event.eventType)
+}
 
 /**
  * Names a property type change, saying what it was changed from when the API could determine it. The
@@ -63,6 +68,13 @@ export const eventDescription = (event: PropertyEvent): string => {
   switch (event.eventType) {
     case 'CREATED_SEALED': {
       const added = seal ? `Added to storage with seal number ${seal}.` : 'Added to storage.'
+      if (relatedSeal && event.fromPrisonName) {
+        const previous =
+          seal && relatedSeal.toLowerCase() !== seal.toLowerCase()
+            ? ` Previously recorded with seal number ${relatedSeal}.`
+            : ''
+        return `Confirmed as received from ${event.fromPrisonName}. ${added}${previous}`
+      }
       // Set when the container was logged as property arriving on transfer and matched to the record it was
       // held under at the sending prison - so the history shows the two records were joined up.
       return relatedSeal ? `${added} Matched to previous seal number ${relatedSeal}.` : added

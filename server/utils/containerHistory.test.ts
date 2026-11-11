@@ -55,6 +55,22 @@ describe('eventTitle', () => {
     expect(eventTitle(archived, 'SN0001')).toBe('Seal SN0001 - Legacy property record archived following DPS migration')
     expect(eventTitle(archived, 'MISSING-1234')).toBe('Legacy property record archived following DPS migration')
   })
+
+  it('titles a linked creation as received when the sending prison is available', () => {
+    expect(
+      eventTitle(
+        event({
+          eventType: 'CREATED_SEALED',
+          fromPrisonName: 'Leeds (HMP)',
+          relatedContainerSealNumber: 'OLD123',
+        }),
+        'NEW123',
+      ),
+    ).toBe('Confirmed as received')
+    expect(eventTitle(event({ eventType: 'CREATED_SEALED', relatedContainerSealNumber: 'OLD123' }), 'NEW123')).toBe(
+      'Added to storage',
+    )
+  })
 })
 
 describe('eventDescription', () => {
@@ -86,6 +102,34 @@ describe('eventDescription', () => {
         event({ eventType: 'CREATED_SEALED', sealNumber: '124744/2', relatedContainerSealNumber: '124744' }),
       ),
     ).toBe('Added to storage with seal number 124744/2. Matched to previous seal number 124744.')
+  })
+
+  it('includes the sending establishment and both seals for a linked creation', () => {
+    expect(
+      eventDescription(
+        event({
+          eventType: 'CREATED_SEALED',
+          sealNumber: 'NEW123',
+          relatedContainerSealNumber: 'OLD123',
+          fromPrisonName: 'Leeds (HMP)',
+        }),
+      ),
+    ).toBe(
+      'Confirmed as received from Leeds (HMP). Added to storage with seal number NEW123. Previously recorded with seal number OLD123.',
+    )
+  })
+
+  it('does not repeat the previous-seal clause when the seal did not change', () => {
+    expect(
+      eventDescription(
+        event({
+          eventType: 'CREATED_SEALED',
+          sealNumber: 'OLD123',
+          relatedContainerSealNumber: 'old123',
+          fromPrisonName: 'Leeds (HMP)',
+        }),
+      ),
+    ).toBe('Confirmed as received from Leeds (HMP). Added to storage with seal number OLD123.')
   })
 
   it('describes a placeholder seal as no seal at all', () => {

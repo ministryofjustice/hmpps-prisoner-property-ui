@@ -105,6 +105,36 @@ test.describe('Container history timeline', () => {
     await expect(historyPage.timeline).not.toContainText('by AUSER')
   })
 
+  test('shows linked creation as received from the sending prison with both seals', async ({ page }) => {
+    await login(page)
+    await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [container], priority: 1 })
+    await prisonerPropertyApi.stubGetContainerEvents({
+      id: 'c1',
+      events: [
+        {
+          ...baseEvent,
+          id: 'received-create',
+          eventType: 'CREATED_SEALED',
+          eventDateTime: '2026-06-01T10:00:00',
+          eventUserId: 'AUSER',
+          sealNumber: 'NEW123',
+          relatedContainerSealNumber: 'OLD123',
+          fromPrisonId: 'LEI',
+          fromPrisonName: 'Leeds (HMP)',
+        },
+      ],
+      priority: 1,
+    })
+    await manageUsersApi.stubGetUser({ username: 'AUSER', name: 'John Doe' })
+    await page.goto('/prisoner/A1234BC/container/c1')
+
+    const historyPage = await ContainerHistoryPage.verifyOnPage(page)
+    await expect(historyPage.timeline).toContainText('Confirmed as received')
+    await expect(historyPage.timeline).toContainText(
+      'Confirmed as received from Leeds (HMP). Added to storage with seal number NEW123. Previously recorded with seal number OLD123.',
+    )
+  })
+
   test('words a legacy record the clean-up archived', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPropertyForPrisoner({
