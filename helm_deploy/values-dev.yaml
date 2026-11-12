@@ -20,5 +20,12 @@ generic-service:
     ENVIRONMENT_NAME: DEV
     AUDIT_ENABLED: "false"
 
+  allowlist:
+    groups:
+      - digital_staff_and_mojo
+      - moj_cloud_platform
+      - prisons
+      - private_prisons
+
 generic-prometheus-alerts:
   alertSeverity: move-a-prisoner-alerts-nonprod
