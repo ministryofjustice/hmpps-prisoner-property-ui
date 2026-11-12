@@ -14,6 +14,7 @@ export interface DetailsForm {
 export interface ParsedDetails {
   sealNumber: string
   previousSealNumber?: string
+  automaticMatch?: { sealNumber: string; prisonName: string }
   containerType: ContainerType
   proposedDisposalDate?: string // ISO yyyy-mm-dd
 }
@@ -153,6 +154,13 @@ export const validateContainers = (blocks: ContainerBlock[]): { values?: ParsedD
         href: `#containers-${index}-${field}`,
       })
     })
+    const seal = trim(block.sealNumber).toLowerCase()
+    if (seal && blocks.slice(0, index).some(other => trim(other.sealNumber).toLowerCase() === seal)) {
+      errors.push({
+        text: `Container ${index + 1}: Enter a different seal number for each property container`,
+        href: `#containers-${index}-sealNumber`,
+      })
+    }
   })
   return errors.length ? { errors } : { values, errors: [] }
 }
@@ -177,6 +185,29 @@ export const matchableContainers = (
 ): PrisonerPropertyContainer[] => containers.filter(container => isIncomingTo(container, viewedPrisonId))
 
 /**
+ * An unchanged seal still identifies arriving property. Supply its recorded seal to the API's existing
+ * transfer-linking flow when staff have not entered a previous seal themselves.
+ */
+export const resolvePreviousSealNumbers = (
+  values: ParsedDetails[],
+  matchable: PrisonerPropertyContainer[],
+): ParsedDetails[] =>
+  values.map(value => {
+    if (value.previousSealNumber) return value
+    const seal = trim(value.sealNumber).toLowerCase()
+    const matches = seal
+      ? matchable.filter(container => trim(container.currentSealNumber ?? '').toLowerCase() === seal)
+      : []
+    const source = matches.length === 1 ? matches[0] : undefined
+    return {
+      ...value,
+      automaticMatch: source?.currentSealNumber?.trim()
+        ? { sealNumber: source.currentSealNumber.trim(), prisonName: source.prisonName || source.prisonId }
+        : undefined,
+    }
+  })
+
+/**
  * Check each previous seal number names property the person actually holds at another establishment.
  *
  * The API enforces this too and is the authority; doing it here as well is what puts the error next to the
@@ -192,7 +223,32 @@ export const validatePreviousSealNumbers = (
   const seals = new Set(matchable.map(container => trim(container.currentSealNumber ?? '').toLowerCase()))
   const many = values.length > 1
   return values.flatMap((value, index) => {
-    const previousSeal = trim(value.previousSealNumber)
+    const previousSeal = trim(value.previousSealNumber || value.automaticMatch?.sealNumber)
+    const field = value.previousSealNumber ? 'previousSealNumber' : 'sealNumber'
+    const lookupSeal = (previousSeal || trim(value.sealNumber)).toLowerCase()
+    if (
+      matchable.filter(container => trim(container.currentSealNumber ?? '').toLowerCase() === lookupSeal).length > 1
+    ) {
+      const text = `More than one incoming property container has seal number ${previousSeal || value.sealNumber}. Check which container is being received with the sending establishments before continuing`
+      return [{ text: many ? `Container ${index + 1}: ${text}` : text, href: `#containers-${index}-${field}` }]
+    }
+    if (
+      previousSeal &&
+      values
+        .slice(0, index)
+        .some(
+          other =>
+            trim(other.previousSealNumber || other.automaticMatch?.sealNumber).toLowerCase() ===
+            previousSeal.toLowerCase(),
+        )
+    ) {
+      return [
+        {
+          text: `Container ${index + 1}: This property due in has already been matched to another container in this journey`,
+          href: `#containers-${index}-${field}`,
+        },
+      ]
+    }
     if (!previousSeal || seals.has(previousSeal.toLowerCase())) return []
     const text = `There is no property with seal number ${previousSeal} held for this person at another establishment. Check the number, or leave it blank if this is new property`
     return [{ text: many ? `Container ${index + 1}: ${text}` : text, href: `#containers-${index}-previousSealNumber` }]

@@ -1,13 +1,17 @@
 import { Router, type Request, type RequestHandler, type Response } from 'express'
 
 import type { Services } from '../../services'
+import config from '../../config'
 import { ALL_CONTAINER_TYPES, buildPagination, containerTypeLabel, DEFAULT_PAGE_SIZE } from '../../utils/propertyList'
 import {
   errorCodeOf,
   matchableContainers,
+  resolvePreviousSealNumbers,
   toContainerBlocks,
   validateContainers,
   validatePreviousSealNumbers,
+  type ParsedDetails,
+  type FieldError,
 } from '../../utils/addContainer'
 import requireManageRole from '../../middleware/requireManageRole'
 import { requirePrisonerAtThisPrison } from '../../middleware/requirePrisonerAccess'
@@ -145,7 +149,11 @@ export default function addContainerRoutes(services: Services, requireActivePris
       const ctx = await resolveContext(userService, req, res, next)
       if (!ctx) return undefined
       const origin = req.query.from === 'list' ? 'list' : 'person'
-      req.session.addContainerJourney = { prisonerNumber: ctx.prisonerNumber, origin, containers: [{}] }
+      req.session.addContainerJourney = {
+        prisonerNumber: ctx.prisonerNumber,
+        origin,
+        containers: [{}],
+      }
       return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
     },
   )
@@ -194,23 +202,87 @@ export default function addContainerRoutes(services: Services, requireActivePris
       // A previous seal number must name property the person actually holds elsewhere, or the two records
       // never get matched and the same box ends up recorded twice. Checked here, against the person's own
       // property, so the error lands on the field rather than after the whole journey is submitted.
-      if (values.some(v => v.previousSealNumber)) {
-        const held = await prisonerPropertyService.getPropertyForPrisoner(ctx.prisonerNumber, res.locals.user.username)
-        const sealErrors = validatePreviousSealNumbers(values, matchableContainers(held, ctx.activeCaseloadId))
-        if (sealErrors.length) {
-          return renderAddDetails(req, res, ctx, journey.origin, blocks, sealErrors)
-        }
+      const held = await prisonerPropertyService.getPropertyForPrisoner(ctx.prisonerNumber, res.locals.user.username)
+      let resolved: (ParsedDetails & Pick<AddContainerDraft, 'incomingContainer'>)[] = values
+      let sealErrors: FieldError[] = []
+      if (config.receiveContainersEnabled) {
+        resolved = await Promise.all(
+          values.map(async (value, index) => {
+            const field = value.previousSealNumber ? 'previousSealNumber' : 'sealNumber'
+            const seal = value.previousSealNumber || value.sealNumber
+            const href = `#containers-${index}-${field}`
+            const prefix = values.length > 1 ? `Container ${index + 1}: ` : ''
+            try {
+              const incoming = await prisonerPropertyService.findIncomingContainer(
+                ctx.prisonerNumber,
+                ctx.activeCaseloadId,
+                seal,
+                res.locals.user.username,
+              )
+              const prisonName =
+                incoming.prisonName ||
+                held.find(container => container.prisonId === incoming.prisonId)?.prisonName ||
+                incoming.prisonId
+              return {
+                ...value,
+                incomingContainer: { id: incoming.id, prisonName },
+                containerType: incoming.containerType,
+                proposedDisposalDate: incoming.proposedDisposalDate ?? undefined,
+              }
+            } catch (error) {
+              const status = (error as { responseStatus?: number }).responseStatus
+              if (status === 404 && errorCodeOf(error) === 'INCOMING_CONTAINER_NOT_FOUND') {
+                if (value.previousSealNumber) {
+                  sealErrors.push({
+                    text: `${prefix}There is no incoming property with seal number ${seal} for this person. Check the number, or leave it blank if this is new property`,
+                    href,
+                  })
+                }
+                return value
+              }
+              if (status === 409 && errorCodeOf(error) === 'AMBIGUOUS_INCOMING_CONTAINER') {
+                sealErrors.push({
+                  text: `${prefix}More than one incoming property container has seal number ${seal}. Check which container is being received with the sending establishments before continuing`,
+                  href,
+                })
+                return value
+              }
+              throw error
+            }
+          }),
+        )
+        const matchedIds = new Set<string>()
+        resolved.forEach((value, index) => {
+          if (!value.incomingContainer) return
+          if (matchedIds.has(value.incomingContainer.id)) {
+            sealErrors.push({
+              text: `Container ${index + 1}: This property due in has already been matched to another container in this journey`,
+              href: `#containers-${index}-${value.previousSealNumber ? 'previousSealNumber' : 'sealNumber'}`,
+            })
+          }
+          matchedIds.add(value.incomingContainer.id)
+        })
+        sealErrors.sort((first, second) => first.href.localeCompare(second.href, undefined, { numeric: true }))
+      } else {
+        const matchable = matchableContainers(held, ctx.activeCaseloadId)
+        resolved = resolvePreviousSealNumbers(values, matchable)
+        sealErrors = validatePreviousSealNumbers(resolved, matchable)
+      }
+      if (sealErrors.length) {
+        return renderAddDetails(req, res, ctx, journey.origin, blocks, sealErrors)
       }
 
       // Keep the storage decision already made for a container at the same index (editing from Check your
       // answers), but only while its type is unchanged - changing the type (e.g. to/from Excess) resets the
       // storage choice so the correct steps are taken again.
-      const containers: AddContainerDraft[] = values.map((v, i) => {
+      const containers: AddContainerDraft[] = resolved.map((v, i) => {
         const previous = journey.containers[i]
         const keep = previous?.containerType === v.containerType
         return {
           sealNumber: v.sealNumber,
           previousSealNumber: v.previousSealNumber,
+          automaticMatch: v.automaticMatch,
+          incomingContainer: v.incomingContainer,
           containerType: v.containerType,
           proposedDisposalDate: v.proposedDisposalDate,
           storageChoice: keep ? previous?.storageChoice : undefined,
@@ -401,9 +473,9 @@ export default function addContainerRoutes(services: Services, requireActivePris
         containers: journey.containers.map((c, index) => ({
           index,
           sealNumber: c.sealNumber,
-          // Shown only when entered - it decides whether this record gets matched to the property's record
-          // at the establishment it came from, so staff should see it before confirming.
           previousSealNumber: c.previousSealNumber,
+          automaticMatch: c.automaticMatch,
+          incomingContainer: c.incomingContainer,
           containerType: c.containerType,
           proposedDisposalDate: c.proposedDisposalDate,
           // Excess sent off-site reads "Branston (offsite)"; excess in a prison location (or any other type)
@@ -433,25 +505,51 @@ export default function addContainerRoutes(services: Services, requireActivePris
       try {
         // Sequential so seal-uniqueness is enforced deterministically and the first failure is surfaced.
         for (const c of journey.containers) {
-          // eslint-disable-next-line no-await-in-loop
-          await prisonerPropertyService.createContainer(
-            {
-              prisonerNumber: ctx.prisonerNumber,
-              prisonId: ctx.activeCaseloadId,
-              containerType: c.containerType!,
-              sealNumber: c.sealNumber!,
-              previousSealNumber: c.previousSealNumber,
-              internalLocationId: c.internalLocationId,
-              // Excess sent off-site is stored at Branston (no internal location); otherwise the API infers
-              // INTERNAL from the location id.
-              locationType: c.containerType === 'EXCESS' && c.storageChoice === 'branston' ? 'BRANSTON' : undefined,
-              proposedDisposalDate: c.proposedDisposalDate,
-            },
-            username,
-          )
+          if (c.incomingContainer) {
+            // eslint-disable-next-line no-await-in-loop
+            await prisonerPropertyService.receiveContainer(
+              c.incomingContainer.id,
+              {
+                prisonerNumber: ctx.prisonerNumber,
+                receivingPrisonId: ctx.activeCaseloadId,
+                sealNumber: c.sealNumber!,
+                internalLocationId: c.internalLocationId,
+                locationType: c.containerType === 'EXCESS' && c.storageChoice === 'branston' ? 'BRANSTON' : undefined,
+              },
+              username,
+            )
+          } else {
+            // eslint-disable-next-line no-await-in-loop
+            await prisonerPropertyService.createContainer(
+              {
+                prisonerNumber: ctx.prisonerNumber,
+                prisonId: ctx.activeCaseloadId,
+                containerType: c.containerType!,
+                sealNumber: c.sealNumber!,
+                previousSealNumber: config.receiveContainersEnabled
+                  ? undefined
+                  : c.previousSealNumber || c.automaticMatch?.sealNumber,
+                internalLocationId: c.internalLocationId,
+                // Excess sent off-site is stored at Branston (no internal location); otherwise the API infers
+                // INTERNAL from the location id.
+                locationType: c.containerType === 'EXCESS' && c.storageChoice === 'branston' ? 'BRANSTON' : undefined,
+                proposedDisposalDate: c.proposedDisposalDate,
+              },
+              username,
+            )
+          }
         }
       } catch (error) {
         const status = (error as { responseStatus?: number }).responseStatus
+        if (config.receiveContainersEnabled && (status === 400 || status === 404 || status === 409)) {
+          const errorMessages = {
+            400: 'The property container details or storage location are invalid. Check the container details and select a storage location with space, then try again.',
+            404: "The incoming property container could not be found. Check this person's property and try again.",
+            409: "The property container is no longer available to receive, or its seal number is already used by another container. Check this person's property before trying again.",
+          }
+          req.flash('error', errorMessages[status])
+          return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+        }
         if (status === 409) {
           req.flash(
             'error',

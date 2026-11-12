@@ -88,6 +88,7 @@ export type PropertyEventType =
   | 'PRISONER_ADMITTED'
   | 'LOCATION_CONFIRMED'
   | 'TRANSFERRED'
+  | 'RECEIVED'
   | 'RETURNED'
   | 'DISPOSAL_REQUIRED'
   | 'DISPOSED'
@@ -234,6 +235,16 @@ export interface RemoveContainerRequest {
 export interface CombineContainersRequest {
   sourceContainerIds: string[]
   containerType: ContainerType
+  sealNumber: string
+  internalLocationId?: string
+  locationType?: StorageLocationType
+}
+
+// Proposed receipt payload (POST /property-containers/{id}/receive). The API derives the sending
+// prison, confirming user and timestamp; the existing container is received rather than created.
+export interface ReceiveContainerRequest {
+  prisonerNumber: string
+  receivingPrisonId: string
   sealNumber: string
   internalLocationId?: string
   locationType?: StorageLocationType

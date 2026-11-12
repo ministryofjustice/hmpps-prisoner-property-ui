@@ -17,6 +17,7 @@ import type {
   PrisonPropertySummary,
   PropertyEvent,
   PropertyLocationAdmin,
+  ReceiveContainerRequest,
   RemoveContainerRequest,
   RestPage,
   UpdateContainerRequest,
@@ -38,6 +39,18 @@ export default class PrisonerPropertyApiClient extends RestClient {
   getPropertyForPrisoner(prisonerNumber: string, username: string): Promise<PrisonerPropertyContainer[]> {
     return this.get<PrisonerPropertyContainer[]>(
       { path: `/property-containers/prisoner/${prisonerNumber}` },
+      asSystem(username),
+    )
+  }
+
+  findIncomingContainer(
+    prisonerNumber: string,
+    prisonId: string,
+    sealNumber: string,
+    username: string,
+  ): Promise<PrisonerPropertyContainer> {
+    return this.get<PrisonerPropertyContainer>(
+      { path: '/property-containers/incoming', query: { prisonerNumber, prisonId, sealNumber } },
       asSystem(username),
     )
   }
@@ -151,6 +164,17 @@ export default class PrisonerPropertyApiClient extends RestClient {
   updateContainer(id: string, body: UpdateContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
     return this.put<PrisonerPropertyContainer>(
       { path: `/property-containers/${id}`, data: { ...body } },
+      asSystem(username),
+    )
+  }
+
+  /**
+   * Confirm receipt of an existing incoming container using a system token tied to the signed-in user.
+   * The system client must hold the ROLE_PRISONER_PROPERTY__RW role.
+   */
+  receiveContainer(id: string, body: ReceiveContainerRequest, username: string): Promise<PrisonerPropertyContainer> {
+    return this.post<PrisonerPropertyContainer>(
+      { path: `/property-containers/${id}/receive`, data: { ...body } },
       asSystem(username),
     )
   }

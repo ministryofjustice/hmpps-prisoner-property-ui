@@ -30,6 +30,7 @@ describe('eventTypeLabel', () => {
     expect(eventTypeLabel('DIED_IN_CUSTODY')).toBe('Due for return – death in custody')
     expect(eventTypeLabel('PRISONER_ADMITTED')).toBe('Property requires review')
     expect(eventTypeLabel('LOCATION_CONFIRMED')).toBe('Storage location confirmed')
+    expect(eventTypeLabel('RECEIVED')).toBe('Confirmed as received')
   })
 
   it('labels the "details changed" events the same and groups removals', () => {
@@ -54,9 +55,35 @@ describe('eventTitle', () => {
     expect(eventTitle(archived, 'SN0001')).toBe('Seal SN0001 - Legacy property record archived following DPS migration')
     expect(eventTitle(archived, 'MISSING-1234')).toBe('Legacy property record archived following DPS migration')
   })
+
+  it('titles a linked creation as received when the sending prison is available', () => {
+    expect(
+      eventTitle(
+        event({
+          eventType: 'CREATED_SEALED',
+          fromPrisonName: 'Leeds (HMP)',
+          relatedContainerSealNumber: 'OLD123',
+        }),
+        'NEW123',
+      ),
+    ).toBe('Confirmed as received')
+    expect(eventTitle(event({ eventType: 'CREATED_SEALED', relatedContainerSealNumber: 'OLD123' }), 'NEW123')).toBe(
+      'Added to storage',
+    )
+  })
 })
 
 describe('eventDescription', () => {
+  it('names the sending establishment for a receipt, falling back to its id or a generic description', () => {
+    expect(eventDescription(event({ eventType: 'RECEIVED', fromPrisonName: 'Leeds (HMP)', fromPrisonId: 'LEI' }))).toBe(
+      'Confirmed as received from Leeds (HMP).',
+    )
+    expect(eventDescription(event({ eventType: 'RECEIVED', fromPrisonId: 'LEI' }))).toBe(
+      'Confirmed as received from LEI.',
+    )
+    expect(eventDescription(event({ eventType: 'RECEIVED' }))).toBe('Confirmed as received from another establishment.')
+  })
+
   it('explains why a legacy record was archived', () => {
     expect(eventDescription(event({ eventType: 'REMOVED', eventUserId: 'LEGACY_CLEANUP', legacyCleanup: true }))).toBe(
       'This record was automatically archived because it exceeded the applicable retention period before migration to DPS and no further property action was required.',
@@ -75,6 +102,34 @@ describe('eventDescription', () => {
         event({ eventType: 'CREATED_SEALED', sealNumber: '124744/2', relatedContainerSealNumber: '124744' }),
       ),
     ).toBe('Added to storage with seal number 124744/2. Matched to previous seal number 124744.')
+  })
+
+  it('includes the sending establishment and both seals for a linked creation', () => {
+    expect(
+      eventDescription(
+        event({
+          eventType: 'CREATED_SEALED',
+          sealNumber: 'NEW123',
+          relatedContainerSealNumber: 'OLD123',
+          fromPrisonName: 'Leeds (HMP)',
+        }),
+      ),
+    ).toBe(
+      'Confirmed as received from Leeds (HMP). Added to storage with seal number NEW123. Previously recorded with seal number OLD123.',
+    )
+  })
+
+  it('does not repeat the previous-seal clause when the seal did not change', () => {
+    expect(
+      eventDescription(
+        event({
+          eventType: 'CREATED_SEALED',
+          sealNumber: 'OLD123',
+          relatedContainerSealNumber: 'old123',
+          fromPrisonName: 'Leeds (HMP)',
+        }),
+      ),
+    ).toBe('Confirmed as received from Leeds (HMP). Added to storage with seal number OLD123.')
   })
 
   it('describes a placeholder seal as no seal at all', () => {

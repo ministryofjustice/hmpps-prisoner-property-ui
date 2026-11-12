@@ -17,6 +17,7 @@ import type {
 } from '../data/prisonerPropertyApiTypes'
 import type { Prisoner } from '../data/prisonerSearchApiTypes'
 import { NomisScreenNotSetUpError } from '../utils/nomisSplash'
+import config from '../config'
 
 jest.mock('@ministryofjustice/hmpps-audit-client')
 jest.mock('../services/prisonerPropertyService')
@@ -2093,6 +2094,325 @@ describe('Add container journey - steps', () => {
     await agent.get(`/prisoner/A1234BC/add-container?from=${from}`).expect(302)
   }
 
+  describe('in-place receipt enabled', () => {
+    const originalFlag = config.receiveContainersEnabled
+    const incoming = container({
+      id: 'incoming',
+      prisonId: 'LEI',
+      prisonName: 'Leeds (HMP)',
+      currentSealNumber: 'OLD123',
+      containerType: 'VALUABLES',
+      proposedDisposalDate: '2099-01-01',
+    })
+    const notFound = { responseStatus: 404, data: { errorCode: 'INCOMING_CONTAINER_NOT_FOUND' } }
+    const enterDetails = (agent: ReturnType<typeof request.agent>, seal = 'OLD123', previousSeal?: string) =>
+      agent.post('/prisoner/A1234BC/add-container/details').type('form').send({
+        'containers[0][sealNumber]': seal,
+        'containers[0][previousSealNumber]': previousSeal,
+        'containers[0][containerType]': 'STANDARD',
+      })
+    const selectLocation = (agent: ReturnType<typeof request.agent>) =>
+      agent
+        .post('/prisoner/A1234BC/add-container/location/0')
+        .type('form')
+        .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+        .expect(302)
+    const confirm = (agent: ReturnType<typeof request.agent>) =>
+      agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({})
+
+    beforeEach(() => {
+      config.receiveContainersEnabled = true
+      withActiveCaseload()
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({}), incoming])
+      prisonerPropertyService.findIncomingContainer.mockResolvedValue(incoming)
+      prisonerPropertyService.receiveContainer.mockResolvedValue(container({ id: 'incoming' }))
+      prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'new' }))
+    })
+
+    afterEach(() => {
+      config.receiveContainersEnabled = originalFlag
+    })
+
+    it.each([null, 'TRANSFERRED'] as const)(
+      'receives the existing container and retains type and disposal date (%s)',
+      async removalOutcome => {
+        prisonerPropertyService.findIncomingContainer.mockResolvedValue({
+          ...incoming,
+          removalOutcome,
+          prisonName: null,
+        })
+        const agent = request.agent(manageApp())
+        await startJourney(agent)
+        await enterDetails(agent).expect(302)
+        await selectLocation(agent)
+        await agent
+          .get('/prisoner/A1234BC/add-container/check')
+          .expect(200)
+          .expect(res => {
+            expect(res.text).toContain('Matched to property due in from Leeds (HMP)')
+            expect(res.text).toContain('Valuables')
+            expect(res.text).toContain('1 January 2099')
+            expect(res.text).not.toContain('Previous seal number')
+          })
+        await confirm(agent).expect(302)
+        expect(prisonerPropertyService.receiveContainer).toHaveBeenCalledWith(
+          'incoming',
+          {
+            prisonerNumber: 'A1234BC',
+            receivingPrisonId: 'MDI',
+            sealNumber: 'OLD123',
+            internalLocationId: 'box1',
+            locationType: undefined,
+          },
+          user.username,
+        )
+        expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+        expect(prisonerPropertyService.updateContainer).not.toHaveBeenCalled()
+      },
+    )
+
+    it('looks up an explicit previous seal and receives with the new seal', async () => {
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent, 'NEW123', 'OLD123').expect(302)
+      await selectLocation(agent)
+      await agent
+        .get('/prisoner/A1234BC/add-container/check')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('Previous seal number')
+          expect(res.text).toContain('Matched to property due in from Leeds (HMP)')
+        })
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.findIncomingContainer).toHaveBeenCalledWith(
+        'A1234BC',
+        'MDI',
+        'OLD123',
+        user.username,
+      )
+      expect(prisonerPropertyService.receiveContainer).toHaveBeenCalledWith(
+        'incoming',
+        expect.objectContaining({ sealNumber: 'NEW123' }),
+        user.username,
+      )
+      expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+    })
+
+    it('accepts a source approved by the API even if its transfer destination differs', async () => {
+      prisonerPropertyService.findIncomingContainer.mockResolvedValue({
+        ...incoming,
+        removalOutcome: 'TRANSFERRED',
+        receivingPrisonId: 'IWI',
+      })
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent).expect(302)
+      await selectLocation(agent)
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.receiveContainer).toHaveBeenCalled()
+      expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+    })
+
+    it('receives excess property at Branston using the existing source type', async () => {
+      prisonerPropertyService.findIncomingContainer.mockResolvedValue({ ...incoming, containerType: 'EXCESS' })
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent).expect(302).expect('location', '/prisoner/A1234BC/add-container/where-stored/0')
+      await agent
+        .post('/prisoner/A1234BC/add-container/where-stored/0')
+        .type('form')
+        .send({ storageChoice: 'branston' })
+        .expect(302)
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.receiveContainer).toHaveBeenCalledWith(
+        'incoming',
+        {
+          prisonerNumber: 'A1234BC',
+          receivingPrisonId: 'MDI',
+          sealNumber: 'OLD123',
+          locationType: 'BRANSTON',
+          internalLocationId: undefined,
+        },
+        user.username,
+      )
+      expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+    })
+
+    it('receives matched property and creates unmatched property in the same journey', async () => {
+      prisonerPropertyService.findIncomingContainer.mockImplementation(async (_prisonerNumber, _prisonId, seal) => {
+        if (seal === 'OLD123') return incoming
+        throw notFound
+      })
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await agent
+        .post('/prisoner/A1234BC/add-container/details')
+        .type('form')
+        .send({
+          'containers[0][sealNumber]': 'OLD123',
+          'containers[0][containerType]': 'STANDARD',
+          'containers[1][sealNumber]': 'NEW',
+          'containers[1][containerType]': 'STANDARD',
+        })
+        .expect(302)
+      await selectLocation(agent)
+      await agent
+        .post('/prisoner/A1234BC/add-container/location/1')
+        .type('form')
+        .send({ internalLocationId: 'box2', locationName: 'Another store' })
+        .expect(302)
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.receiveContainer).toHaveBeenCalledTimes(1)
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledTimes(1)
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+        expect.objectContaining({ sealNumber: 'NEW', internalLocationId: 'box2', previousSealNumber: undefined }),
+        user.username,
+      )
+    })
+
+    it('creates new property only for a recognised current-seal lookup miss', async () => {
+      prisonerPropertyService.findIncomingContainer.mockRejectedValue(notFound)
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent, 'NEW').expect(302)
+      await selectLocation(agent)
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sealNumber: 'NEW',
+          containerType: 'STANDARD',
+          previousSealNumber: undefined,
+        }),
+        user.username,
+      )
+      expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+    })
+
+    it('clears the incoming ID when the current seal is changed to unmatched property', async () => {
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent).expect(302)
+      await selectLocation(agent)
+      await agent
+        .get('/prisoner/A1234BC/add-container/details')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).not.toMatch(/name="containers\[0\]\[previousSealNumber\]"\s+value="OLD123"/)
+        })
+      prisonerPropertyService.findIncomingContainer.mockRejectedValue(notFound)
+      await enterDetails(agent, 'NEW').expect(302)
+      await selectLocation(agent)
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+        expect.objectContaining({ sealNumber: 'NEW' }),
+        user.username,
+      )
+      expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+    })
+
+    it('rejects an unmatched explicit previous seal on its field', async () => {
+      prisonerPropertyService.findIncomingContainer.mockRejectedValue(notFound)
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent, 'NEW', 'TYPO')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('There is no incoming property with seal number TYPO')
+          expect(res.text).toContain('href="#containers-0-previousSealNumber"')
+        })
+      expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+      expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+    })
+
+    it('blocks an ambiguous lookup without falling back to create', async () => {
+      prisonerPropertyService.findIncomingContainer.mockRejectedValue({
+        responseStatus: 409,
+        data: { errorCode: 'AMBIGUOUS_INCOMING_CONTAINER' },
+      })
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent)
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('More than one incoming property container has seal number OLD123')
+          expect(res.text).toContain('href="#containers-0-sealNumber"')
+        })
+      expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+      expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+    })
+
+    it.each([403, 404, 503])(
+      'does not interpret an unexpected lookup status %s as new property',
+      async responseStatus => {
+        prisonerPropertyService.findIncomingContainer.mockRejectedValue({ responseStatus })
+        const agent = request.agent(manageApp())
+        await startJourney(agent)
+        await enterDetails(agent).expect(500)
+        expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+        expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+      },
+    )
+
+    it('rejects duplicate source IDs even with different current seals', async () => {
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await agent
+        .post('/prisoner/A1234BC/add-container/details')
+        .type('form')
+        .send({
+          'containers[0][sealNumber]': 'ONE',
+          'containers[0][previousSealNumber]': 'OLD123',
+          'containers[0][containerType]': 'STANDARD',
+          'containers[1][sealNumber]': 'TWO',
+          'containers[1][previousSealNumber]': 'OLD123',
+          'containers[1][containerType]': 'STANDARD',
+        })
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('This property due in has already been matched')
+          expect(res.text).toContain('href="#containers-1-previousSealNumber"')
+        })
+      expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      [
+        400,
+        'The property container details or storage location are invalid. Check the container details and select a storage location with space, then try again.',
+      ],
+      [404, "The incoming property container could not be found. Check this person's property and try again."],
+      [
+        409,
+        "The property container is no longer available to receive, or its seal number is already used by another container. Check this person's property before trying again.",
+      ],
+    ])(
+      'shows a specific message for receipt status %s without creating a replacement',
+      async (responseStatus, message) => {
+        prisonerPropertyService.receiveContainer.mockRejectedValue({ responseStatus })
+        const agent = request.agent(manageApp())
+        await startJourney(agent)
+        await enterDetails(agent).expect(302)
+        await selectLocation(agent)
+        await confirm(agent).expect(302).expect('location', '/prisoner/A1234BC/add-container/details')
+        expect(flashProvider).toHaveBeenCalledWith('error', message)
+        expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+      },
+    )
+
+    it('uses the current configuration rather than a flag saved when the journey started', async () => {
+      const agent = request.agent(manageApp())
+      config.receiveContainersEnabled = false
+      await startJourney(agent)
+      config.receiveContainersEnabled = true
+      await enterDetails(agent).expect(302)
+      await selectLocation(agent)
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.findIncomingContainer).toHaveBeenCalled()
+      expect(prisonerPropertyService.receiveContainer).toHaveBeenCalled()
+      expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+    })
+  })
+
   it('renders the details form', async () => {
     withActiveCaseload()
     prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([container({ prisonerName: 'John Smith' })])
@@ -2212,6 +2532,179 @@ describe('Add container journey - steps', () => {
       }),
       { throwOnError: false, logOnError: true },
     )
+  })
+
+  it.each([null, 'TRANSFERRED'] as const)(
+    'automatically links a matching incoming seal through confirmation (removal outcome %s)',
+    async removalOutcome => {
+      withActiveCaseload()
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+        container({
+          prisonId: 'LEI',
+          prisonerCurrentPrisonId: 'MDI',
+          currentSealNumber: 'IncomingSeal',
+          prisonName: 'Leeds (HMP)',
+          removalOutcome,
+          receivingPrisonId: 'MDI',
+        }),
+      ])
+      prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'receiving' }))
+
+      const agent = request.agent(manageApp())
+      await agent
+        .get('/prisoner/A1234BC')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('Property due to be transferred in')
+          expect(res.text).toContain('IncomingSeal')
+        })
+      await startJourney(agent)
+      await agent
+        .post('/prisoner/A1234BC/add-container/details')
+        .type('form')
+        .send({ 'containers[0][sealNumber]': ' incomingseal ', 'containers[0][containerType]': 'STANDARD' })
+        .expect(302)
+        .expect('location', '/prisoner/A1234BC/add-container/location/0')
+      await agent
+        .post('/prisoner/A1234BC/add-container/location/0')
+        .type('form')
+        .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+        .expect(302)
+      await agent
+        .get('/prisoner/A1234BC/add-container/check')
+        .expect(200)
+        .expect(res => {
+          expect(res.text).toContain('Matched to property due in from Leeds (HMP)')
+          expect(res.text).not.toContain('Previous seal number')
+        })
+      await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledTimes(1)
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sealNumber: 'incomingseal',
+          previousSealNumber: 'IncomingSeal',
+          prisonId: 'MDI',
+          internalLocationId: 'box1',
+        }),
+        user.username,
+      )
+    },
+  )
+
+  it('honours an explicit previous seal even when the current seal matches other incoming property', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ id: 'automatic', prisonId: 'LEI', currentSealNumber: 'CURRENT' }),
+      container({ id: 'explicit', prisonId: 'BRI', currentSealNumber: 'PREVIOUS' }),
+    ])
+    prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'received' }))
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({
+        'containers[0][sealNumber]': 'CURRENT',
+        'containers[0][previousSealNumber]': 'PREVIOUS',
+        'containers[0][containerType]': 'STANDARD',
+      })
+      .expect(302)
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/0')
+      .type('form')
+      .send({
+        internalLocationId: 'box1',
+        locationName: 'Reception Store',
+      })
+      .expect(302)
+    await agent
+      .get('/prisoner/A1234BC/add-container/check')
+      .expect(200)
+      .expect(res => {
+        expect(res.text).toContain('Previous seal number')
+        expect(res.text).toContain('PREVIOUS')
+        expect(res.text).not.toContain('Matched to property due in')
+      })
+    await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+    expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({ sealNumber: 'CURRENT', previousSealNumber: 'PREVIOUS' }),
+      user.username,
+    )
+  })
+
+  it('does not match a container in transit to a different prison', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ prisonId: 'MDI', currentSealNumber: 'LOCAL' }),
+      container({
+        prisonId: 'LEI',
+        currentSealNumber: 'ELSEWHERE',
+        removalOutcome: 'TRANSFERRED',
+        receivingPrisonId: 'IWI',
+        prisonerCurrentPrisonId: 'IWI',
+      }),
+    ])
+    prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'new' }))
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({
+        'containers[0][sealNumber]': 'ELSEWHERE',
+        'containers[0][containerType]': 'STANDARD',
+      })
+      .expect(302)
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/0')
+      .type('form')
+      .send({
+        internalLocationId: 'box1',
+        locationName: 'Reception Store',
+      })
+      .expect(302)
+    await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+    expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+      expect.objectContaining({ sealNumber: 'ELSEWHERE', previousSealNumber: undefined }),
+      user.username,
+    )
+  })
+
+  it('does not automatically link property already held here or removed property', async () => {
+    withActiveCaseload()
+    prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([
+      container({ currentSealNumber: 'LOCAL' }),
+      container({ prisonId: 'LEI', currentSealNumber: 'REMOVED', removalOutcome: 'RETURNED' }),
+    ])
+    prisonerPropertyService.createContainer.mockResolvedValue(container({ id: 'newC' }))
+    const agent = request.agent(manageApp())
+    await startJourney(agent)
+    await agent
+      .post('/prisoner/A1234BC/add-container/details')
+      .type('form')
+      .send({
+        'containers[0][sealNumber]': 'LOCAL',
+        'containers[0][containerType]': 'STANDARD',
+        'containers[1][sealNumber]': 'REMOVED',
+        'containers[1][containerType]': 'STANDARD',
+      })
+      .expect(302)
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/0')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+    await agent
+      .post('/prisoner/A1234BC/add-container/location/1')
+      .type('form')
+      .send({ internalLocationId: 'box1', locationName: 'Reception Store' })
+      .expect(302)
+    await agent.post('/prisoner/A1234BC/add-container/confirm').type('form').send({}).expect(302)
+    expect(prisonerPropertyService.createContainer).toHaveBeenCalledTimes(2)
+    for (const [body] of prisonerPropertyService.createContainer.mock.calls) {
+      expect(body.previousSealNumber).toBeUndefined()
+    }
   })
 
   it('shows a Manage storage locations button on the location page for a location admin, returning here', async () => {
