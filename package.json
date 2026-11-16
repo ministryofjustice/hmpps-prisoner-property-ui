@@ -82,7 +82,7 @@
     "@types/superagent": "^8.1.10",
     "@types/supertest": "^7.2.0",
     "audit-ci": "^7.1.0",
-    "del": "8.0.1",
+    "del": "9.0.1",
     "esbuild": "^0.28.1",
     "esbuild-plugin-copy": "^2.1.1",
     "esbuild-plugin-manifest": "^1.0.5",
