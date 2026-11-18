@@ -81,8 +81,15 @@ export const eventDescription = (event: PropertyEvent): string => {
     }
     case 'SEAL_CHANGED':
       return seal ? `Seal number changed to ${seal}.` : 'Seal number changed.'
-    case 'RECEIVED':
-      return `Confirmed as received from ${event.fromPrisonName ?? event.fromPrisonId ?? 'another establishment'}.`
+    case 'RECEIVED': {
+      const receivedFrom = event.fromPrisonName ?? event.fromPrisonId ?? 'another establishment'
+      const added = seal ? ` Added to storage with seal number ${seal}.` : ''
+      const previous =
+        relatedSeal && relatedSeal.toLowerCase() !== seal?.toLowerCase()
+          ? ` Previously recorded with seal number ${relatedSeal}.`
+          : ''
+      return `Confirmed as received from ${receivedFrom}.${added}${previous}`
+    }
     case 'CONTAINER_TYPE_CHANGE':
       // containerType is snapshotted as at this event, so it names what the type was changed to; the API
       // derives what it was changed from where it can.

@@ -84,6 +84,33 @@ describe('eventDescription', () => {
     expect(eventDescription(event({ eventType: 'RECEIVED' }))).toBe('Confirmed as received from another establishment.')
   })
 
+  it('includes the receipt-time seal and a distinct previous seal', () => {
+    expect(
+      eventDescription(
+        event({
+          eventType: 'RECEIVED',
+          fromPrisonName: 'Leeds (HMP)',
+          sealNumber: 'NEW123',
+          relatedContainerSealNumber: 'OLD123',
+        }),
+      ),
+    ).toBe(
+      'Confirmed as received from Leeds (HMP). Added to storage with seal number NEW123. Previously recorded with seal number OLD123.',
+    )
+  })
+
+  it('does not repeat a previous seal when it matches the receipt-time seal', () => {
+    expect(
+      eventDescription(
+        event({
+          eventType: 'RECEIVED',
+          sealNumber: 'OLD123',
+          relatedContainerSealNumber: 'old123',
+        }),
+      ),
+    ).toBe('Confirmed as received from another establishment. Added to storage with seal number OLD123.')
+  })
+
   it('explains why a legacy record was archived', () => {
     expect(eventDescription(event({ eventType: 'REMOVED', eventUserId: 'LEGACY_CLEANUP', legacyCleanup: true }))).toBe(
       'This record was automatically archived because it exceeded the applicable retention period before migration to DPS and no further property action was required.',

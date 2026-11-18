@@ -225,13 +225,6 @@ export const validatePreviousSealNumbers = (
   return values.flatMap((value, index) => {
     const previousSeal = trim(value.previousSealNumber || value.automaticMatch?.sealNumber)
     const field = value.previousSealNumber ? 'previousSealNumber' : 'sealNumber'
-    const lookupSeal = (previousSeal || trim(value.sealNumber)).toLowerCase()
-    if (
-      matchable.filter(container => trim(container.currentSealNumber ?? '').toLowerCase() === lookupSeal).length > 1
-    ) {
-      const text = `More than one incoming property container has seal number ${previousSeal || value.sealNumber}. Check which container is being received with the sending establishments before continuing`
-      return [{ text: many ? `Container ${index + 1}: ${text}` : text, href: `#containers-${index}-${field}` }]
-    }
     if (
       previousSeal &&
       values

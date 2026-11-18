@@ -258,15 +258,9 @@ describe('previous seal numbers', () => {
   })
 
   describe('validatePreviousSealNumbers', () => {
-    it.each([undefined, '0000'])('rejects ambiguous incoming seals (previous seal %s)', previousSeal => {
+    it('leaves duplicate-seal ambiguity to the receipt-enabled lookup flow', () => {
       const incoming = [held({ id: 'one', currentSealNumber: '0000' }), held({ id: 'two', currentSealNumber: '0000' })]
-      const resolved = resolvePreviousSealNumbers([{ ...details(previousSeal), sealNumber: '0000' }], incoming)
-      expect(validatePreviousSealNumbers(resolved, incoming)).toEqual([
-        {
-          text: 'More than one incoming property container has seal number 0000. Check which container is being received with the sending establishments before continuing',
-          href: `#containers-0-${previousSeal ? 'previousSealNumber' : 'sealNumber'}`,
-        },
-      ])
+      expect(validatePreviousSealNumbers([details('0000')], incoming)).toEqual([])
     })
 
     it('rejects two different current seals linked to the same explicit previous seal', () => {

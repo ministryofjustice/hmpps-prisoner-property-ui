@@ -25,6 +25,10 @@ export interface AddContainerJourney {
   prisonerNumber: string
   origin: 'list' | 'person'
   containers: AddContainerDraft[]
+  // The mode used to resolve drafts; confirmation returns to details if the flag changes.
+  receiveContainersEnabledAtResolution?: boolean
+  // Successful writes removed from the retry batch after a later container fails.
+  completedContainerCount?: number
 }
 
 // Working state for the multi-step "remove a property container" journey. Cleared on confirm/cancel.

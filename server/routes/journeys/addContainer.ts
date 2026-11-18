@@ -290,7 +290,11 @@ export default function addContainerRoutes(services: Services, requireActivePris
           locationName: keep ? previous?.locationName : undefined,
         }
       })
-      req.session.addContainerJourney = { ...journey, containers }
+      req.session.addContainerJourney = {
+        ...journey,
+        containers,
+        receiveContainersEnabledAtResolution: config.receiveContainersEnabled,
+      }
 
       return res.redirect(nextStepUrl(ctx.prisonerNumber, nextStep(containers, 0)))
     },
@@ -500,8 +504,13 @@ export default function addContainerRoutes(services: Services, requireActivePris
       if (journey?.prisonerNumber !== ctx.prisonerNumber || !journey.containers.length) {
         return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
       }
+      if (journey.receiveContainersEnabledAtResolution !== config.receiveContainersEnabled) {
+        req.flash('error', 'The receipt setting has changed. Check the property details again before continuing.')
+        return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
+      }
 
       const { username } = res.locals.user
+      let completedCount = 0
       try {
         // Sequential so seal-uniqueness is enforced deterministically and the first failure is surfaced.
         for (const c of journey.containers) {
@@ -538,8 +547,21 @@ export default function addContainerRoutes(services: Services, requireActivePris
               username,
             )
           }
+          completedCount += 1
         }
       } catch (error) {
+        if (completedCount > 0) {
+          req.session.addContainerJourney = {
+            ...journey,
+            containers: journey.containers.slice(completedCount),
+            completedContainerCount: (journey.completedContainerCount ?? 0) + completedCount,
+          }
+        }
+        const partialCompletion =
+          completedCount > 0
+            ? ` ${completedCount} property container${completedCount === 1 ? ' was' : 's were'} added before this error. The remaining containers are saved for retry.`
+            : ''
+        const withPartialCompletion = (message: string) => `${message}${partialCompletion}`
         const status = (error as { responseStatus?: number }).responseStatus
         if (config.receiveContainersEnabled && (status === 400 || status === 404 || status === 409)) {
           const errorMessages = {
@@ -547,13 +569,15 @@ export default function addContainerRoutes(services: Services, requireActivePris
             404: "The incoming property container could not be found. Check this person's property and try again.",
             409: "The property container is no longer available to receive, or its seal number is already used by another container. Check this person's property before trying again.",
           }
-          req.flash('error', errorMessages[status])
+          req.flash('error', withPartialCompletion(errorMessages[status]))
           return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
         }
         if (status === 409) {
           req.flash(
             'error',
-            'A property container with this seal number already exists. Enter a different seal number.',
+            withPartialCompletion(
+              'A property container with this seal number already exists. Enter a different seal number.',
+            ),
           )
           return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
         }
@@ -564,9 +588,11 @@ export default function addContainerRoutes(services: Services, requireActivePris
           const failedToMatch = errorCodeOf(error) === 'PREVIOUS_SEAL_NUMBER_NOT_FOUND'
           req.flash(
             'error',
-            failedToMatch
-              ? 'The previous seal number no longer matches property held for this person at another establishment. Check the number, or leave it blank if this is new property.'
-              : 'A storage location could not be used. Check the containers and try again.',
+            withPartialCompletion(
+              failedToMatch
+                ? 'The previous seal number no longer matches property held for this person at another establishment. Check the number, or leave it blank if this is new property.'
+                : 'A storage location could not be used. Check the containers and try again.',
+            ),
           )
           return res.redirect(`/prisoner/${ctx.prisonerNumber}/add-container/details`)
         }
@@ -580,13 +606,13 @@ export default function addContainerRoutes(services: Services, requireActivePris
           subjectId: ctx.prisonerNumber,
           subjectType: 'PRISONER_ID',
           correlationId: req.id,
-          details: { count: journey.containers.length },
+          details: { count: (journey.completedContainerCount ?? 0) + journey.containers.length },
         },
         { throwOnError: false, logOnError: true },
       )
 
       const { origin } = journey
-      const added = journey.containers.length
+      const added = (journey.completedContainerCount ?? 0) + journey.containers.length
       req.session.addContainerJourney = undefined
       // One container is named, several are counted - "Property container added", "3 property containers added"
       req.flash('success', added === 1 ? 'Property container added' : `${added} property containers added`)

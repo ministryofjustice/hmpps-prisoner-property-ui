@@ -2270,6 +2270,48 @@ describe('Add container journey - steps', () => {
       )
     })
 
+    it('retries only containers that were not written before a later failure', async () => {
+      prisonerPropertyService.findIncomingContainer.mockImplementation(async (_prisonerNumber, _prisonId, seal) => {
+        if (seal === 'OLD123') return incoming
+        throw notFound
+      })
+      prisonerPropertyService.createContainer.mockRejectedValueOnce({ responseStatus: 409 })
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await agent
+        .post('/prisoner/A1234BC/add-container/details')
+        .type('form')
+        .send({
+          'containers[0][sealNumber]': 'OLD123',
+          'containers[0][containerType]': 'STANDARD',
+          'containers[1][sealNumber]': 'NEW',
+          'containers[1][containerType]': 'STANDARD',
+        })
+        .expect(302)
+      await selectLocation(agent)
+      await agent
+        .post('/prisoner/A1234BC/add-container/location/1')
+        .type('form')
+        .send({ internalLocationId: 'box2', locationName: 'Another store' })
+        .expect(302)
+
+      await confirm(agent).expect(302).expect('location', '/prisoner/A1234BC/add-container/details')
+      expect(prisonerPropertyService.receiveContainer).toHaveBeenCalledTimes(1)
+      expect(flashProvider).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('1 property container was added before this error'),
+      )
+
+      await enterDetails(agent, 'NEW').expect(302)
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.receiveContainer).toHaveBeenCalledTimes(1)
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledTimes(2)
+      expect(prisonerPropertyService.createContainer).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sealNumber: 'NEW', internalLocationId: 'box2' }),
+        user.username,
+      )
+    })
+
     it('creates new property only for a recognised current-seal lookup miss', async () => {
       prisonerPropertyService.findIncomingContainer.mockRejectedValue(notFound)
       const agent = request.agent(manageApp())
@@ -2341,6 +2383,23 @@ describe('Add container journey - steps', () => {
       expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
     })
 
+    it('preserves legacy previous-seal behavior for ambiguous matches when receipt is disabled', async () => {
+      config.receiveContainersEnabled = false
+      prisonerPropertyService.getPropertyForPrisoner.mockResolvedValue([incoming, { ...incoming, id: 'incoming-2' }])
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent, 'NEW123', 'OLD123').expect(302)
+      await selectLocation(agent)
+      await confirm(agent).expect(302)
+
+      expect(prisonerPropertyService.findIncomingContainer).not.toHaveBeenCalled()
+      expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+        expect.objectContaining({ sealNumber: 'NEW123', previousSealNumber: 'OLD123' }),
+        user.username,
+      )
+    })
+
     it.each([403, 404, 503])(
       'does not interpret an unexpected lookup status %s as new property',
       async responseStatus => {
@@ -2409,6 +2468,50 @@ describe('Add container journey - steps', () => {
       await confirm(agent).expect(302)
       expect(prisonerPropertyService.findIncomingContainer).toHaveBeenCalled()
       expect(prisonerPropertyService.receiveContainer).toHaveBeenCalled()
+      expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+    })
+
+    it('returns to details without writing when the receipt flag is disabled after matching', async () => {
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent).expect(302)
+      await selectLocation(agent)
+
+      config.receiveContainersEnabled = false
+      await confirm(agent).expect(302).expect('location', '/prisoner/A1234BC/add-container/details')
+      expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+      expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+
+      await enterDetails(agent).expect(302)
+      await selectLocation(agent)
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+      expect(prisonerPropertyService.createContainer).toHaveBeenCalledWith(
+        expect.objectContaining({ sealNumber: 'OLD123', previousSealNumber: 'OLD123' }),
+        user.username,
+      )
+    })
+
+    it('returns to details without writing when receipt is enabled after legacy matching', async () => {
+      config.receiveContainersEnabled = false
+      const agent = request.agent(manageApp())
+      await startJourney(agent)
+      await enterDetails(agent).expect(302)
+      await selectLocation(agent)
+
+      config.receiveContainersEnabled = true
+      await confirm(agent).expect(302).expect('location', '/prisoner/A1234BC/add-container/details')
+      expect(prisonerPropertyService.receiveContainer).not.toHaveBeenCalled()
+      expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
+
+      await enterDetails(agent).expect(302)
+      await selectLocation(agent)
+      await confirm(agent).expect(302)
+      expect(prisonerPropertyService.receiveContainer).toHaveBeenCalledWith(
+        'incoming',
+        expect.objectContaining({ sealNumber: 'OLD123' }),
+        user.username,
+      )
       expect(prisonerPropertyService.createContainer).not.toHaveBeenCalled()
     })
   })
