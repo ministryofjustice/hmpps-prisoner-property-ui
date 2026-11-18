@@ -52,6 +52,59 @@ const titleFor = (eventType: PropertyEventType, overrides: Partial<PrisonerTimel
   buildPrisonerTimeline([containerEvent({ eventType, ...overrides })], 'A1234BC')[0].title
 
 describe('buildPrisonerTimeline', () => {
+  it('names the sending establishment when receipt is confirmed', () => {
+    expect(titleFor('RECEIVED', { fromPrisonName: 'Brixton (HMP)' })).toBe(
+      'Property container SN880032 confirmed as received from Brixton (HMP)',
+    )
+  })
+
+  it('uses a fallback when a receipt has no resolved sending establishment', () => {
+    expect(titleFor('RECEIVED')).toBe('Property container SN880032 confirmed as received from another establishment')
+  })
+
+  it('omits an unknown seal from a receipt title', () => {
+    expect(titleFor('RECEIVED', { sealNumber: null, fromPrisonName: 'Brixton (HMP)' })).toBe(
+      'Property container confirmed as received from Brixton (HMP)',
+    )
+  })
+
+  it('uses receipt wording for linked creation events when the API supplies the sending establishment', () => {
+    expect(titleFor('CREATED_SEALED', { relatedContainerSealNumber: 'OLD', fromPrisonName: 'Brixton (HMP)' })).toBe(
+      'Property container SN880032 confirmed as received from Brixton (HMP), previously recorded with seal number OLD.',
+    )
+  })
+
+  it.each(['RECEIVED', 'CREATED_SEALED'] as const)('shows both seals and the sending prison for %s', eventType => {
+    expect(
+      titleFor(eventType, {
+        sealNumber: 'NEW123',
+        relatedContainerSealNumber: 'OLD123',
+        fromPrisonName: 'Leeds (HMP)',
+      }),
+    ).toBe(
+      'Property container NEW123 confirmed as received from Leeds (HMP), previously recorded with seal number OLD123.',
+    )
+  })
+
+  it.each(['NEW123', 'new123', ' NEW123 ', null, 'MISSING-123'])(
+    'does not describe an unchanged or unknown previous seal (%s)',
+    previousSeal => {
+      expect(
+        titleFor('RECEIVED', {
+          sealNumber: 'NEW123',
+          relatedContainerSealNumber: previousSeal,
+          fromPrisonName: 'Leeds (HMP)',
+        }),
+      ).toBe('Property container NEW123 confirmed as received from Leeds (HMP)')
+    },
+  )
+
+  it('retains the previous seal when the sending prison name is unavailable', () => {
+    expect(titleFor('RECEIVED', { sealNumber: 'NEW123', relatedContainerSealNumber: 'OLD123' })).toBe(
+      'Property container NEW123 confirmed as received from another establishment, previously recorded with seal number OLD123.',
+    )
+  })
+
   it('builds a title sentence per event type using the resolved names and seal', () => {
     expect(titleFor('CREATED_SEALED')).toBe('Property container SN880032 added to storage at Leeds (HMP)')
     expect(titleFor('SEAL_CHANGED')).toBe('Property container details changed — seal number now SN880032')

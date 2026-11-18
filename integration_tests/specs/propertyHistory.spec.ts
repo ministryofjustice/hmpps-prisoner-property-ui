@@ -107,6 +107,35 @@ test.describe('Property history timeline', () => {
     await resetStubs()
   })
 
+  for (const eventType of ['RECEIVED', 'CREATED_SEALED'] as const) {
+    test(`shows both seals and the sending establishment for ${eventType}`, async ({ page }) => {
+      await login(page)
+      await prisonerPropertyApi.stubGetPropertyForPrisoner({ containers: [container], priority: 1 })
+      await prisonerPropertyApi.stubGetPrisonerPropertyHistory({
+        prisonerNumber: 'A1234BC',
+        items: [
+          timelineItem({
+            eventType,
+            sealNumber: 'NEW123',
+            relatedContainerSealNumber: 'OLD123',
+            fromPrisonName: 'Leeds (HMP)',
+            toPrisonName: 'Moorland (HMP & YOI)',
+            actingEstablishmentName: 'Moorland (HMP & YOI)',
+          }),
+        ],
+        priority: 1,
+      })
+      await manageUsersApi.stubGetUser({ username: 'AUSER', name: 'John Doe' })
+      await page.goto('/prisoner/A1234BC/history')
+      const historyPage = await PropertyHistoryPage.verifyOnPage(page)
+      await expect(historyPage.timeline).toContainText(
+        'Property container NEW123 confirmed as received from Leeds (HMP), previously recorded with seal number OLD123.',
+      )
+      await expect(historyPage.timeline).toContainText('by John Doe, Moorland (HMP & YOI)')
+      await expect(historyPage.timeline).not.toContainText('added to storage')
+    })
+  }
+
   test('switches to the Property history tab and shows the interleaved timeline', async ({ page }) => {
     await login(page)
     await prisonerPropertyApi.stubGetPropertyForPrisoner({

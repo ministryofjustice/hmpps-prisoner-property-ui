@@ -16,6 +16,47 @@ import type {
 export default {
   stubPing: (httpStatus = 200): SuperAgentRequest => stubPing('/prisoner-property-api', httpStatus),
 
+  stubFindIncomingContainer: ({
+    prisonerNumber = 'A1234BC',
+    prisonId = 'MDI',
+    sealNumber = undefined as string | undefined,
+    container = undefined as PrisonerPropertyContainer | undefined,
+    errorCode = 'INCOMING_CONTAINER_NOT_FOUND',
+    httpStatus = undefined as number | undefined,
+    priority = 1,
+  } = {}): SuperAgentRequest =>
+    stubFor({
+      priority,
+      request: {
+        method: 'GET',
+        urlPath: '/prisoner-property-api/property-containers/incoming',
+        queryParameters: {
+          prisonerNumber: { equalTo: prisonerNumber },
+          prisonId: { equalTo: prisonId },
+          ...(sealNumber ? { sealNumber: { equalTo: sealNumber } } : {}),
+        },
+      },
+      response: {
+        status: httpStatus ?? (container ? 200 : 404),
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: container ?? { errorCode },
+      },
+    }),
+
+  stubReceiveContainer: ({
+    id = 'incoming',
+    container = undefined as PrisonerPropertyContainer | undefined,
+    httpStatus = 200,
+  } = {}): SuperAgentRequest =>
+    stubFor({
+      request: { method: 'POST', urlPath: `/prisoner-property-api/property-containers/${id}/receive` },
+      response: {
+        status: httpStatus,
+        headers: { 'Content-Type': 'application/json;charset=UTF-8' },
+        jsonBody: container ?? {},
+      },
+    }),
+
   stubGetPropertyForPrisoner: (
     {
       prisonerNumber = 'A1234BC',

@@ -1,7 +1,7 @@
 import type { AuthenticationClient } from '@ministryofjustice/hmpps-auth-clients'
 import PrisonerPropertyApiClient from '../data/prisonerPropertyApiClient'
 import PrisonerPropertyService from './prisonerPropertyService'
-import type { PrisonerPropertyContainer } from '../data/prisonerPropertyApiTypes'
+import type { PrisonerPropertyContainer, ReceiveContainerRequest } from '../data/prisonerPropertyApiTypes'
 
 jest.mock('../data/prisonerPropertyApiClient')
 
@@ -13,6 +13,37 @@ describe('PrisonerPropertyService', () => {
 
   beforeEach(() => {
     prisonerPropertyService = new PrisonerPropertyService(prisonerPropertyApiClient)
+  })
+
+  it('should delegate receiveContainer to the api client and return its result', async () => {
+    const container = { id: 'container-1', prisonId: 'MDI' } as PrisonerPropertyContainer
+    const body: ReceiveContainerRequest = {
+      prisonerNumber: 'A1234BC',
+      receivingPrisonId: 'MDI',
+      sealNumber: '0000',
+      internalLocationId: 'location-1',
+    }
+    prisonerPropertyApiClient.receiveContainer.mockResolvedValue(container)
+
+    const result = await prisonerPropertyService.receiveContainer('container-1', body, 'AUSER_GEN')
+
+    expect(prisonerPropertyApiClient.receiveContainer).toHaveBeenCalledWith('container-1', body, 'AUSER_GEN')
+    expect(result).toEqual(container)
+  })
+
+  it('delegates incoming lookup with the prisoner, receiving prison and entered seal', async () => {
+    const container = { id: 'incoming', prisonId: 'LEI' } as PrisonerPropertyContainer
+    prisonerPropertyApiClient.findIncomingContainer.mockResolvedValue(container)
+
+    await expect(
+      prisonerPropertyService.findIncomingContainer('A1234BC', 'MDI', 'OLD123', 'AUSER_GEN'),
+    ).resolves.toEqual(container)
+    expect(prisonerPropertyApiClient.findIncomingContainer).toHaveBeenCalledWith(
+      'A1234BC',
+      'MDI',
+      'OLD123',
+      'AUSER_GEN',
+    )
   })
 
   it('should call getPropertyForPrisoner on the api client and return its result', async () => {

@@ -9,6 +9,8 @@ import type { PrisonerAccessContext } from '../../middleware/requirePrisonerAcce
 export interface AddContainerDraft {
   sealNumber?: string
   previousSealNumber?: string
+  automaticMatch?: { sealNumber: string; prisonName: string }
+  incomingContainer?: { id: string; prisonName: string }
   containerType?: ContainerType
   proposedDisposalDate?: string // ISO yyyy-mm-dd
   storageChoice?: 'branston' | 'internal'
@@ -23,6 +25,10 @@ export interface AddContainerJourney {
   prisonerNumber: string
   origin: 'list' | 'person'
   containers: AddContainerDraft[]
+  // The mode used to resolve drafts; confirmation returns to details if the flag changes.
+  receiveContainersEnabledAtResolution?: boolean
+  // Successful writes removed from the retry batch after a later container fails.
+  completedContainerCount?: number
 }
 
 // Working state for the multi-step "remove a property container" journey. Cleared on confirm/cancel.

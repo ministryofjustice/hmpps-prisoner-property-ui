@@ -115,6 +115,42 @@ every step runs first. **Combine is the exception to how you enter one**: its en
 the person page (it carries the selected containers), so it is the one journey you cannot reach by typing
 a URL.
 
+Receipt is controlled by `RECEIVE_CONTAINERS_ENABLED`, defaulting to `false`. The local `feature.env`
+enables it for browser tests. Do not enable it in preprod or production until the API endpoints are
+deployed.
+
+When enabled, the details step calls `GET /property-containers/incoming` with the prisoner number,
+receiving prison and explicitly entered previous seal, otherwise the current seal. A match is saved
+separately from entered answers, using the existing container ID and the API's eligibility decision.
+'Check your answers' names the sending establishment and shows its existing property type and disposal
+date; those values are retained, not updated by receipt. Storage choices use the source's type, so
+incoming excess property still chooses between an internal location and Branston.
+
+Confirmation sends `prisonerNumber`, `receivingPrisonId`, the current seal and destination location to
+`POST /property-containers/{id}/receive`. This preserves the container ID and history. Only a `404` with
+`INCOMING_CONTAINER_NOT_FOUND` for a current seal takes the ordinary create path. A missing explicit
+previous seal or `AMBIGUOUS_INCOMING_CONTAINER` produces a field error; other lookup failures propagate
+without falling back to create. Ambiguity is blocked pending resolution with the sending establishments;
+this version does not offer container selection.
+
+Matches are recalculated on every details submission. Repeated current seals and repeated source IDs
+are rejected before confirmation. Mixed batches can create new property and receive existing property;
+each API call is still a separate transaction. Receipt errors return to details without creating a
+replacement container. The journey reads `config.receiveContainersEnabled` directly rather than
+storing a separate rollout flag in the session.
+
+When the flag is off, the existing create-and-link flow remains available: a matching current seal
+supplies the recorded previous seal without putting it into the user's previous-seal answer. It uses
+the incoming-list eligibility rule, whereas the new flow follows the API, which intentionally permits
+receipt at a different expected destination.
+
+The timeline supports the `RECEIVED` event introduced by
+[API PR #141](https://github.com/ministryofjustice/hmpps-prisoner-property-api/pull/141), using its event-time
+`sealNumber` and `fromPrisonName` for "Property container [Seal] confirmed as received from [sending
+establishment]". Linked `CREATED_SEALED` events use this wording only if the API supplies the sending
+establishment; older events retain their existing wording. When `relatedContainerSealNumber` supplies
+a different previous seal, receipt wording adds ", previously recorded with seal number [old seal]."
+
 ### The establishment list
 
 Two behaviours on that page are worth knowing before changing it:

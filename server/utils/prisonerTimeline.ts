@@ -53,11 +53,19 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
   const container = containerPrefix(seal)
   const establishment = item.actingEstablishmentName ?? 'this establishment'
   const toPrison = item.toPrisonName ?? 'another establishment'
+  const receipt = `${container} confirmed as received from ${item.fromPrisonName ?? 'another establishment'}`
+  const receiptTitle =
+    relatedSeal && relatedSeal.toLowerCase() !== seal?.toLowerCase()
+      ? `${receipt}, previously recorded with seal number ${relatedSeal}.`
+      : receipt
 
   if (isLegacyArchive(item)) return legacyArchiveTitle(seal)
 
   switch (item.eventType) {
     case 'CREATED_SEALED':
+      if (relatedSeal && item.fromPrisonName) {
+        return receiptTitle
+      }
       // A related seal here means the container was logged as property arriving on transfer and matched to
       // the record it was held under at the sending prison.
       return relatedSeal
@@ -68,6 +76,8 @@ const timelineTitle = (item: PrisonerTimelineItem): string => {
       return seal
         ? `Property container details changed — seal number now ${seal}`
         : 'Property container details changed — seal number'
+    case 'RECEIVED':
+      return receiptTitle
     case 'CONTAINER_TYPE_CHANGE': {
       // Mirrors the "seal number now X" idiom above. The API supplies what the type was changed from where
       // it can determine it; where it cannot, the title just names the new type.
